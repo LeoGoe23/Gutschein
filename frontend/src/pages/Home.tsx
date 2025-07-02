@@ -24,9 +24,21 @@ export default function HomeLayout() {
           </Box>
         </Box>
 
-        <Box sx={{ position: 'absolute', bottom: 0, right: 0, height: '100%', maxWidth: '50%', zIndex: 1, pointerEvents: 'none' }}>
-          <HeroImage />
-        </Box>
+<Box
+  sx={{
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    height: '100%',
+    maxWidth: '50%',
+    zIndex: 1,
+    pointerEvents: 'none',
+    display: { xs: 'none', sm: 'block' }, // 👈 hier: auf Handys ausblenden
+  }}
+>
+  <HeroImage />
+</Box>
+
       </Box>
 
       <ContentSection />
