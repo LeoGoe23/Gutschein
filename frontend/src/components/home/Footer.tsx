@@ -2,7 +2,7 @@ import { Box, Typography, Link } from '@mui/material';
 
 export default function Footer() {
   return (
-    <Box sx={{ width: '100%', backgroundColor: '#222', color: '#fff', padding: '6rem 4%', mt: '4rem' }}>
+    <Box sx={{ width: '100%', backgroundColor: '#222', color: '#fff', padding: '6rem 4%' }}>
       
       <Box sx={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: '3rem' }}>
         

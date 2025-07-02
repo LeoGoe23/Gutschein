@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import About from './pages/About';
+import Demo from './pages/Demo';
 import Gutschein from './pages/Gutschein';
 import Step1 from './pages/gutschein/Step1';
 import Step2 from './pages/gutschein/Step2';
@@ -14,7 +15,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
-        
+        <Route path="/demo" element={<Demo />} />
+
         <Route path="/gutschein" element={<Gutschein />}>
           <Route path="step1" element={<Step1 />} />
           <Route path="step2" element={<Step2 />} />
