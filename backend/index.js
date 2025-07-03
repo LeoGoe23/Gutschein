@@ -1,10 +1,21 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+require("dotenv").config();
+const express = require("express");
+const mongoose = require("mongoose");
+const gutscheineRoute = require("./routes/gutscheine");
+
+console.log("Router geladen:", typeof gutscheineRoute);
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => res.send('Gutschein API läuft'));
-app.listen(5000, () => console.log('Server läuft auf Port 5000'));
+app.use("/api/gutscheine", gutscheineRoute);
+
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log("MongoDB verbunden");
+    app.listen(process.env.PORT || 5000, () => {
+      console.log("Server läuft auf Port", process.env.PORT || 5000);
+    });
+  })
+  .catch((err) => console.error("MongoDB Fehler:", err));
