@@ -1,15 +1,15 @@
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Typography, Button, TextField, MenuItem, Select } from '@mui/material';
 import { useState } from 'react';
-import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
-export default function Gutscheindesign() {
-  const [design, setDesign] = useState<'design1' | 'design2' | 'design3' | 'design4'>('design1');
+export default function GutscheinDesigner() {
+  const [fuer, setFuer] = useState('');
+  const [von, setVon] = useState('');
+  const [widmung, setWidmung] = useState('');
+  const [farbe, setFarbe] = useState('#00796B');
+  const [schriftart, setSchriftart] = useState('serif');
   const [image, setImage] = useState<string | null>(null);
-
-  const betrag = '50 €';
-  const dienstleistung = '1x Massage';
-  const promocode = 'ABC123';
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -19,210 +19,82 @@ export default function Gutscheindesign() {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    const element = document.getElementById('gutschein-preview');
+  const handleDownload = async () => {
+    const element = document.getElementById('gutschein-vorschau');
     if (!element) return;
 
     const canvas = await html2canvas(element);
     const imgData = canvas.toDataURL('image/png');
 
-    const pdf = new jsPDF({
-      orientation: design === 'design3' || design === 'design4' ? 'portrait' : 'landscape',
-      unit: 'px',
-      format: design === 'design3' || design === 'design4' ? [300, 450] : [600, 300],
-    });
-
-    pdf.addImage(imgData, 'PNG', 0, 0, 
-      design === 'design3' || design === 'design4' ? 300 : 600, 
-      design === 'design3' || design === 'design4' ? 450 : 300
-    );
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [400, 600] });
+    pdf.addImage(imgData, 'PNG', 0, 0, 400, 600);
     pdf.save('Gutschein.pdf');
   };
 
   return (
-    <Box sx={{ maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <Box sx={{ display: 'flex', gap: '3rem', flexWrap: 'wrap', p: '2rem', fontFamily: 'system-ui, sans-serif' }}>
 
-      <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>
-        Gutscheindesign
-      </Typography>
-
-      <Button variant="contained" component="label">
-        Bild hochladen
-        <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
-      </Button>
-
-      <Typography sx={{ mt: '1rem' }}>
-        Design auswählen:
-      </Typography>
-
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
-        
-        {/* Design 1 - Querformat Elegant */}
-        <Box
-          onClick={() => setDesign('design1')}
-          sx={{
-            border: design === 'design1' ? '3px solid #00796B' : '2px solid #ccc',
-            borderRadius: '0.5rem',
-            cursor: 'pointer',
-            padding: '0.5rem',
-            backgroundColor: '#fff',
-          }}
-        >
-          <Box
-            sx={{
-              width: '300px',
-              height: '150px',
-              border: '2px solid #C8B560',
-              backgroundColor: '#fff',
-              padding: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              fontFamily: 'serif',
-            }}
-          >
-            <Typography sx={{ fontSize: '1.2rem', color: '#C8B560', fontWeight: 500 }}>
-              Gutschein
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography sx={{ fontSize: '1.2rem', color: '#C8B560' }}>{betrag}</Typography>
-              <Typography sx={{ fontSize: '0.9rem' }}>{promocode}</Typography>
-            </Box>
-          </Box>
+      {/* Linke Vorschau */}
+      <Box sx={{ border: '1px solid #ccc', width: '300px', backgroundColor: '#FDF8F0' }}>
+        <Box sx={{ backgroundColor: farbe, height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {image ? (
+            <img src={image} alt="Logo" style={{ maxHeight: '100px' }} />
+          ) : (
+            <Typography sx={{ color: '#fff', fontSize: '1.2rem' }}>Ihr Logo</Typography>
+          )}
         </Box>
 
-        {/* Design 2 - Querformat Modern */}
-        <Box
-          onClick={() => setDesign('design2')}
-          sx={{
-            border: design === 'design2' ? '3px solid #00796B' : '2px solid #ccc',
-            borderRadius: '0.5rem',
-            cursor: 'pointer',
-            padding: '0.5rem',
-            backgroundColor: '#fff',
-          }}
-        >
-          <Box
-            sx={{
-              width: '300px',
-              height: '150px',
-              backgroundColor: '#E0F7FA',
-              padding: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 700 }}>
-              Gutschein {dienstleistung}
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography sx={{ fontSize: '1.2rem' }}>{betrag}</Typography>
-              <Typography sx={{ fontSize: '0.9rem' }}>{promocode}</Typography>
-            </Box>
-          </Box>
-        </Box>
+        <Box sx={{ p: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', fontFamily: schriftart }}>
+          <Typography>Sie können diesen Gutschein personalisieren.</Typography>
 
-        {/* Design 3 - Hochformat Minimal */}
-        <Box
-          onClick={() => setDesign('design3')}
-          sx={{
-            border: design === 'design3' ? '3px solid #00796B' : '2px solid #ccc',
-            borderRadius: '0.5rem',
-            cursor: 'pointer',
-            padding: '0.5rem',
-            backgroundColor: '#fff',
-          }}
-        >
-          <Box
-            sx={{
-              width: '150px',
-              height: '225px',
-              backgroundColor: '#FFF5E1',
-              padding: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Typography sx={{ fontSize: '1rem', fontWeight: 700 }}>
-              Gutschein
-            </Typography>
-            <Typography sx={{ fontSize: '1.2rem' }}>{betrag}</Typography>
-            <Typography sx={{ fontSize: '0.9rem' }}>{promocode}</Typography>
-          </Box>
-        </Box>
+          <Typography sx={{ fontSize: '0.9rem' }}>für</Typography>
+          <Typography sx={{ borderBottom: '1px solid #333', minHeight: '2rem' }}>{fuer}</Typography>
 
-        {/* Design 4 - Hochformat Verspielt */}
-        <Box
-          onClick={() => setDesign('design4')}
-          sx={{
-            border: design === 'design4' ? '3px solid #00796B' : '2px solid #ccc',
-            borderRadius: '0.5rem',
-            cursor: 'pointer',
-            padding: '0.5rem',
-            backgroundColor: '#fff',
-          }}
-        >
-          <Box
-            sx={{
-              width: '150px',
-              height: '225px',
-              backgroundColor: '#E8EAF6',
-              padding: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Typography sx={{ fontSize: '1rem', fontWeight: 700 }}>
-              Geschenk für dich
-            </Typography>
-            <Typography sx={{ fontSize: '1.2rem' }}>{betrag}</Typography>
-            <Typography sx={{ fontSize: '0.9rem' }}>{promocode}</Typography>
-          </Box>
-        </Box>
+          <Typography sx={{ fontSize: '0.9rem' }}>von</Typography>
+          <Typography sx={{ borderBottom: '1px solid #333', minHeight: '2rem' }}>{von}</Typography>
 
+          <Typography sx={{ fontSize: '0.9rem' }}>Widmung</Typography>
+          <Typography sx={{ minHeight: '4rem', border: '1px solid #ddd', p: '0.5rem' }}>{widmung}</Typography>
+
+          <Button onClick={handleDownload} variant="outlined" sx={{ mt: '1rem' }}>
+            PDF Download
+          </Button>
+        </Box>
       </Box>
 
-      <Typography sx={{ mt: '2rem', fontWeight: 500 }}>
-        Vorschau aktiv:
-      </Typography>
+      {/* Rechte Einstellungen */}
+      <Box sx={{ maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-      <Box
-        id="gutschein-preview"
-        sx={{
-          width: design === 'design3' || design === 'design4' ? '300px' : '600px',
-          height: design === 'design3' || design === 'design4' ? '450px' : '300px',
-          border: '2px solid #ccc',
-          backgroundColor:
-            design === 'design1' ? '#fff' :
-            design === 'design2' ? '#E0F7FA' :
-            design === 'design3' ? '#FFF5E1' :
-            '#E8EAF6',
-          padding: '2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          position: 'relative',
-        }}
-      >
-        <Typography sx={{ fontSize: '2rem', mb: '1rem' }}>
-          {design === 'design4' ? 'Geschenk für dich' : 'Gutschein'}
-        </Typography>
-        <Typography sx={{ fontSize: '1.5rem' }}>{dienstleistung}</Typography>
-        <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>{betrag}</Typography>
-        <Typography sx={{ fontSize: '1rem', mt: '1rem' }}>CODE: {promocode}</Typography>
+        <Typography sx={{ fontSize: '1.5rem', fontWeight: 700 }}>Gutschein anpassen</Typography>
+
+        <TextField label="Für" value={fuer} onChange={(e) => setFuer(e.target.value)} />
+        <TextField label="Von" value={von} onChange={(e) => setVon(e.target.value)} />
+        <TextField
+          label="Widmung"
+          multiline
+          rows={3}
+          value={widmung}
+          onChange={(e) => setWidmung(e.target.value)}
+          inputProps={{ maxLength: 160 }}
+          helperText={`${160 - widmung.length} Zeichen übrig`}
+        />
+
+        <Typography sx={{ mt: '1rem' }}>Farbe wählen</Typography>
+        <input type="color" value={farbe} onChange={(e) => setFarbe(e.target.value)} style={{ width: '100%', height: '2rem' }} />
+
+        <Typography>Schriftart wählen</Typography>
+        <Select value={schriftart} onChange={(e) => setSchriftart(e.target.value)} fullWidth>
+          <MenuItem value="serif">Serif (klassisch)</MenuItem>
+          <MenuItem value="sans-serif">Sans-Serif (modern)</MenuItem>
+          <MenuItem value="cursive">Cursive (verspielt)</MenuItem>
+        </Select>
+
+        <Typography sx={{ mt: '1rem' }}>Logo oder Bild hochladen</Typography>
+        <Button variant="outlined" component="label">
+          Datei wählen
+          <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
+        </Button>
       </Box>
-
-      <Button
-        variant="outlined"
-        sx={{ mt: '2rem', maxWidth: '200px' }}
-        onClick={handleDownloadPDF}
-      >
-        Als PDF herunterladen
-      </Button>
-
     </Box>
   );
 }
