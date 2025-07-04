@@ -41,10 +41,6 @@ export default function TopBar() {
 
         {/* Links for Desktop */}
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: '2rem' }}>
-          <Typography sx={{ cursor: 'pointer', fontSize: '1.1rem', color: '#333', fontWeight: '600' }}>
-            Über uns
-          </Typography>
-
           <Typography
             component={Link}
             to="/roadmap"
@@ -56,7 +52,24 @@ export default function TopBar() {
               textDecoration: 'none',
             }}
           >
-            Funktionen
+            Über uns
+          </Typography>
+
+          <Typography
+            component={Link}
+            to={user ? "/profil" : "#"}
+            onClick={() => {
+              if (!user) setOpen(true);
+            }}
+            sx={{
+              cursor: 'pointer',
+              fontSize: '1.1rem',
+              color: '#333',
+              fontWeight: '600',
+              textDecoration: 'none',
+            }}
+          >
+            Mein Konto
           </Typography>
 
           {user ? (
@@ -82,6 +95,7 @@ export default function TopBar() {
                 }}
               >
                 <MenuItem disabled>{user.email}</MenuItem>
+                <MenuItem component={Link} to="/profil">Profil</MenuItem>
                 <MenuItem onClick={handleLogout}>Abmelden</MenuItem>
               </Menu>
             </>

@@ -36,7 +36,13 @@ export default function LoginModal({ open, onClose }: Props) {
     setLoginError("");
 
     signInWithEmailAndPassword(auth, email, passwort)
-      .then(res => {
+      .then(async (res) => {
+        const user = res.user;
+        // Benutzer erfolgreich angemeldet, Daten in Firestore speichern
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email,
+          lastLogin: new Date(),
+        });
         setSuccess(true);
       })
       .catch(err => {
@@ -53,21 +59,36 @@ const handleRegister = () => {
 
   createUserWithEmailAndPassword(auth, email, passwort)
     .then(async (res) => {
-      console.log("User created successfully:", res.user); // Debugging log
-      await setDoc(doc(db, "users", res.user.uid), {
+      const userData = {
         email: res.user.email,
-        createdAt: new Date()
-      });
-      console.log("User document set successfully in Firestore."); // Debugging log
+        createdAt: new Date(),
+        Unternehmensdaten: {
+          Vorname: "",
+          Name: "",
+          Unternehmensname: "",
+          Branche: "",
+          Telefon: "",
+        },
+        Gutscheindetails: {
+          Titel: "",
+        },
+        Gutscheindesign: {
+          Farben: "",
+          Logo: "",
+        },
+        Zahlungsdaten: {
+          IBAN: "",
+        },
+      };
+
+      await setDoc(doc(db, "users", res.user.uid), userData);
       setSuccess(true);
       setTimeout(() => {
-        console.log("Closing modal after registration success."); // Debugging log
         setIsRegister(false); // Zurück auf Login-Ansicht für das nächste Öffnen
         onClose();
       }, 1000);
     })
     .catch(err => {
-      console.error("Error during registration:", err); // Debugging log
       switch (err.code) {
         case "auth/email-already-in-use":
           setLoginError("Diese E-Mail-Adresse wird bereits verwendet.");

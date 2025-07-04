@@ -31,7 +31,21 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         position: 'relative',
       }}
     >
-      <Typography sx={{ fontSize: '1.4rem', fontWeight: 700, mb: '4rem', mt: '6rem', color: '#111' }}>
+      <Typography
+        variant="h6"
+        sx={{
+          color: 'black',
+          marginBottom: '4rem',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          cursor: 'pointer',
+        }}
+        onClick={() => window.location.href = '/'}
+      >
+        Gutscheinfabrik
+      </Typography>
+
+      <Typography sx={{ fontSize: '1.4rem', fontWeight: 700, mb: '4rem', mt: '0rem', color: '#111' }}>
         Onboarding
       </Typography>
 
