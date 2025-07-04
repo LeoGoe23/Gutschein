@@ -30,7 +30,6 @@ export default function Gutschein() {
     <GutscheinProvider>
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
         
-        <LogoTopLeft />
         <Sidebar activeStep={currentIndex + 1} />
 
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '4rem', overflow: 'hidden' }}>
