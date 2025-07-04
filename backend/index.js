@@ -2,13 +2,19 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const gutscheineRoute = require("./routes/gutscheine");
+const zahlungRoute = require("./routes/zahlung");
 
 console.log("Router geladen:", typeof gutscheineRoute);
 
 const app = express();
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("API läuft");
+});
+
 app.use("/api/gutscheine", gutscheineRoute);
+app.use("/api/zahlung", zahlungRoute);
 
 mongoose
   .connect(process.env.MONGODB_URI)
