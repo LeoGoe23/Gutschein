@@ -1,12 +1,32 @@
-import { Box, Button, Typography, IconButton, Drawer, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Button, Typography, IconButton, Drawer, List, ListItem, ListItemText, Avatar, Menu, MenuItem, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import LoginModal from '../../components/login/LoginModal';
+import { auth } from '../../auth/firebase';
+import useAuth from '../../auth/useAuth';
+import { signOut } from "firebase/auth";
 
 export default function TopBar() {
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const user = useAuth();
+  const menuOpen = Boolean(anchorEl);
+
+  const handleAvatarClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    signOut(auth);
+    handleMenuClose();
+  };
 
   return (
     <>
@@ -39,24 +59,52 @@ export default function TopBar() {
             Funktionen
           </Typography>
 
-          <Button
-            variant="outlined"
-            onClick={() => setOpen(true)}
-            sx={{
-              color: '#4F46E5',
-              borderColor: '#4F46E5',
-              backgroundColor: 'white',
-              textTransform: 'none',
-              fontWeight: 800,
-              borderRadius: 20,
-              padding: '1rem 1.6rem',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-              fontSize: '1rem',
-              '&:hover': { backgroundColor: '#f0f0f0' },
-            }}
-          >
-            Einloggen
-          </Button>
+          {user ? (
+            <>
+              <Tooltip title="Account">
+                <IconButton onClick={handleAvatarClick}>
+                  <Avatar sx={{ bgcolor: '#4F46E5', width: 36, height: 36 }}>
+                    {user.email?.charAt(0).toUpperCase() || "U"}
+                  </Avatar>
+                </IconButton>
+              </Tooltip>
+              <Menu
+                anchorEl={anchorEl}
+                open={menuOpen}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+              >
+                <MenuItem disabled>{user.email}</MenuItem>
+                <MenuItem onClick={handleLogout}>Abmelden</MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <Button
+              variant="outlined"
+              onClick={() => setOpen(true)}
+              sx={{
+                color: '#4F46E5',
+                borderColor: '#4F46E5',
+                backgroundColor: 'white',
+                textTransform: 'none',
+                fontWeight: 800,
+                borderRadius: 20,
+                padding: '1rem 1.6rem',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                fontSize: '1rem',
+                '&:hover': { backgroundColor: '#f0f0f0' },
+              }}
+            >
+              Einloggen
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -69,9 +117,15 @@ export default function TopBar() {
           <ListItem component={Link} to="/roadmap" onClick={() => setDrawerOpen(false)}>
             <ListItemText primary="Funktionen" />
           </ListItem>
-          <ListItem component="li" onClick={() => { setOpen(true); setDrawerOpen(false); }}>
-            <ListItemText primary="Einloggen" />
-          </ListItem>
+          {user ? (
+            <ListItem component="li" onClick={() => { handleLogout(); setDrawerOpen(false); }}>
+              <ListItemText primary="Abmelden" />
+            </ListItem>
+          ) : (
+            <ListItem component="li" onClick={() => { setOpen(true); setDrawerOpen(false); }}>
+              <ListItemText primary="Einloggen" />
+            </ListItem>
+          )}
         </List>
       </Drawer>
 
