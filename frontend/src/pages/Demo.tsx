@@ -9,6 +9,7 @@ import {
   IconButton,
   TextField,
   CircularProgress,
+  Modal,
 } from '@mui/material';
 import { useState } from 'react';
 import InfoIcon from '@mui/icons-material/Info';
@@ -21,6 +22,7 @@ export default function MassageVoucher() {
   const [fromName, setFromName] = useState(''); // 'Von' Name
   const [forName, setForName] = useState(''); // 'Für' Name
   const [loading, setLoading] = useState(false); // Ladezustand für Download
+  const [infoOpen, setInfoOpen] = useState(false); // Modal-Öffnung für Info
   const navigate = useNavigate(); // navigate Hook verwenden
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +62,14 @@ export default function MassageVoucher() {
   const handleBuy = () => {
     // Navigiere zur Startseite
     navigate('/');
+  };
+
+  const handleInfoClick = () => {
+    setInfoOpen(true); // Modal öffnen
+  };
+
+  const handleInfoClose = () => {
+    setInfoOpen(false); // Modal schließen
   };
 
   return (
@@ -103,6 +113,7 @@ export default function MassageVoucher() {
         }}
       >
         <IconButton
+          onClick={handleInfoClick} // Modal öffnen
           sx={{
             backgroundColor: '#fff',
             borderRadius: '50%',
@@ -117,6 +128,54 @@ export default function MassageVoucher() {
           <InfoIcon />
         </IconButton>
       </Box>
+
+      {/* Modal für Info */}
+      <Modal
+        open={infoOpen}
+        onClose={handleInfoClose}
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Box
+          sx={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '400px',
+            textAlign: 'center',
+          }}
+        >
+          <Typography variant="h6" sx={{ marginBottom: '1rem' }}>
+            Demo
+          </Typography>
+
+          <Typography variant="body1" sx={{ marginBottom: '1rem' }}>
+            Dies ist eine Testseite, die zeigt, was Ihr Kunde letztendlich sehen wird.
+          </Typography>
+
+          <Button
+            variant="contained"
+            onClick={handleInfoClose}
+            sx={{
+              backgroundColor: '#4F46E5',
+              fontSize: '1.1rem',
+              padding: '1rem 2.2rem',
+              borderRadius: '1rem',
+              boxShadow: '0 6px 14px rgba(0,0,0,0.15)',
+              textTransform: 'none',
+              '&:hover': {
+                backgroundColor: '#4338CA',
+                boxShadow: '0 8px 18px rgba(0,0,0,0.2)',
+              },
+            }}
+          >
+            Schließen
+          </Button>
+        </Box>
+      </Modal>
 
       {/* Hauptinhalt */}
       <Box
@@ -229,9 +288,9 @@ export default function MassageVoucher() {
                 sx={{
                   mt: 5,
                   backgroundColor: '#5548F2',
-                  padding: '0.9rem 4rem',
-                  fontSize: '1.1rem',
-                  borderRadius: '1rem',
+                  padding: '0.6rem 2rem', // Größe des Buttons reduziert
+                  fontSize: '1rem', // Schriftgröße angepasst
+                  borderRadius: '0.8rem',
                   boxShadow: 3,
                   textTransform: 'none',
                   width: '100%',
@@ -239,7 +298,7 @@ export default function MassageVoucher() {
                 onClick={handleDownload}
                 disabled={loading}
               >
-                {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Gutschein herunterladen'}
+                {loading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Gutschein herunterladen'}
               </Button>
             </>
           )}

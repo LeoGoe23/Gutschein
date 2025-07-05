@@ -11,18 +11,19 @@ export default function Sidebar() {
 
   return (
     <Box sx={{
-      width: { xs: '80px', md: '250px' },
+      width: '280px',
       height: '100vh',
       backgroundColor: '#111827',
       color: 'white',
       display: 'flex',
       flexDirection: 'column',
-      paddingTop: '3rem',
+      padding: '4rem 2rem 8rem 2rem',
       position: 'fixed',
       left: 0,
       top: 0,
       zIndex: 2,
-      alignItems: 'center'
+      alignItems: 'center',
+      borderRadius: '0 1rem 1rem 0',
     }}>
       <Typography
         variant="h6"
@@ -31,7 +32,7 @@ export default function Sidebar() {
           marginBottom: '4rem',
           fontWeight: 'bold',
           textAlign: 'center',
-          cursor: 'pointer'
+          cursor: 'pointer',
         }}
         onClick={() => window.location.href = '/'}
       >
