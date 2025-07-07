@@ -10,10 +10,11 @@ import Step2 from './pages/gutschein/Step2';
 import Step3 from './pages/gutschein/Step3';
 import Step4 from './pages/gutschein/Step4';
 import Step5 from './pages/gutschein/Step5';
+import StepMinimal from './pages/StepMinimal';
 import GutscheinePage from './pages/profil/Gutscheine';
 import EinnahmenPage from './pages/profil/Einnahmen';
 import EinstellungenPage from './pages/profil/Einstellungen';
-import KontoPage from './pages/profil/Konto';
+import SelbstDesign from './pages/profil/design';
 
 export default function App() {
   return (
@@ -27,7 +28,7 @@ export default function App() {
           <Route path="gutscheine" element={<GutscheinePage />} />
           <Route path="einnahmen" element={<EinnahmenPage />} />
           <Route path="einstellungen" element={<EinstellungenPage />} />
-          <Route path="konto" element={<KontoPage />} />
+          <Route path="selbstdesign" element={<SelbstDesign />} />
         </Route>
         <Route path="/gutschein" element={<Gutschein />}>
           <Route path="step1" element={<Step1 />} />
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="step4" element={<Step4 />} />
           <Route path="step5" element={<Step5 />} />
         </Route>
+        <Route path="stepminimal" element={<StepMinimal />} />
       </Routes>
     </BrowserRouter>
   );

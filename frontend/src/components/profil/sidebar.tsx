@@ -2,12 +2,20 @@ import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typogr
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import SettingsIcon from '@mui/icons-material/Settings';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import DesignServicesIcon from '@mui/icons-material/DesignServices'; // Neues Icon importieren
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Navigate to '/profil/einnahmen' on initial load
+  useEffect(() => {
+    if (location.pathname === '/profil') {
+      navigate('/profil/einnahmen');
+    }
+  }, [location.pathname, navigate]);
 
   return (
     <Box sx={{
@@ -43,27 +51,6 @@ export default function Sidebar() {
         
         <ListItem disablePadding>
           <ListItemButton
-            selected={location.pathname === '/profil/gutscheine'}
-            onClick={() => navigate('/profil/gutscheine')}
-            sx={{
-              justifyContent: 'center',
-              padding: '1rem',
-              borderRadius: '12px',
-              backgroundColor: location.pathname === '/profil/gutscheine' ? '#1f2937' : 'transparent',
-              transform: location.pathname === '/profil/gutscheine' ? 'scale(1.05)' : 'scale(1)',
-              transition: 'all 0.2s',
-              '&:hover': { backgroundColor: '#1f2937' }
-            }}
-          >
-            <ListItemIcon sx={{ color: location.pathname === '/profil/gutscheine' ? '#4F46E5' : 'white', minWidth: 'auto' }}>
-              <LocalActivityIcon sx={{ fontSize: '2rem' }} />
-            </ListItemIcon>
-            <ListItemText primary="Meine Gutscheine" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
-          </ListItemButton>
-        </ListItem>
-
-        <ListItem disablePadding>
-          <ListItemButton
             selected={location.pathname === '/profil/einnahmen'}
             onClick={() => navigate('/profil/einnahmen')}
             sx={{
@@ -85,6 +72,46 @@ export default function Sidebar() {
 
         <ListItem disablePadding>
           <ListItemButton
+            selected={location.pathname === '/profil/gutscheine'}
+            onClick={() => navigate('/profil/gutscheine')}
+            sx={{
+              justifyContent: 'center',
+              padding: '1rem',
+              borderRadius: '12px',
+              backgroundColor: location.pathname === '/profil/gutscheine' ? '#1f2937' : 'transparent',
+              transform: location.pathname === '/profil/gutscheine' ? 'scale(1.05)' : 'scale(1)',
+              transition: 'all 0.2s',
+              '&:hover': { backgroundColor: '#1f2937' }
+            }}
+          >
+            <ListItemIcon sx={{ color: location.pathname === '/profil/gutscheine' ? '#4F46E5' : 'white', minWidth: 'auto' }}>
+              <LocalActivityIcon sx={{ fontSize: '2rem' }} />
+            </ListItemIcon>
+            <ListItemText primary="Meine Gutscheine" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
+            selected={location.pathname === '/profil/selbstdesign'}
+            onClick={() => navigate('/profil/selbstdesign')}
+            sx={{
+              justifyContent: 'center',
+              padding: '1rem',
+              borderRadius: '12px',
+              backgroundColor: location.pathname === '/profil/selbstdesign' ? '#1f2937' : 'transparent',
+              transform: location.pathname === '/profil/selbstdesign' ? 'scale(1.05)' : 'scale(1)',
+              transition: 'all 0.2s',
+              '&:hover': { backgroundColor: '#1f2937' }
+            }}
+          >
+            <ListItemIcon sx={{ color: location.pathname === '/profil/selbstdesign' ? '#4F46E5' : 'white', minWidth: 'auto' }}>
+              <DesignServicesIcon sx={{ fontSize: '2rem' }} /> {/* Neues Icon */}
+            </ListItemIcon>
+            <ListItemText primary="Gutscheindesign" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
             selected={location.pathname === '/profil/einstellungen'}
             onClick={() => navigate('/profil/einstellungen')}
             sx={{
@@ -101,27 +128,6 @@ export default function Sidebar() {
               <SettingsIcon sx={{ fontSize: '2rem' }} />
             </ListItemIcon>
             <ListItemText primary="Einstellungen" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
-          </ListItemButton>
-        </ListItem>
-
-        <ListItem disablePadding>
-          <ListItemButton
-            selected={location.pathname === '/profil/konto'}
-            onClick={() => navigate('/profil/konto')}
-            sx={{
-              justifyContent: 'center',
-              padding: '1rem',
-              borderRadius: '12px',
-              backgroundColor: location.pathname === '/profil/konto' ? '#1f2937' : 'transparent',
-              transform: location.pathname === '/profil/konto' ? 'scale(1.05)' : 'scale(1)',
-              transition: 'all 0.2s',
-              '&:hover': { backgroundColor: '#1f2937' }
-            }}
-          >
-            <ListItemIcon sx={{ color: location.pathname === '/profil/konto' ? '#4F46E5' : 'white', minWidth: 'auto' }}>
-              <AccountCircleIcon sx={{ fontSize: '2rem' }} />
-            </ListItemIcon>
-            <ListItemText primary="Mein Konto" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
           </ListItemButton>
         </ListItem>
         

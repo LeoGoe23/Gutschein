@@ -31,18 +31,7 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         position: 'relative',
       }}
     >
-      {/* Logo hinzufügen */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-          marginBottom: '0rem',
-        }}
-        onClick={() => navigate('/')}
-      >
-        <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 60, height: 60 }} />
-      </Box>
+
 
       <Typography
         variant="h6"
