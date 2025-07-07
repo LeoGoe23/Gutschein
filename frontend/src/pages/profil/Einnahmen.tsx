@@ -53,8 +53,23 @@ export default function EinnahmenPage() {
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
         <StatCard label="Gesamtumsatz" value={`${data?.Einnahmen?.gesamtUmsatz} €`} icon={<MonetizationOnIcon />} color="#3b82f6" />
         <StatCard label="Gesamtverkäufe" value={data?.Einnahmen?.anzahlVerkäufe} icon={<LocalActivityIcon />} color="#10b981" />
-        <StatCard label="Umsatz letzter Monat" value={`${data?.Einnahmen?.history?.umsatzLetzterMonat ?? 0} €`} icon={<TrendingUpIcon />} color="#f59e0b" />
-        <StatCard label="Letzter Verkauf" value={data?.Einnahmen?.history?.letzterVerkauf ?? '-'} icon={<AccessTimeIcon />} color="#6366f1" />
+        <StatCard label="Umsatz letzter Monat" value={`${data?.Einnahmen?.umsatzLetzterMonat ?? 0} €`} icon={<TrendingUpIcon />} color="#f59e0b" />
+        <StatCard 
+          label="Letzter Verkauf" 
+          value={
+            data?.Einnahmen?.letzterVerkauf?.toDate
+              ? new Date(data.Einnahmen.letzterVerkauf.toDate()).toLocaleString('de-DE', {
+                  day: '2-digit',
+                  month: '2-digit', // Monat als Zahl
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : '-'
+          }
+          icon={<AccessTimeIcon />} 
+          color="#6366f1" 
+        />
       </Box>
 
       <Box sx={{ mt: 4, backgroundColor: '#fff', borderRadius: '12px', boxShadow: 1, p: 2 }}>
@@ -64,7 +79,12 @@ export default function EinnahmenPage() {
             <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
             <XAxis dataKey="monat" />
             <YAxis yAxisId="left" />
-            <YAxis yAxisId="right" orientation="right" />
+            <YAxis 
+              yAxisId="right" 
+              orientation="right" 
+              tickFormatter={(value) => String(Math.floor(value))}
+              domain={[0, 'dataMax']} 
+            />
             <Tooltip />
             <Legend />
             <Line yAxisId="left" type="monotone" dataKey="umsatz" stroke="#3b82f6" strokeWidth={2} name="Umsatz (€)" />
@@ -126,7 +146,7 @@ function StatCard({ label, value, icon, color }: { label: string; value: string 
       </Box>
       <Box>
         <Typography variant="body2" sx={{ color: '#555' }}>{label}</Typography>
-        <Typography variant="h5" sx={{ fontWeight: 'bold', mt: 0.5 }}>{value}</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', mt: 0.5, fontSize: '1.25rem' }}>{value}</Typography>
       </Box>
     </Box>
   );

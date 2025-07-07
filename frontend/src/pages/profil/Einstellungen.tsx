@@ -7,7 +7,9 @@ import { auth, db } from '../../auth/firebase';
 export default function EinstellungenPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [edit, setEdit] = useState(false);
+  const [editUnternehmensdaten, setEditUnternehmensdaten] = useState(false);
+  const [editKontaktinformationen, setEditKontaktinformationen] = useState(false);
+  const [editZahlungsinformationen, setEditZahlungsinformationen] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
@@ -26,16 +28,14 @@ export default function EinstellungenPage() {
     fetchData();
   }, []);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
   const saveChanges = async () => {
     if (!auth.currentUser) return;
     const userRef = doc(db, 'users', auth.currentUser.uid);
     await updateDoc(userRef, formData);
     setData(formData);
-    setEdit(false);
+    setEditUnternehmensdaten(false);
+    setEditKontaktinformationen(false);
+    setEditZahlungsinformationen(false);
   };
 
   if (loading) return (
@@ -46,123 +46,170 @@ export default function EinstellungenPage() {
 
   return (
     <PageContainer title="Einstellungen">
-      <Box sx={{
-        maxWidth: '700px',
-        margin: '3rem 0',
-        padding: '2rem 2.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '10px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        backgroundColor: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        alignSelf: 'flex-start'
-      }}>
-        
-        <Typography sx={{ fontSize: '1.8rem', fontWeight: 700, mb: 2 }}>Unternehmensdaten</Typography>
-
-        <Box sx={{ display: 'flex', gap: '1rem' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 2 }}>
+        {/* Unternehmensdaten */}
+        <Box sx={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: 1, p: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Unternehmensdaten</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            <TextField
+              label="Vorname"
+              sx={{ flex: '1 1 calc(50% - 8px)' }}
+              value={formData?.['Unternehmensdaten']?.Vorname || ''}
+              disabled={!editUnternehmensdaten}
+              onChange={(e) => {
+                setFormData({
+                  ...formData,
+                  Unternehmensdaten: {
+                    ...formData.Unternehmensdaten,
+                    Vorname: e.target.value
+                  }
+                });
+              }}
+            />
+            <TextField
+              label="Nachname"
+              sx={{ flex: '1 1 calc(50% - 8px)' }}
+              value={formData?.['Unternehmensdaten']?.Name || ''}
+              disabled={!editUnternehmensdaten}
+              onChange={(e) => {
+                setFormData({
+                  ...formData,
+                  Unternehmensdaten: {
+                    ...formData.Unternehmensdaten,
+                    Name: e.target.value
+                  }
+                });
+              }}
+            />
+          </Box>
           <TextField
-            label="Vorname"
+            label="Unternehmen"
             fullWidth
-            value={formData?.['Unternehmensdaten']?.Vorname || ''}
-            disabled={!edit}
+            sx={{ mt: 2 }}
+            value={formData?.['Unternehmensdaten']?.Unternehmensname || ''}
+            disabled={!editUnternehmensdaten}
             onChange={(e) => {
               setFormData({
                 ...formData,
                 Unternehmensdaten: {
                   ...formData.Unternehmensdaten,
-                  Vorname: e.target.value
+                  Unternehmensname: e.target.value
                 }
               });
             }}
           />
-
           <TextField
-            label="Nachname"
+            label="Branche"
             fullWidth
-            value={formData?.['Unternehmensdaten']?.Name || ''}
-            disabled={!edit}
+            sx={{ mt: 2 }}
+            value={formData?.['Unternehmensdaten']?.Branche || ''}
+            disabled={!editUnternehmensdaten}
             onChange={(e) => {
               setFormData({
                 ...formData,
                 Unternehmensdaten: {
                   ...formData.Unternehmensdaten,
-                  Name: e.target.value
+                  Branche: e.target.value
                 }
               });
             }}
           />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
+            {!editUnternehmensdaten ? (
+              <Button variant="contained" onClick={() => setEditUnternehmensdaten(true)}>Bearbeiten</Button>
+            ) : (
+              <>
+                <Button variant="contained" color="success" onClick={saveChanges}>Speichern</Button>
+                <Button variant="outlined" color="inherit" onClick={() => { setFormData(data); setEditUnternehmensdaten(false); }}>Abbrechen</Button>
+              </>
+            )}
+          </Box>
         </Box>
 
-        <TextField
-          label="Unternehmen"
-          fullWidth
-          value={formData?.['Unternehmensdaten']?.Unternehmensname || ''}
-          disabled={!edit}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              Unternehmensdaten: {
-                ...formData.Unternehmensdaten,
-                Unternehmensname: e.target.value
-              }
-            });
-          }}
-        />
+        {/* Kontaktinformationen */}
+        <Box sx={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: 1, p: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Kontaktinformationen</Typography>
+          <TextField
+            label="Telefon"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={formData?.['Unternehmensdaten']?.Telefon || ''}
+            disabled={!editKontaktinformationen}
+            onChange={(e) => {
+              setFormData({
+                ...formData,
+                Unternehmensdaten: {
+                  ...formData.Unternehmensdaten,
+                  Telefon: e.target.value
+                }
+              });
+            }}
+          />
+          <TextField
+            label="E-Mail"
+            fullWidth
+            value={formData?.email || ''}
+            disabled={!editKontaktinformationen}
+            onChange={(e) => {
+              setFormData({ ...formData, email: e.target.value });
+            }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
+            {!editKontaktinformationen ? (
+              <Button variant="contained" onClick={() => setEditKontaktinformationen(true)}>Bearbeiten</Button>
+            ) : (
+              <>
+                <Button variant="contained" color="success" onClick={saveChanges}>Speichern</Button>
+                <Button variant="outlined" color="inherit" onClick={() => { setFormData(data); setEditKontaktinformationen(false); }}>Abbrechen</Button>
+              </>
+            )}
+          </Box>
+        </Box>
 
-        <TextField
-          label="Branche"
-          fullWidth
-          value={formData?.['Unternehmensdaten']?.Branche || ''}
-          disabled={!edit}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              Unternehmensdaten: {
-                ...formData.Unternehmensdaten,
-                Branche: e.target.value
-              }
-            });
-          }}
-        />
-
-        <TextField
-          label="Telefon"
-          fullWidth
-          value={formData?.['Unternehmensdaten']?.Telefon || ''}
-          disabled={!edit}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              Unternehmensdaten: {
-                ...formData.Unternehmensdaten,
-                Telefon: e.target.value
-              }
-            });
-          }}
-        />
-
-        <TextField
-          label="E-Mail"
-          fullWidth
-          value={formData?.email || ''}
-          disabled={!edit}
-          onChange={(e) => handleChange('email', e.target.value)}
-        />
-
-        <Divider sx={{ my: 2 }} />
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          {!edit ? (
-            <Button variant="contained" onClick={() => setEdit(true)}>Bearbeiten</Button>
-          ) : (
-            <>
-              <Button variant="contained" color="success" onClick={saveChanges}>Speichern</Button>
-              <Button variant="outlined" color="inherit" onClick={() => { setFormData(data); setEdit(false); }}>Abbrechen</Button>
-            </>
-          )}
+        {/* Zahlungsinformationen */}
+        <Box sx={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: 1, p: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Zahlungsinformationen</Typography>
+          <TextField
+            label="IBAN"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={formData?.['Zahlungsdaten']?.IBAN || ''}
+            disabled={!editZahlungsinformationen}
+            onChange={(e) => {
+              setFormData({
+                ...formData,
+                Zahlungsdaten: {
+                  ...formData.Zahlungsdaten,
+                  IBAN: e.target.value
+                }
+              });
+            }}
+          />
+          <TextField
+            label="Zahlungsempfänger"
+            fullWidth
+            value={formData?.['Zahlungsdaten']?.Zahlungsempfänger || ''}
+            disabled={!editZahlungsinformationen}
+            onChange={(e) => {
+              setFormData({
+                ...formData,
+                Zahlungsdaten: {
+                  ...formData.Zahlungsdaten,
+                  Zahlungsempfänger: e.target.value
+                }
+              });
+            }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
+            {!editZahlungsinformationen ? (
+              <Button variant="contained" onClick={() => setEditZahlungsinformationen(true)}>Bearbeiten</Button>
+            ) : (
+              <>
+                <Button variant="contained" color="success" onClick={saveChanges}>Speichern</Button>
+                <Button variant="outlined" color="inherit" onClick={() => { setFormData(data); setEditZahlungsinformationen(false); }}>Abbrechen</Button>
+              </>
+            )}
+          </Box>
         </Box>
       </Box>
     </PageContainer>

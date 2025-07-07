@@ -1,100 +1,245 @@
-import { Box, Typography, Button, TextField, MenuItem, Select } from '@mui/material';
+import { Box, Button, Typography, TextField, Card, CardActionArea } from '@mui/material';
+import ImageIcon from '@mui/icons-material/Image';
+import CollectionsIcon from '@mui/icons-material/Collections';
 import { useState } from 'react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
-export default function GutscheinDesigner() {
-  const [fuer, setFuer] = useState('');
-  const [von, setVon] = useState('');
-  const [widmung, setWidmung] = useState('');
-  const [farbe, setFarbe] = useState('#00796B');
-  const [schriftart, setSchriftart] = useState('serif');
-  const [image, setImage] = useState<string | null>(null);
+interface Feld {
+  typ: 'CODE' | 'TEXT' | 'WIDMUNG';
+  x: number;
+  y: number;
+  text: string;
+  editing: boolean;
+}
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+export default function GutscheinEditor() {
+  const [modus, setModus] = useState<'eigenes' | 'vorlage'>('eigenes');
+  const [hintergrund, setHintergrund] = useState<string | null>(null);
+  const [felder, setFelder] = useState<Feld[]>([]); // Keine Elemente initial
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleBildUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      const reader = new FileReader();
-      reader.onload = () => setImage(reader.result as string);
-      reader.readAsDataURL(e.target.files[0]);
+      const url = URL.createObjectURL(e.target.files[0]);
+      setHintergrund(url);
     }
   };
 
-  const handleDownload = async () => {
-    const element = document.getElementById('gutschein-vorschau');
-    if (!element) return;
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
 
-    const canvas = await html2canvas(element);
-    const imgData = canvas.toDataURL('image/png');
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (draggedIndex === null) return;
+    const newFelder = [...felder];
+    const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+    newFelder[draggedIndex] = {
+      ...newFelder[draggedIndex],
+      x: e.clientX - rect.left - 50,
+      y: e.clientY - rect.top - 15,
+    };
+    setFelder(newFelder);
+    setDraggedIndex(null);
+  };
 
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [400, 600] });
-    pdf.addImage(imgData, 'PNG', 0, 0, 400, 600);
-    pdf.save('Gutschein.pdf');
+  const toggleEdit = (index: number) => {
+    const newFelder = [...felder];
+    newFelder[index].editing = !newFelder[index].editing;
+    setFelder(newFelder);
+  };
+
+  const updateText = (index: number, newText: string) => {
+    const newFelder = [...felder];
+    newFelder[index].text = newText;
+    setFelder(newFelder);
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: '3rem', flexWrap: 'wrap', p: '2rem', fontFamily: 'system-ui, sans-serif' }}>
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h5" mb={2} sx={{ fontSize: '2rem', fontWeight: 700 }}>
+        Gutschein Editor
+      </Typography>
 
-      {/* Linke Vorschau */}
-      <Box sx={{ border: '1px solid #ccc', width: '300px', backgroundColor: '#FDF8F0' }}>
-        <Box sx={{ backgroundColor: farbe, height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {image ? (
-            <img src={image} alt="Logo" style={{ maxHeight: '100px' }} />
-          ) : (
-            <Typography sx={{ color: '#fff', fontSize: '1.2rem' }}>Ihr Logo</Typography>
+      {/* Auswahl-Karten */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Card
+          sx={{
+            width: 200,
+            border: modus === 'eigenes' ? '2px solid #1976d2' : '1px solid #ccc',
+            boxShadow: modus === 'eigenes' ? '0 0 10px rgba(25, 118, 210, 0.5)' : 'none',
+          }}
+        >
+          <CardActionArea onClick={() => setModus('eigenes')} sx={{ p: 2, textAlign: 'center' }}>
+            <ImageIcon sx={{ fontSize: 40, color: modus === 'eigenes' ? '#1976d2' : '#555' }} />
+            <Typography mt={1}>Eigenes Design hochladen</Typography>
+          </CardActionArea>
+        </Card>
+
+        <Card
+          sx={{
+            width: 200,
+            border: modus === 'vorlage' ? '2px solid #1976d2' : '1px solid #ccc',
+            boxShadow: modus === 'vorlage' ? '0 0 10px rgba(25, 118, 210, 0.5)' : 'none',
+          }}
+        >
+          <CardActionArea onClick={() => setModus('vorlage')} sx={{ p: 2, textAlign: 'center' }}>
+            <CollectionsIcon sx={{ fontSize: 40, color: modus === 'vorlage' ? '#1976d2' : '#555' }} />
+            <Typography mt={1}>Vorgefertigtes Design wählen</Typography>
+          </CardActionArea>
+        </Card>
+      </Box>
+
+      {/* Hauptbereich mit Editor und Gutscheincode-Elementen */}
+      <Box sx={{ display: 'flex', gap: 2 }}>
+        {/* Gutscheincode-Elemente */}
+        <Box
+          sx={{
+            width: 200,
+            padding: 2,
+          }}
+        >
+          {modus === 'eigenes' && (
+            <Box sx={{ mb: 2 }}>
+              <Typography sx={{ fontWeight: 500, mb: '0.5rem' }}>
+                Gutscheindesign hochladen (pdf):
+              </Typography>
+              <Button
+                variant="contained"
+                component="label"
+                sx={{ textTransform: 'none' }}
+              >
+                Datei auswählen
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBildUpload}
+                  hidden
+                />
+              </Button>
+            </Box>
+          )}
+
+          <Typography variant="subtitle1" mb={2}>
+            Elemente
+          </Typography>
+          {!felder.some((feld) => feld.typ === 'CODE') && ( // Gutscheincode nur anzeigen, wenn es noch nicht hinzugefügt wurde
+            <Box
+              draggable
+              onDragStart={() => setDraggedIndex(-1)} // -1 für neues Element
+              sx={{
+                padding: '4px 8px',
+                border: '1px dashed gray',
+                cursor: 'move',
+                marginBottom: 2,
+              }}
+            >
+              Gutscheincode hier
+            </Box>
+          )}
+          {!felder.some((feld) => feld.typ === 'WIDMUNG') && ( // Widmung nur anzeigen, wenn es noch nicht hinzugefügt wurde
+            <Box
+              draggable
+              onDragStart={() => setDraggedIndex(-2)} // -2 für neues Element
+              sx={{
+                padding: '4px 8px',
+                border: '1px dashed gray',
+                cursor: 'move',
+                marginBottom: 2,
+              }}
+            >
+              Widmung hier
+            </Box>
           )}
         </Box>
 
-        <Box sx={{ p: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', fontFamily: schriftart }}>
-          <Typography>Sie können diesen Gutschein personalisieren.</Typography>
+        {/* Editor-Bereich */}
+        <Box
+          sx={{
+            border: '1px solid gray',
+            width: 595,
+            height: 842,
+            position: 'relative',
+            backgroundColor: '#fafafa',
+            overflow: 'hidden',
+            mb: 2,
+          }}
+          onDragOver={(e) => e.preventDefault()} // Ermöglicht das Ablegen
+          onDrop={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const newFelder = [...felder];
 
-          <Typography sx={{ fontSize: '0.9rem' }}>für</Typography>
-          <Typography sx={{ borderBottom: '1px solid #333', minHeight: '2rem' }}>{fuer}</Typography>
+            if (draggedIndex === -1) {
+              // Neues Gutscheincode-Element hinzufügen
+              newFelder.push({
+                typ: 'CODE',
+                x: e.clientX - rect.left - 50,
+                y: e.clientY - rect.top - 15,
+                text: 'Gutscheincode hier',
+                editing: false,
+              });
+            } else if (draggedIndex === -2) {
+              // Neues Widmungs-Element hinzufügen
+              newFelder.push({
+                typ: 'WIDMUNG',
+                x: e.clientX - rect.left - 50,
+                y: e.clientY - rect.top - 15,
+                text: 'Widmung hier',
+                editing: false,
+              });
+            } else if (draggedIndex !== null) {
+              // Bestehendes Element verschieben
+              newFelder[draggedIndex] = {
+                ...newFelder[draggedIndex],
+                x: e.clientX - rect.left - 50,
+                y: e.clientY - rect.top - 15,
+              };
+            }
 
-          <Typography sx={{ fontSize: '0.9rem' }}>von</Typography>
-          <Typography sx={{ borderBottom: '1px solid #333', minHeight: '2rem' }}>{von}</Typography>
+            setFelder(newFelder);
+            setDraggedIndex(null);
+          }}
+        >
+          {modus === 'eigenes' && hintergrund && (
+            <img
+              src={hintergrund}
+              alt="Hintergrund"
+              style={{ width: '100%', height: '100%', position: 'absolute' }}
+            />
+          )}
 
-          <Typography sx={{ fontSize: '0.9rem' }}>Widmung</Typography>
-          <Typography sx={{ minHeight: '4rem', border: '1px solid #ddd', p: '0.5rem' }}>{widmung}</Typography>
-
-          <Button onClick={handleDownload} variant="outlined" sx={{ mt: '1rem' }}>
-            PDF Download
-          </Button>
+          {modus === 'eigenes' && felder.map((feld, index) => (
+            <div
+              key={index}
+              style={{
+                position: 'absolute',
+                left: feld.x,
+                top: feld.y,
+                padding: '4px 8px',
+                backgroundColor: 'rgba(255,255,255,0.8)',
+                border: '1px dashed gray',
+                cursor: 'move',
+                minWidth: '80px',
+              }}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDoubleClick={() => toggleEdit(index)}
+            >
+              {feld.editing ? (
+                <TextField
+                  size="small"
+                  value={feld.text}
+                  onChange={(e) => updateText(index, e.target.value)}
+                  onBlur={() => toggleEdit(index)}
+                  autoFocus
+                />
+              ) : (
+                <span>{feld.text}</span>
+              )}
+            </div>
+          ))}
         </Box>
       </Box>
 
-      {/* Rechte Einstellungen */}
-      <Box sx={{ maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-        <Typography sx={{ fontSize: '1.5rem', fontWeight: 700 }}>Gutschein anpassen</Typography>
-
-        <TextField label="Für" value={fuer} onChange={(e) => setFuer(e.target.value)} />
-        <TextField label="Von" value={von} onChange={(e) => setVon(e.target.value)} />
-        <TextField
-          label="Widmung"
-          multiline
-          rows={3}
-          value={widmung}
-          onChange={(e) => setWidmung(e.target.value)}
-          inputProps={{ maxLength: 160 }}
-          helperText={`${160 - widmung.length} Zeichen übrig`}
-        />
-
-        <Typography sx={{ mt: '1rem' }}>Farbe wählen</Typography>
-        <input type="color" value={farbe} onChange={(e) => setFarbe(e.target.value)} style={{ width: '100%', height: '2rem' }} />
-
-        <Typography>Schriftart wählen</Typography>
-        <Select value={schriftart} onChange={(e) => setSchriftart(e.target.value)} fullWidth>
-          <MenuItem value="serif">Serif (klassisch)</MenuItem>
-          <MenuItem value="sans-serif">Sans-Serif (modern)</MenuItem>
-          <MenuItem value="cursive">Cursive (verspielt)</MenuItem>
-        </Select>
-
-        <Typography sx={{ mt: '1rem' }}>Logo oder Bild hochladen</Typography>
-        <Button variant="outlined" component="label">
-          Datei wählen
-          <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
-        </Button>
-      </Box>
+      
     </Box>
   );
 }

@@ -1,13 +1,14 @@
 import { Box, Button, Typography, IconButton, Drawer, List, ListItem, ListItemText, Avatar, Menu, MenuItem, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LoginModal from '../../components/login/LoginModal';
 import { auth } from '../../auth/firebase';
 import useAuth from '../../auth/useAuth';
 import { signOut } from "firebase/auth";
 
 export default function TopBar() {
+  const navigate = useNavigate(); // Hook für Navigation
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -24,7 +25,11 @@ export default function TopBar() {
   };
 
   const handleLogout = () => {
-    signOut(auth);
+    signOut(auth).then(() => {
+      navigate('/'); // Nach dem Abmelden zur Startseite navigieren
+    }).catch((error) => {
+      console.error("Logout failed:", error);
+    });
     handleMenuClose();
   };
 

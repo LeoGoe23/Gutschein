@@ -1,34 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Typography, Button, Stack, Modal, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import DesignServicesIcon from '@mui/icons-material/DesignServices';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 
 export default function HeroText() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);  // Modal-Öffnung
-  const [timer, setTimer] = useState(5);    // Timer-Startwert
-  const [countdown, setCountdown] = useState(false);  // Startet den Timer
-
-  // Countdown-Logik
-  useEffect(() => {
-    if (countdown && timer > 0) {
-      const timerInterval = setInterval(() => {
-        setTimer(prev => prev - 1);
-      }, 1000);
-      return () => clearInterval(timerInterval);  // Cleanup der Intervalle
-    } else if (timer === 0) {
-      // Automatisch Demo starten, wenn der Timer abgelaufen ist
-      navigate('/demo');
-    }
-  }, [countdown, timer, navigate]);
-
-  const handleDemoClick = () => {
-    setOpen(true);  // Modal öffnen
-    setCountdown(true);  // Countdown starten
-  };
-
-  const handleDemoStart = () => {
-    navigate('/demo');
-  };
+  const [anmeldenOpen, setAnmeldenOpen] = useState(false);
 
   return (
     <Stack spacing={5}>
@@ -49,7 +27,7 @@ export default function HeroText() {
       <Stack direction="row" spacing={3}>
         <Button
           variant="contained"
-          onClick={() => navigate('/gutschein/step1')}
+          onClick={() => setAnmeldenOpen(true)}
           sx={{
             backgroundColor: '#4F46E5',
             fontSize: '1.1rem',
@@ -68,7 +46,7 @@ export default function HeroText() {
 
         <Button
           variant="outlined"
-          onClick={handleDemoClick}  // Modal und Timer aktivieren
+          onClick={() => navigate('/demo')}
           sx={{
             borderColor: '#4F46E5',
             color: '#4F46E5',
@@ -87,10 +65,9 @@ export default function HeroText() {
         </Button>
       </Stack>
 
-      {/* Modal für die Demo */}
       <Modal
-        open={open}
-        onClose={() => setOpen(false)}
+        open={anmeldenOpen}
+        onClose={() => setAnmeldenOpen(false)}
         sx={{
           display: 'flex',
           justifyContent: 'center',
@@ -100,38 +77,77 @@ export default function HeroText() {
         <Box
           sx={{
             backgroundColor: 'white',
-            padding: '2rem',
-            borderRadius: '8px',
-            maxWidth: '400px',
+            padding: '4rem',
+            borderRadius: '16px',
+            maxWidth: '1000px',
+            width: '95%',
             textAlign: 'center',
+            boxShadow: '0 0 30px rgba(0,0,0,0.2)',
           }}
         >
-            <Typography variant="h6" sx={{ marginBottom: '1rem' }}>
-             Es folgt eine kurze Demo.
-            </Typography>
-
-          <Typography variant="body1" sx={{ marginBottom: '1rem' }}>
-            Demo startet in {timer} Sekunden...
+          <Typography variant="h4" sx={{ marginBottom: '3rem', fontWeight: 700 }}>
+            Wie möchten Sie starten?
           </Typography>
 
-          <Button
-            variant="contained"
-            onClick={handleDemoStart}
-            sx={{
-              backgroundColor: '#4F46E5',
-              fontSize: '1.1rem',
-              padding: '1rem 2.2rem',
-              borderRadius: '1rem',
-              boxShadow: '0 6px 14px rgba(0,0,0,0.15)',
-              textTransform: 'none',
-              '&:hover': {
-                backgroundColor: '#4338CA',
-                boxShadow: '0 8px 18px rgba(0,0,0,0.2)',
-              },
-            }}
-          >
-            Demo starten
-          </Button>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={5} justifyContent="center">
+            <Box
+              onClick={() => navigate('/gutschein/step1')}
+              sx={{
+                flex: 1,
+                minWidth: '300px',
+                border: '3px solid #E0E0E0',
+                borderRadius: '20px',
+                padding: '3rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                '&:hover': {
+                  borderColor: '#4F46E5',
+                  boxShadow: '0 0 25px rgba(79,70,229,0.25)',
+                  transform: 'scale(1.05)',
+                },
+              }}
+            >
+              <DesignServicesIcon sx={{ fontSize: 90, color: '#4F46E5', marginBottom: '1.5rem' }} />
+              <Typography variant="h5" sx={{ marginBottom: '1rem', fontWeight: 600 }}>
+                Selbst gestalten
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#555', maxWidth: '350px' }}>
+                Geben Sie Ihre Daten selbst ein und designen Sie Ihren Gutschein ganz nach Ihren Vorstellungen.
+              </Typography>
+            </Box>
+
+            <Box
+              onClick={() => navigate('/stepminimal')}
+              sx={{
+                flex: 1,
+                minWidth: '300px',
+                border: '3px solid #E0E0E0',
+                borderRadius: '20px',
+                padding: '3rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                '&:hover': {
+                  borderColor: '#4F46E5',
+                  boxShadow: '0 0 25px rgba(79,70,229,0.25)',
+                  transform: 'scale(1.05)',
+                },
+              }}
+            >
+              <SupportAgentIcon sx={{ fontSize: 90, color: '#4F46E5', marginBottom: '1.5rem' }} />
+              <Typography variant="h5" sx={{ marginBottom: '1rem', fontWeight: 600 }}>
+                Wir übernehmen das
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#555', maxWidth: '350px' }}>
+                Lehnen Sie sich zurück. Sie geben nur die Grunddaten an – wir kümmern uns um das Design und die Abwicklung.
+              </Typography>
+            </Box>
+          </Stack>
         </Box>
       </Modal>
     </Stack>

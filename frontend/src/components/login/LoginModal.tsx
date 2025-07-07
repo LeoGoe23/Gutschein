@@ -37,37 +37,64 @@ export default function LoginModal({ open, onClose }: Props) {
     const currentMonth = new Date().toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit' }); // Format: MM.YYYY
 
     if (userDoc.exists()) {
-      const existingData = userDoc.data() as Record<string, any>;
-      const monthlyData = existingData.Einnahmen?.monatlich || {};
+        const existingData = userDoc.data() as Record<string, any>;
+        const monthlyData = existingData.Einnahmen?.monatlich || {};
 
-      // Falls der aktuelle Monat nicht existiert, füge ihn hinzu
-      if (!monthlyData[currentMonth]) {
-        monthlyData[currentMonth] = {
-          verkaufteGutscheine: 0,
-          gesamtUmsatz: 0,
+        // Falls der aktuelle Monat nicht existiert, füge ihn hinzu
+        if (!monthlyData[currentMonth]) {
+            monthlyData[currentMonth] = {
+                verkaufteGutscheine: 0,
+                gesamtUmsatz: 0,
+            };
+        }
+
+        // Datenfelder zusammenführen, ohne Überschreiben
+        const mergedGutscheine = {
+            ...newUserData.Gutscheine,
+            ...existingData.Gutscheine, // Bestehende Gutscheine beibehalten
         };
-      }
 
-      const mergedData = {
-        ...existingData,
-        ...newUserData,
-        Einnahmen: {
-          ...existingData.Einnahmen,
-          monatlich: monthlyData,
-        },
-      };
+        const mergedUnternehmensdaten = {
+            ...newUserData.Unternehmensdaten,
+            ...existingData.Unternehmensdaten, // Bestehende Unternehmensdaten beibehalten
+        };
 
-      await setDoc(userDocRef, mergedData);
+        const mergedZahlungsdaten = {
+            ...newUserData.Zahlungsdaten,
+            ...existingData.Zahlungsdaten, // Bestehende Zahlungsdaten beibehalten
+        };
+
+        const mergedGutscheindetails = {
+            ...newUserData.Gutscheindetails,
+            ...existingData.Gutscheindetails, // Bestehende Gutscheindetails beibehalten
+        };
+
+        const mergedData = {
+            ...newUserData,
+            ...existingData,
+            Gutscheine: mergedGutscheine,
+            Unternehmensdaten: mergedUnternehmensdaten,
+            Zahlungsdaten: mergedZahlungsdaten,
+            Gutscheindetails: mergedGutscheindetails,
+            Einnahmen: {
+                ...newUserData.Einnahmen,
+                ...existingData.Einnahmen,
+                monatlich: monthlyData,
+            },
+        };
+
+        // Speichere die zusammengeführten Daten in der Datenbank
+        await setDoc(userDocRef, mergedData);
     } else {
-      // Initialisiere die monatlichen Daten für den aktuellen Monat
-      newUserData.Einnahmen.monatlich = {
-        [currentMonth]: {
-          verkaufteGutscheine: 0,
-          gesamtUmsatz: 0,
-        },
-      };
+        // Initialisiere die monatlichen Daten für den aktuellen Monat
+        newUserData.Einnahmen.monatlich = {
+            [currentMonth]: {
+                verkaufteGutscheine: 0,
+                gesamtUmsatz: 0,
+            },
+        };
 
-      await setDoc(userDocRef, newUserData);
+        await setDoc(userDocRef, newUserData);
     }
   };
 
@@ -98,10 +125,6 @@ export default function LoginModal({ open, onClose }: Props) {
           },
         },
       },
-      Design: {
-        Farben: "",
-        Logo: "",
-      },
       Zahlungsdaten: {
         Zahlungsempfänger: "",
         IBAN: "",
@@ -112,7 +135,22 @@ export default function LoginModal({ open, onClose }: Props) {
           wert: 0,
           verkauftAm: null
         }
-      }
+      },
+      Gutscheindetails: {
+        Gutscheindesign: {},
+        Gutscheinarten: {
+            Standard: {
+              Preis: 10,
+              Beschreibung: "Standard-Gutschein",
+              Aktiv: true,
+            },
+            Premium: {
+              Preis: 20,
+              Beschreibung: "Premium-Gutschein",
+              Aktiv: true,
+            },
+        },
+      },
     };
   };
 
