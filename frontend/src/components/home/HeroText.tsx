@@ -22,7 +22,7 @@ export default function HeroText() {
   };
 
   const handleStartDemo = () => {
-    navigate('/demo', { state: { uploadedImage } });
+    navigate('/checkout', { state: { uploadedImage } });
   };
 
   return (

@@ -36,7 +36,7 @@ export default function Step1() {
       </Typography>
 
       <Typography sx={{ color: '#555', mb: '1rem' }}>
-        Bitte füllen Sie die folgenden Angaben zu Ihrer Person aus.
+        Bitte füllen Sie die folgenden Angaben zu Ihrer Person/ Ihrem Unternehmen aus.
       </Typography>
 
       <TextField 
@@ -68,7 +68,7 @@ export default function Step1() {
       />
 
       <TextField 
-        label="Website-URL" 
+        label="Website-Link" 
         variant="outlined" 
         type="url" 
         required 

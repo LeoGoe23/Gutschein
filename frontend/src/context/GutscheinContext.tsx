@@ -14,7 +14,8 @@ export function GutscheinProvider({ children }: { children: React.ReactNode }) {
     dienstleistungen: [] as { desc: string; price: string }[],
     customValue: false,
     name: '',
-    bild: null as string | null,
+    bild: null as string | null, // Bild des Unternehmens
+    unternehmensname: '', // Unternehmensname
     design: 'light',
   });
 

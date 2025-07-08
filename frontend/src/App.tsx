@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import About from './pages/About';
-import Demo from './pages/Demo';
 import Ueberuns from './pages/ueberuns';
 import Gutschein from './pages/Gutschein';
 import Profil from './pages/Profile';
@@ -22,7 +21,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
-        <Route path="/demo" element={<Demo />} />
         <Route path="/ueberuns" element={<Ueberuns />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/profil" element={<Profil />}>
