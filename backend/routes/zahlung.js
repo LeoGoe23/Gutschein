@@ -10,6 +10,9 @@ router.post("/create-payment-intent", async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100,
       currency: "eur",
+      metadata: {
+        gutscheincode: code,
+      },
     });
 
     res.send({

@@ -3,10 +3,14 @@ const express = require("express");
 const mongoose = require("mongoose");
 const gutscheineRoute = require("./routes/gutscheine");
 const zahlungRoute = require("./routes/zahlung");
+const webhookRoute = require("./routes/webhook");
+const bodyParser = require("body-parser");
 
 console.log("Router geladen:", typeof gutscheineRoute);
 
 const app = express();
+
+app.use("/api/webhook", webhookRoute);
 app.use(express.json());
 
 app.get("/", (req, res) => {
