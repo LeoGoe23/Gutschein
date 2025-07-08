@@ -69,6 +69,11 @@ export default function LoginModal({ open, onClose }: Props) {
             ...existingData.Gutscheindetails, // Bestehende Gutscheindetails beibehalten
         };
 
+        const mergedCheckout = {
+            ...newUserData.Checkout,
+            ...existingData.Checkout, // Bestehende Checkout-Daten beibehalten
+        };
+
         const mergedData = {
             ...newUserData,
             ...existingData,
@@ -76,6 +81,7 @@ export default function LoginModal({ open, onClose }: Props) {
             Unternehmensdaten: mergedUnternehmensdaten,
             Zahlungsdaten: mergedZahlungsdaten,
             Gutscheindetails: mergedGutscheindetails,
+            Checkout: mergedCheckout,
             Einnahmen: {
                 ...newUserData.Einnahmen,
                 ...existingData.Einnahmen,
@@ -105,12 +111,22 @@ export default function LoginModal({ open, onClose }: Props) {
     return {
       email,
       createdAt: new Date(),
+      registrationFinished: false,
       Unternehmensdaten: {
         Vorname: "",
         Name: "",
         Unternehmensname: "",
         Branche: "",
         Telefon: "",
+      },
+            Checkout: {
+        slug: "",
+        Unternehmensname: "",
+        Gutscheinarten: {},
+        BildURL: "",
+        GutscheinURL: "",
+        Dienstleistung: false, // Ändere Boolean zu boolean
+        Freibetrag: false,     // Ändere Boolean zu boolean
       },
       Einnahmen: {
         gesamtUmsatz: 0,

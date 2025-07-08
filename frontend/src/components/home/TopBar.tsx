@@ -48,7 +48,7 @@ export default function TopBar() {
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: '2rem' }}>
           <Typography
             component={Link}
-            to="/roadmap"
+            to="/ueberuns"
             sx={{
               cursor: 'pointer',
               fontSize: '1.1rem',

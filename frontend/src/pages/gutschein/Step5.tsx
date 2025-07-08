@@ -1,6 +1,7 @@
 import { Box, Typography, Button } from '@mui/material';
 import { useGutschein } from '../../context/GutscheinContext';
-import { ReactElement, JSXElementConstructor, ReactNode, ReactPortal, Key } from 'react';
+import { ReactElement } from 'react';
+import { Email, Phone, Person, Business, Image } from '@mui/icons-material';
 
 export default function Zusammenfassung() {
   const { data } = useGutschein();
@@ -17,48 +18,52 @@ export default function Zusammenfassung() {
         <Typography sx={{ fontWeight: 500, mb: '0.5rem' }}>
           Persönliche Daten:
         </Typography>
-        <Typography>Vorname: {data.vorname}</Typography>
-        <Typography>Nachname: {data.nachname}</Typography>
-        <Typography>E-Mail: {data.email}</Typography>
-        <Typography>Telefon: {data.telefon}</Typography>
-        <Typography>Geschäftsart: {data.geschaeftsart}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Person sx={{ color: '#4CAF50' }} />
+          <Typography>Vorname: {data.vorname}</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Person sx={{ color: '#4CAF50' }} />
+          <Typography>Nachname: {data.nachname}</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Email sx={{ color: '#4CAF50' }} />
+          <Typography>E-Mail: {data.email}</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Phone sx={{ color: '#4CAF50' }} />
+          <Typography>Telefon: {data.telefon}</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Business sx={{ color: '#4CAF50' }} />
+          <Typography>Geschäftsart: {data.geschaeftsart}</Typography>
+        </Box>
 
-        <Typography sx={{ fontWeight: 500, mt: '1.5rem', mb: '0.5rem' }}>
-          Gutschein Details:
-        </Typography>
-        <Typography>Gutscheinname: {data.name}</Typography>
-        <Typography>Art: {data.art === 'wert' ? 'Wert-Gutschein' : 'Dienstleistung'}</Typography>
-
-        {data.art === 'wert' && (
-          <>
-            <Typography>Werte: {data.betraege.join(', ')} €</Typography>
-            <Typography>Freier Betrag erlaubt: {data.customValue ? 'Ja' : 'Nein'}</Typography>
-          </>
-        )}
-
-        {data.art === 'dienstleistung' && (
-          <>
-            {data.dienstleistungen.map((d: { desc: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; price: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, i: Key | null | undefined) => (
-              <Typography key={i}>
-                {d.desc} – {d.price} €
-              </Typography>
-            ))}
-          </>
-        )}
-
-        <Typography sx={{ fontWeight: 500, mt: '1.5rem', mb: '0.5rem' }}>
-          Design:
-        </Typography>
-        <Typography>Design-Stil: {data.design}</Typography>
         {data.bild && (
-          <Box sx={{ mt: '1rem' }}>
+          <Box sx={{ mt: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Image sx={{ color: '#4CAF50' }} />
             <img src={data.bild} alt="Bild" style={{ width: '100px', borderRadius: '0.5rem' }} />
           </Box>
         )}
       </Box>
 
-      <Button variant="contained" sx={{ mt: '2rem', backgroundColor: '#2E7D66' }}>
-        Gutschein erstellen
+      <Button
+        variant="contained"
+        sx={{
+          mt: '2rem',
+          backgroundColor: '#4CAF50',
+          color: '#fff',
+          padding: '0.75rem 2rem',
+          fontSize: '1rem',
+          fontWeight: 600,
+          borderRadius: '2rem',
+          boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.1)',
+          '&:hover': {
+            backgroundColor: '#45A049',
+          },
+        }}
+      >
+        Vorschau: Was sieht Ihr Kunde
       </Button>
 
     </Box>

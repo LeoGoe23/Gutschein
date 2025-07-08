@@ -1,20 +1,94 @@
-import { Box, Typography, Button, IconButton } from '@mui/material';
-import { useState } from 'react';
+import { Box, Typography, Button, IconButton, Stack } from '@mui/material';
+import { useState, useEffect } from 'react';
 import UploadIcon from '@mui/icons-material/Upload';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { storage } from '../auth/firebase';
+import { ref, getDownloadURL } from 'firebase/storage';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import AppleIcon from '@mui/icons-material/Apple';
+import GoogleIcon from '@mui/icons-material/Google';
+import PayPalIcon from '@mui/icons-material/AccountBalanceWallet'; // Beispiel-Icon für PayPal
 
 const stripePromise = loadStripe('your-publishable-key-here'); // Ersetze mit deinem Stripe-Publishable-Key
+
+function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mt: 4 }}>
+      <Button
+        variant="outlined"
+        startIcon={<CreditCardIcon />}
+        onClick={() => onSelect('card')}
+        sx={{
+          borderRadius: 2,
+          px: 2,
+          py: 1.5,
+          textTransform: 'none',
+          boxShadow: 1,
+          flex: 1,
+        }}
+      >
+        Kredit-/ Debit
+      </Button>
+      <Button
+        variant="outlined"
+        startIcon={<AppleIcon />}
+        onClick={() => onSelect('apple_pay')}
+        sx={{
+          borderRadius: 2,
+          px: 2,
+          py: 1.5,
+          textTransform: 'none',
+          boxShadow: 1,
+          flex: 1,
+        }}
+      >
+        Apple Pay
+      </Button>
+      <Button
+        variant="outlined"
+        startIcon={<GoogleIcon />}
+        onClick={() => onSelect('google_pay')}
+        sx={{
+          borderRadius: 2,
+          px: 2,
+          py: 1.5,
+          textTransform: 'none',
+          boxShadow: 1,
+          flex: 1,
+        }}
+      >
+        Google Pay
+      </Button>
+      <Button
+        variant="outlined"
+        startIcon={<PayPalIcon />}
+        onClick={() => onSelect('paypal')}
+        sx={{
+          borderRadius: 2,
+          px: 2,
+          py: 1.5,
+          textTransform: 'none',
+          boxShadow: 1,
+          flex: 1,
+        }}
+      >
+        PayPal
+      </Button>
+    </Box>
+  );
+}
 
 function PaymentForm({ betrag }: { betrag: number | null }) {
   const stripe = useStripe();
   const elements = useElements();
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
 
   const handlePayment = async () => {
-    if (!stripe || !elements || !betrag) {
-      alert('Bitte geben Sie einen Betrag ein.');
+    if (!stripe || !elements || !betrag || !paymentMethod) {
+      alert('Bitte wählen Sie eine Zahlungsmethode und geben Sie einen Betrag ein.');
       return;
     }
 
@@ -23,7 +97,7 @@ function PaymentForm({ betrag }: { betrag: number | null }) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ amount: betrag * 100 }), // Betrag in Cent
+      body: JSON.stringify({ amount: betrag * 100, paymentMethod }),
     });
 
     const { clientSecret } = await response.json();
@@ -31,7 +105,7 @@ function PaymentForm({ betrag }: { betrag: number | null }) {
     const result = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: 'http://localhost:3000/success', // Optional: Erfolg-URL
+        return_url: 'http://localhost:3000/success',
       },
     });
 
@@ -45,11 +119,14 @@ function PaymentForm({ betrag }: { betrag: number | null }) {
   return (
     <Box sx={{ mt: 4 }}>
       <Typography variant="body1" sx={{ mb: 2 }}>
-        Geben Sie Ihre Zahlungsinformationen ein:
+        Wählen Sie Ihre Zahlungsmethode:
       </Typography>
-      <Box sx={{ border: '1px solid #ccc', borderRadius: '8px', p: 2, mb: 2 }}>
-        <CardElement options={{ hidePostalCode: true }} />
-      </Box>
+      <PaymentOptions onSelect={setPaymentMethod} />
+      {paymentMethod === 'card' && (
+        <Box sx={{ border: '1px solid #ccc', borderRadius: '8px', p: 2, mb: 4, mt: 2 }}>
+          <CardElement options={{ hidePostalCode: true }} />
+        </Box>
+      )}
       <Button
         variant="contained"
         size="large"
@@ -63,6 +140,7 @@ function PaymentForm({ betrag }: { betrag: number | null }) {
           textTransform: 'none',
           boxShadow: 3,
           '&:hover': { backgroundColor: '#bdbdbd' },
+          mt: 2,
         }}
         onClick={handlePayment}
       >
@@ -80,6 +158,21 @@ export default function GutscheinLandingPage() {
 
   const kundenName = "L'Osteria";
   const beschreibung = "Ihr Gutschein kann direkt nach dem Kauf per E-Mail versendet oder ausgedruckt werden.";
+
+  // Firebase Storage Bild laden
+  useEffect(() => {
+    const loadStartImage = async () => {
+      try {
+        const imageRef = ref(storage, 'start.jpg');
+        const imageUrl = await getDownloadURL(imageRef);
+        setHintergrundBild(imageUrl);
+      } catch (error) {
+        console.error('Fehler beim Laden des Bildes:', error);
+      }
+    };
+
+    loadStartImage();
+  }, []);
 
   const handleHintergrundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

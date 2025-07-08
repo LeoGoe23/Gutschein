@@ -1,15 +1,8 @@
-import { Box, TextField, Typography, MenuItem } from '@mui/material';
+import { Box, TextField, Typography } from '@mui/material';
 import { useState } from 'react';
 
 export default function Zahlungsdaten() {
   const [payoutLimit, setPayoutLimit] = useState('');
-  const [payoutFrequency, setPayoutFrequency] = useState('');
-
-  const frequencyOptions = [
-    { label: 'Sofort bei jeder Bestellung', value: 'sofort' },
-    { label: 'Wöchentlich', value: 'woche' },
-    { label: 'Monatlich', value: 'monat' },
-  ];
 
   return (
     <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -36,35 +29,6 @@ export default function Zahlungsdaten() {
         fullWidth 
         placeholder="DE..."
       />
-
-      <Typography sx={{ fontWeight: 500, mt: '1rem' }}>
-        Auszahlungseinstellungen
-      </Typography>
-
-      <TextField 
-        label="Mindestauszahlungsbetrag in €" 
-        variant="outlined" 
-        type="number" 
-        value={payoutLimit}
-        onChange={(e) => setPayoutLimit(e.target.value)}
-        fullWidth 
-        placeholder="z. B. 50"
-      />
-
-      <TextField
-        select
-        label="Auszahlungsintervall"
-        value={payoutFrequency}
-        onChange={(e) => setPayoutFrequency(e.target.value)}
-        required
-        fullWidth
-      >
-        {frequencyOptions.map((opt) => (
-          <MenuItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </MenuItem>
-        ))}
-      </TextField>
 
     </Box>
   );
