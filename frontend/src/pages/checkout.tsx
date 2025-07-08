@@ -156,7 +156,7 @@ export default function GutscheinLandingPage() {
   const [betrag, setBetrag] = useState<number | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
 
-  const kundenName = "L'Osteria";
+  const kundenName = "Ihr Unternehmen";
   const beschreibung = "Ihr Gutschein kann direkt nach dem Kauf per E-Mail versendet oder ausgedruckt werden.";
 
   // Firebase Storage Bild laden
@@ -178,13 +178,6 @@ export default function GutscheinLandingPage() {
     const file = event.target.files?.[0];
     if (file) {
       setHintergrundBild(URL.createObjectURL(file));
-    }
-  };
-
-  const handleGutscheinUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setGutscheinBild(URL.createObjectURL(file));
     }
   };
 
@@ -213,11 +206,11 @@ export default function GutscheinLandingPage() {
             p: { xs: 4, md: 8 },
           }}
         >
-          <Box sx={{ maxWidth: '450px', width: '100%', textAlign: { xs: 'center', md: 'left' }, mt: { xs: 8, md: 0 } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
+          <Box sx={{ maxWidth: '450px', width: '100%', textAlign: { xs: 'center', md: 'left' }, mt: { xs: 6, md: -2 } }}>
+            <Typography variant="h5" sx={{ fontWeight: 500, mb: 1, color: 'grey.600' }}>
               Gutschein für
             </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 4 }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, mb: 4, color: 'grey.800' }}>
               {kundenName}
             </Typography>
 
@@ -291,45 +284,8 @@ export default function GutscheinLandingPage() {
           }}
         >
           <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
-            <label>
-              <input type="file" hidden accept="image/*" onChange={handleHintergrundUpload} />
-              <IconButton sx={{ color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)' }} component="span">
-                <UploadIcon />
-              </IconButton>
-            </label>
           </Box>
         </Box>
-
-        {gutscheinBild && (
-          <Box
-            component="img"
-            src={gutscheinBild}
-            alt="Gutschein"
-            sx={{
-              display: { xs: 'none', md: 'block' },
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '280px',
-              height: 'auto',
-              boxShadow: 3,
-              backgroundColor: '#fff',
-              p: 1,
-              borderRadius: 1,
-            }}
-          />
-        )}
-
-        <Box sx={{ position: 'absolute', top: 16, left: { xs: 'calc(50% - 30px)', md: 'calc(50% - 40px)' }, zIndex: 5 }}>
-          <label>
-            <input type="file" hidden accept="image/*" onChange={handleGutscheinUpload} />
-            <IconButton sx={{ color: '#000', backgroundColor: 'rgba(255,255,255,0.8)' }} component="span">
-              <UploadIcon />
-            </IconButton>
-          </label>
-        </Box>
-
       </Box>
     </Elements>
   );

@@ -19,7 +19,7 @@ export default function Zahlungsdaten() {
         label="Kontoinhaber" 
         variant="outlined" 
         required 
-        fullWidth 
+        fullWidth
       />
 
       <TextField 
