@@ -1,27 +1,22 @@
-import { Box, TextField, Typography, ToggleButton, ToggleButtonGroup, Button, Chip } from '@mui/material';
+import { Box, TextField, Typography, Switch, Button, Chip, Paper } from '@mui/material';
 import { useState } from 'react';
 
 export default function GutscheinDetails() {
-  const [type, setType] = useState<'wert' | 'dienstleistung' | ''>('');
-  const [valueInput, setValueInput] = useState('');
-  const [values, setValues] = useState<string[]>([]);
-  const [allowCustomValue, setAllowCustomValue] = useState(false);
-
-  const [serviceDesc, setServiceDesc] = useState('');
+  const [enableFreeValue, setEnableFreeValue] = useState(false);
+  const [enableServices, setEnableServices] = useState(false);
+  const [serviceShortDesc, setServiceShortDesc] = useState('');
+  const [serviceLongDesc, setServiceLongDesc] = useState('');
   const [servicePrice, setServicePrice] = useState('');
-  const [services, setServices] = useState<{ desc: string; price: string }[]>([]);
-
-  const handleAddValue = () => {
-    if (valueInput.trim()) {
-      setValues([...values, valueInput.trim()]);
-      setValueInput('');
-    }
-  };
+  const [services, setServices] = useState<{ shortDesc: string; longDesc: string; price: string }[]>([]);
 
   const handleAddService = () => {
-    if (serviceDesc.trim() && servicePrice.trim()) {
-      setServices([...services, { desc: serviceDesc.trim(), price: servicePrice.trim() }]);
-      setServiceDesc('');
+    if (serviceShortDesc.trim() && servicePrice.trim()) {
+      setServices([
+        ...services,
+        { shortDesc: serviceShortDesc.trim(), longDesc: serviceLongDesc.trim(), price: servicePrice.trim() },
+      ]);
+      setServiceShortDesc('');
+      setServiceLongDesc('');
       setServicePrice('');
     }
   };
@@ -37,104 +32,80 @@ export default function GutscheinDetails() {
         Bitte legen Sie die Details für den Gutschein fest.
       </Typography>
 
-      <TextField 
-        label="Name des Gutscheins" 
-        variant="outlined" 
-        required 
-        fullWidth 
-        placeholder="z. B. Wellness-Gutschein, Abendessen, etc."
-      />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <Typography sx={{ fontWeight: 500 }}>Freie Wertangabe möglich</Typography>
+        <Switch
+          checked={enableFreeValue}
+          onChange={(e) => setEnableFreeValue(e.target.checked)}
+        />
+      </Box>
 
-      <Typography sx={{ mt: '0.5rem', fontWeight: 500 }}>
-        Art des Gutscheins
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <Typography sx={{ fontWeight: 500 }}>Feste Dienstleistungen</Typography>
+        <Switch
+          checked={enableServices}
+          onChange={(e) => setEnableServices(e.target.checked)}
+        />
+      </Box>
 
-      <ToggleButtonGroup
-        value={type}
-        exclusive
-        onChange={(_, newType) => setType(newType)}
-        sx={{ display: 'flex', gap: '1rem' }}
-      >
-        <ToggleButton value="wert" sx={{ flex: 1 }}>
-          Wert-Gutschein
-        </ToggleButton>
-        <ToggleButton value="dienstleistung" sx={{ flex: 1 }}>
-          Dienstleistung
-        </ToggleButton>
-      </ToggleButtonGroup>
-
-      {type === 'wert' && (
+      {enableServices && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
-          <Typography>
-            Fügen Sie feste Gutscheinwerte hinzu:
-          </Typography>
-
-          <Box sx={{ display: 'flex', gap: '1rem' }}>
-            <TextField 
-              label="Betrag in €" 
-              variant="outlined" 
-              type="number" 
-              value={valueInput}
-              onChange={(e) => setValueInput(e.target.value)}
-              fullWidth 
-            />
-            <Button variant="contained" onClick={handleAddValue}>
-              Hinzufügen
-            </Button>
-          </Box>
-
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            {values.map((val, index) => (
-              <Chip 
-                key={index} 
-                label={`${val} €`} 
-                onDelete={() => setValues(values.filter((_, i) => i !== index))} 
-              />
-            ))}
-          </Box>
-
-        </Box>
-      )}
-
-      {type === 'dienstleistung' && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
           <Typography>
             Fügen Sie mögliche Dienstleistungen hinzu:
           </Typography>
 
-          <Box sx={{ display: 'flex', gap: '1rem' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Box sx={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <TextField 
+                label="Kurzbeschreibung" 
+                variant="outlined" 
+                value={serviceShortDesc}
+                onChange={(e) => setServiceShortDesc(e.target.value)}
+                fullWidth 
+              />
+              <TextField 
+                label="Preis in €" 
+                variant="outlined" 
+                type="number"
+                value={servicePrice}
+                onChange={(e) => setServicePrice(e.target.value)}
+                sx={{ width: '150px' }}
+              />
+            </Box>
             <TextField 
-              label="Beschreibung" 
+              label="Längere Beschreibung (optional)" 
               variant="outlined" 
-              value={serviceDesc}
-              onChange={(e) => setServiceDesc(e.target.value)}
+              value={serviceLongDesc}
+              onChange={(e) => setServiceLongDesc(e.target.value)}
               fullWidth 
-            />
-            <TextField 
-              label="Preis in €" 
-              variant="outlined" 
-              type="number"
-              value={servicePrice}
-              onChange={(e) => setServicePrice(e.target.value)}
-              sx={{ width: '150px' }}
             />
             <Button variant="contained" onClick={handleAddService}>
               Hinzufügen
             </Button>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {services.map((serv, index) => (
-              <Chip 
-                key={index} 
-                label={`${serv.desc} – ${serv.price} €`} 
-                onDelete={() => setServices(services.filter((_, i) => i !== index))} 
-              />
+              <Paper key={index} sx={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <Typography sx={{ fontWeight: 500 }}>
+                  {serv.shortDesc} – {serv.price} €
+                </Typography>
+                {serv.longDesc && (
+                  <Typography sx={{ color: '#555' }}>
+                    {serv.longDesc}
+                  </Typography>
+                )}
+                <Box sx={{ display: 'flex', gap: '0.5rem' }}>
+                  <Button variant="outlined" onClick={() => alert(`Details: ${serv.longDesc}`)}>
+                    Details anzeigen
+                  </Button>
+                  <Button variant="outlined" color="error" onClick={() => setServices(services.filter((_, i) => i !== index))}>
+                    Löschen
+                  </Button>
+                </Box>
+              </Paper>
             ))}
           </Box>
-
         </Box>
       )}
 

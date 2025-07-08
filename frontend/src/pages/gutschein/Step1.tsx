@@ -1,8 +1,32 @@
-import { Box, TextField, Typography } from '@mui/material';
+import { Box, TextField, Typography, Button } from '@mui/material';
+import { useState } from 'react';
 import { useGutschein } from '../../context/GutscheinContext';
 
 export default function Step1() {
   const { data, setData } = useGutschein();
+  const [websiteError, setWebsiteError] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setData({ ...data, image: file });
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleWebsiteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setData({ ...data, website: url });
+
+    // Simple URL validation
+    const urlPattern = /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)(\/[\w-]*)*$/;
+    setWebsiteError(!urlPattern.test(url));
+  };
 
   return (
     <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -44,6 +68,17 @@ export default function Step1() {
       />
 
       <TextField 
+        label="Website-URL" 
+        variant="outlined" 
+        type="url" 
+        required 
+        fullWidth 
+        value={data.website}
+        onChange={handleWebsiteChange}
+        error={websiteError}
+        helperText={websiteError ? 'Bitte geben Sie eine gültige URL ein.' : ''}
+      />
+      <TextField 
         label="Telefonnummer (optional)" 
         variant="outlined" 
         type="tel" 
@@ -61,6 +96,29 @@ export default function Step1() {
         onChange={(e) => setData({ ...data, geschaeftsart: e.target.value })}
       />
 
+      <Typography sx={{ color: '#555', mt: '1rem' }}>
+        Unternehmensbild hochladen: (Für die Darstellung auf der Website)
+      </Typography>
+      <Button variant="contained" component="label">
+        Bild auswählen
+        <input 
+          type="file" 
+          accept="image/*" 
+          hidden 
+          onChange={handleImageUpload} 
+        />
+      </Button>
+
+      {imagePreview && (
+        <Box sx={{ mt: '1rem', textAlign: 'center' }}>
+          <Typography sx={{ color: '#555', mb: '0.5rem' }}>Vorschau:</Typography>
+          <img 
+            src={imagePreview} 
+            alt="Bildvorschau" 
+            style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} 
+          />
+        </Box>
+      )}
     </Box>
   );
 }
