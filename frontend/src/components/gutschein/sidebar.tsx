@@ -1,6 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import { useNavigate } from 'react-router-dom';
+import TopLeftLogo from '../home/TopLeftLogo'; // Import für TopLeftLogo
 
 interface SidebarProps {
   activeStep: number;
@@ -20,7 +21,7 @@ export default function Sidebar({ activeStep }: SidebarProps) {
   return (
     <Box
       sx={{
-        width: '280px',
+        width: '400px',
         backgroundColor: '#EAF4F2',
         padding: '4rem 2rem 8rem 2rem',
         display: 'flex',
@@ -31,23 +32,14 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         position: 'relative',
       }}
     >
+      {/* TopLeftLogo hinzufügen */}
+      <Box sx={{ position: 'absolute', top: '0rem', left: '3rem', zIndex: 3 }}>
+        <TopLeftLogo />
+      </Box>
 
 
-      <Typography
-        variant="h6"
-        sx={{
-          color: 'black',
-          marginBottom: '4rem',
-          fontWeight: 'bold',
-          textAlign: 'center',
-          cursor: 'pointer',
-        }}
-        onClick={() => window.location.href = '/'}
-      >
-        Gutscheinfabrik
-      </Typography>
 
-      <Typography sx={{ fontSize: '1.4rem', fontWeight: 700, mb: '4rem', mt: '0rem', color: '#111' }}>
+      <Typography sx={{ fontSize: '1.4rem', fontWeight: 700, mb: '4rem', mt: '5rem', color: '#111' }}>
         Onboarding
       </Typography>
 

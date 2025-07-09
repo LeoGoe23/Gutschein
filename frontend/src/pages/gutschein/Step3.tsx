@@ -1,13 +1,16 @@
 import { Box, Button, Typography, TextField, Card, CardActionArea } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
-import CollectionsIcon from '@mui/icons-material/Collections';
-import DesignServicesIcon from '@mui/icons-material/DesignServices'; // Neues Icon importieren
+import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import { useState } from 'react';
+import { ResizableBox } from 'react-resizable'; // Hinzufügen der Resizable-Komponente
+import 'react-resizable/css/styles.css'; // CSS für Resizable-Komponente importieren
 
 interface Feld {
   typ: 'CODE' | 'TEXT' | 'BETRAG';
   x: number;
   y: number;
+  width: number; // Neue Eigenschaft für Breite
+  height: number; // Neue Eigenschaft für Höhe
   text: string;
   editing: boolean;
 }
@@ -15,8 +18,9 @@ interface Feld {
 export default function GutscheinEditor() {
   const [modus, setModus] = useState<'eigenes' | 'vorlage' | 'designen'>('eigenes');
   const [hintergrund, setHintergrund] = useState<string | null>(null);
-  const [felder, setFelder] = useState<Feld[]>([]); // Keine Elemente initial
+  const [felder, setFelder] = useState<Feld[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isResizing, setIsResizing] = useState<boolean[]>([]); // State für Skalierung
 
   const handleBildUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -54,6 +58,26 @@ export default function GutscheinEditor() {
     setFelder(newFelder);
   };
 
+  const handleResizeStart = (index: number) => {
+    const resizingState = [...isResizing];
+    resizingState[index] = true;
+    setIsResizing(resizingState);
+  };
+
+  const handleResizeStop = (index: number, data: { size: { width: number; height: number } }) => {
+    const resizingState = [...isResizing];
+    resizingState[index] = false;
+    setIsResizing(resizingState);
+
+    const newFelder = [...felder];
+    newFelder[index] = {
+      ...newFelder[index],
+      width: data.size.width,
+      height: data.size.height,
+    };
+    setFelder(newFelder);
+  };
+
   return (
     <Box sx={{ p: 0 }}>
       <Typography variant="h5" mb={2} sx={{ fontSize: '2rem', fontWeight: 700 }}>
@@ -71,20 +95,7 @@ export default function GutscheinEditor() {
         >
           <CardActionArea onClick={() => setModus('eigenes')} sx={{ p: 2, textAlign: 'center' }}>
             <ImageIcon sx={{ fontSize: 40, color: modus === 'eigenes' ? '#1976d2' : '#555' }} />
-            <Typography mt={1}>Eigenes Design hochladen</Typography>
-          </CardActionArea>
-        </Card>
-
-        <Card
-          sx={{
-            width: 200,
-            border: modus === 'vorlage' ? '2px solid #1976d2' : '1px solid #ccc',
-            boxShadow: modus === 'vorlage' ? '0 0 10px rgba(25, 118, 210, 0.5)' : 'none',
-          }}
-        >
-          <CardActionArea onClick={() => setModus('vorlage')} sx={{ p: 2, textAlign: 'center' }}>
-            <CollectionsIcon sx={{ fontSize: 40, color: modus === 'vorlage' ? '#1976d2' : '#555' }} />
-            <Typography mt={1}>Vorgefertigtes Design wählen</Typography>
+            <Typography mt={1}>Design hochladen/ Design auswählen</Typography>
           </CardActionArea>
         </Card>
 
@@ -105,7 +116,7 @@ export default function GutscheinEditor() {
       {/* Hauptbereich mit Editor und Gutscheincode-Elementen */}
       <Box sx={{ display: 'flex', gap: 2 }}>
         {modus === 'designen' ? (
-          <Box sx={{ width: '100%', textAlign: 'center', mt: 4 }}>
+          <Box sx={{ width: '100%', textAlign: 'left', mt: 4 }}> {/* textAlign auf 'left' geändert */}
             <Typography variant="h6" sx={{ fontWeight: 500 }}>
               Wir erstellen den Gutschein!
             </Typography>
@@ -130,7 +141,7 @@ export default function GutscheinEditor() {
                   <Button
                     variant="contained"
                     component="label"
-                    sx={{ textTransform: 'none' }}
+                    sx={{ textTransform: 'none', mb: 2 }}
                   >
                     Datei auswählen
                     <input
@@ -139,6 +150,16 @@ export default function GutscheinEditor() {
                       onChange={handleBildUpload}
                       hidden
                     />
+                  </Button>
+
+                  {/* Button für Gutscheindesign auswählen */}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    sx={{ textTransform: 'none' }}
+                    onClick={() => console.log('Gutscheindesign auswählen')}
+                  >
+                    Design auswählen
                   </Button>
                 </Box>
               )}
@@ -197,6 +218,8 @@ export default function GutscheinEditor() {
                     typ: 'CODE',
                     x: e.clientX - rect.left - 50,
                     y: e.clientY - rect.top - 15,
+                    width: 100, // Standardbreite
+                    height: 50, // Standardhöhe
                     text: 'Gutscheincode hier',
                     editing: false,
                   });
@@ -205,15 +228,11 @@ export default function GutscheinEditor() {
                     typ: 'BETRAG',
                     x: e.clientX - rect.left - 50,
                     y: e.clientY - rect.top - 15,
+                    width: 100,
+                    height: 50,
                     text: 'Betrag / Dienstleistung',
                     editing: false,
                   });
-                } else if (draggedIndex !== null) {
-                  newFelder[draggedIndex] = {
-                    ...newFelder[draggedIndex],
-                    x: e.clientX - rect.left - 50,
-                    y: e.clientY - rect.top - 15,
-                  };
                 }
 
                 setFelder(newFelder);
@@ -228,42 +247,62 @@ export default function GutscheinEditor() {
                 />
               )}
 
-              {modus === 'eigenes' && felder.map((feld, index) => (
-                <div
-                  key={index}
-                  style={{
-                    position: 'absolute',
-                    left: feld.x,
-                    top: feld.y,
-                    padding: '4px 8px',
-                    backgroundColor: 'rgba(255,255,255,0.8)',
-                    border: '1px dashed gray',
-                    cursor: 'move',
-                    minWidth: '80px',
-                  }}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDoubleClick={() => toggleEdit(index)}
-                >
-                  {feld.editing ? (
-                    <TextField
-                      size="small"
-                      value={feld.text}
-                      onChange={(e) => updateText(index, e.target.value)}
-                      onBlur={() => toggleEdit(index)}
-                      autoFocus
-                    />
-                  ) : (
-                    <span>{feld.text}</span>
-                  )}
-                </div>
-              ))}
+              {modus === 'eigenes' && felder.map((feld, index) => {
+                return (
+                  <div
+                    key={index}
+                    draggable={!isResizing[index]} // Deaktivieren von draggable während des Skalierens
+                    onDragStart={() => handleDragStart(index)}
+                    onDragEnd={(e) => {
+                      const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                      const newFelder = [...felder];
+                      newFelder[index] = {
+                        ...newFelder[index],
+                        x: e.clientX - rect.left - feld.width / 2,
+                        y: e.clientY - rect.top - feld.height / 2,
+                      };
+                      setFelder(newFelder);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: feld.x,
+                      top: feld.y,
+                      cursor: isResizing[index] ? 'default' : 'move', // Cursor ändern, wenn skaliert wird
+                    }}
+                  >
+                    <ResizableBox
+                      width={feld.width}
+                      height={feld.height}
+                      minConstraints={[50, 30]} // Mindestgröße
+                      maxConstraints={[300, 200]} // Maximalgröße
+                      onResizeStart={() => handleResizeStart(index)} // Skalierung starten
+                      onResizeStop={(e, data) => handleResizeStop(index, data)} // Skalierung beenden
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        border: '1px dashed gray',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: Math.min(feld.width / 10, feld.height / 2), // Dynamische Textgröße
+                          textAlign: 'center',
+                        }}
+                      >
+                        <span>{feld.text}</span>
+                      </div>
+                    </ResizableBox>
+                  </div>
+                );
+              })}
             </Box>
           </>
         )}
       </Box>
-
-      
     </Box>
   );
 }
