@@ -1,11 +1,9 @@
-const express = require("express");
-const router = express.Router();
-const Stripe = require("stripe");
-const bodyParser = require("body-parser");
-const Gutschein = require("../models/Gutschein");
-require("dotenv").config();
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const express     = require("express");
+const router      = express.Router();
+const bodyParser  = require("body-parser");
+const Stripe      = require("stripe");
+const stripe      = new Stripe(process.env.STRIPE_SECRET_KEY);
+const Gutschein   = require("../models/Gutschein");
 
 router.post(
   "/",
@@ -14,15 +12,6 @@ router.post(
     const sig = req.headers["stripe-signature"];
     let event;
 
-    // 🔍 Debugging
-    console.log("📩 Raw Body:", req.body.toString());
-    console.log("🔐 Webhook Secret geladen:", process.env.STRIPE_WEBHOOK_SECRET);
-
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      console.error("❌ Kein Webhook-Secret gesetzt!");
-      return res.status(500).send("Webhook secret fehlt.");
-    }
-
     try {
       event = stripe.webhooks.constructEvent(
         req.body,
@@ -30,40 +19,28 @@ router.post(
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
-      console.error("❌ Webhook Fehler:", err.message);
+      console.error("Webhook Error:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    console.log(`🔔 Event empfangen: ${event.type}`);
+    console.log("Stripe Event:", event.type);
 
     if (event.type === "payment_intent.succeeded") {
-      const paymentIntent = event.data.object;
-      console.log("✅ Zahlung erfolgreich:", paymentIntent.id);
+      const pi = event.data.object;
+      console.log("Zahlung erfolgreich:", pi.id);
 
-      const code = paymentIntent.metadata?.gutscheincode;
-      if (!code) {
-        console.warn("⚠️ Kein Gutscheincode enthalten.");
-        return res.status(200).send();
-      }
-
-      try {
-        const gutschein = await Gutschein.findOneAndUpdate(
+      // Beispiel: markiere Gutschein als eingelöst, wenn Code im Metadata
+      const code = pi.metadata?.gutscheincode;
+      if (code) {
+        await Gutschein.findOneAndUpdate(
           { code },
-          { eingelöst: true },
-          { new: true }
+          { eingelöst: true }
         );
-
-        if (gutschein) {
-          console.log(`🎉 Gutschein ${code} eingelöst.`);
-        } else {
-          console.warn(`🔎 Gutschein ${code} nicht gefunden.`);
-        }
-      } catch (err) {
-        console.error("❌ Fehler beim Gutschein-Update:", err.message);
+        console.log("Gutschein", code, "als eingelöst markiert");
       }
     }
 
-    res.status(200).json({ received: true });
+    res.json({ received: true });
   }
 );
 
