@@ -12,7 +12,9 @@ import AppleIcon from '@mui/icons-material/Apple';
 import GoogleIcon from '@mui/icons-material/Google';
 import PayPalIcon from '@mui/icons-material/AccountBalanceWallet'; // Beispiel-Icon für PayPal
 
-const stripePromise = loadStripe('your-publishable-key-here'); // Ersetze mit deinem Stripe-Publishable-Key
+const stripePromise = loadStripe('pk_test_51RhHIRR2x5MTZQ6PvldGQhCgkDZMHXWxXOnesPE9SOslCdAl8B3RWN5eC2eWPtmwA0zBd4ptrpWSyamgaza6rs8a00OHFXf1DL')
+const router = express.Router();
+const stripe = new Stripe('sk_test_51RhHIRR2x5MTZQ6PvoOovToEeZ5nOJExSSGkkJH74JVfjMApM1vfoNEXWNjdHNKsAJm4wzjcONMQPFPgpFe6vp3u006m1jIbvy', { apiVersion: '2022-11-15' });
 
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
@@ -81,7 +83,7 @@ function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   );
 }
 
-function PaymentForm({ betrag }: { betrag: number | null }) {
+function PaymentForm({ betrag, customerEmail }: { betrag: number | null, customerEmail: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
@@ -97,15 +99,16 @@ function PaymentForm({ betrag }: { betrag: number | null }) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ amount: betrag * 100, paymentMethod }),
+      body: JSON.stringify({ amount: betrag * 100, paymentMethod, customerEmail }),
     });
 
     const { clientSecret } = await response.json();
 
     const result = await stripe.confirmPayment({
+      clientSecret,
       elements,
       confirmParams: {
-        return_url: 'http://localhost:3000/success',
+        return_url: 'http://localhost:3001/success',
       },
     });
 
@@ -155,6 +158,7 @@ export default function GutscheinLandingPage() {
   const [gutscheinBild, setGutscheinBild] = useState<string | null>(null);
   const [betrag, setBetrag] = useState<number | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [customerEmail, setCustomerEmail] = useState<string>("");
 
   const kundenName = "Ihr Unternehmen";
   const beschreibung = "Ihr Gutschein kann direkt nach dem Kauf per E-Mail versendet oder ausgedruckt werden.";
@@ -221,9 +225,26 @@ export default function GutscheinLandingPage() {
             {!showPaymentForm && (
               <>
                 <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
+                  An welche E-Mail Adresse soll der Gutschein geschickt werden?
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-start' }, alignItems: 'center', mb: 4 }}>
+                  <input
+                    type="email"
+                    placeholder="E-Mail eingeben"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    style={{
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #ccc',
+                      width: '300px',
+                      fontSize: '1rem',
+                    }}
+                  />
+                </Box>
+                <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
                   Welchen Betrag möchten Sie schenken?
                 </Typography>
-
                 <Box sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-start' }, alignItems: 'center', mb: 4 }}>
                   <input
                     type="number"
@@ -241,7 +262,6 @@ export default function GutscheinLandingPage() {
                   />
                   <Typography variant="body1" sx={{ fontSize: '1.2rem' }}>€</Typography>
                 </Box>
-
                 <Button
                   variant="contained"
                   size="large"
@@ -264,7 +284,7 @@ export default function GutscheinLandingPage() {
               </>
             )}
 
-            {showPaymentForm && <PaymentForm betrag={betrag} />}
+            {showPaymentForm && <PaymentForm betrag={betrag} customerEmail={customerEmail} />}
           </Box>
         </Box>
 
