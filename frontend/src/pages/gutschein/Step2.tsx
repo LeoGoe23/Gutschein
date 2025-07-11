@@ -1,29 +1,51 @@
-import { Box, TextField, Typography, Switch, Button, Chip, Paper } from '@mui/material';
+import { Box, TextField, Typography, Switch, Button, Paper } from '@mui/material';
 import { useState } from 'react';
+import { useGutschein } from '../../context/GutscheinContext';
+
+interface Dienstleistung {
+  shortDesc: string;
+  longDesc: string;
+  price: string;
+}
 
 export default function GutscheinDetails() {
-  const [enableFreeValue, setEnableFreeValue] = useState(false);
-  const [enableServices, setEnableServices] = useState(false);
+  const { data, setData } = useGutschein();
   const [serviceShortDesc, setServiceShortDesc] = useState('');
   const [serviceLongDesc, setServiceLongDesc] = useState('');
   const [servicePrice, setServicePrice] = useState('');
-  const [services, setServices] = useState<{ shortDesc: string; longDesc: string; price: string }[]>([]);
 
   const handleAddService = () => {
     if (serviceShortDesc.trim() && servicePrice.trim()) {
-      setServices([
-        ...services,
-        { shortDesc: serviceShortDesc.trim(), longDesc: serviceLongDesc.trim(), price: servicePrice.trim() },
-      ]);
+      const newService = {
+        shortDesc: serviceShortDesc.trim(),
+        longDesc: serviceLongDesc.trim(),
+        price: servicePrice.trim(),
+      };
+      setData({
+        ...data,
+        dienstleistungen: [...data.dienstleistungen, newService],
+      });
       setServiceShortDesc('');
       setServiceLongDesc('');
       setServicePrice('');
     }
   };
 
+  const handleToggleFreeValue = (checked: boolean) => {
+    setData({ ...data, customValue: checked });
+  };
+
+  const handleToggleServices = (checked: boolean) => {
+    setData({ ...data, art: checked ? 'dienstleistung' : 'wert' });
+  };
+
+  const handleDeleteService = (index: number) => {
+    const updatedServices = data.dienstleistungen.filter((_: any, i: number) => i !== index);
+    setData({ ...data, dienstleistungen: updatedServices });
+  };
+
   return (
     <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
       <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>
         Gutschein Details
       </Typography>
@@ -35,20 +57,20 @@ export default function GutscheinDetails() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <Typography sx={{ fontWeight: 500 }}>Freie Wertangabe möglich</Typography>
         <Switch
-          checked={enableFreeValue}
-          onChange={(e) => setEnableFreeValue(e.target.checked)}
+          checked={data.customValue}
+          onChange={(e) => handleToggleFreeValue(e.target.checked)}
         />
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <Typography sx={{ fontWeight: 500 }}>Feste Dienstleistungen</Typography>
         <Switch
-          checked={enableServices}
-          onChange={(e) => setEnableServices(e.target.checked)}
+          checked={data.art === 'dienstleistung'}
+          onChange={(e) => handleToggleServices(e.target.checked)}
         />
       </Box>
 
-      {enableServices && (
+      {data.art === 'dienstleistung' && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <Typography>
             Fügen Sie mögliche Dienstleistungen hinzu:
@@ -85,30 +107,29 @@ export default function GutscheinDetails() {
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {services.map((serv, index) => (
+            {data.dienstleistungen.map((serv: Dienstleistung, index: number) => (
               <Paper key={index} sx={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <Typography sx={{ fontWeight: 500 }}>
-                  {serv.shortDesc} – {serv.price} €
+              <Typography sx={{ fontWeight: 500 }}>
+                {serv.shortDesc} – {serv.price} €
+              </Typography>
+              {serv.longDesc && (
+                <Typography sx={{ color: '#555' }}>
+                {serv.longDesc}
                 </Typography>
-                {serv.longDesc && (
-                  <Typography sx={{ color: '#555' }}>
-                    {serv.longDesc}
-                  </Typography>
-                )}
-                <Box sx={{ display: 'flex', gap: '0.5rem' }}>
-                  <Button variant="outlined" onClick={() => alert(`Details: ${serv.longDesc}`)}>
-                    Details anzeigen
-                  </Button>
-                  <Button variant="outlined" color="error" onClick={() => setServices(services.filter((_, i) => i !== index))}>
-                    Löschen
-                  </Button>
-                </Box>
+              )}
+              <Box sx={{ display: 'flex', gap: '0.5rem' }}>
+                <Button variant="outlined" onClick={() => alert(`Details: ${serv.longDesc}`)}>
+                Details anzeigen
+                </Button>
+                <Button variant="outlined" color="error" onClick={() => handleDeleteService(index)}>
+                Löschen
+                </Button>
+              </Box>
               </Paper>
             ))}
           </Box>
         </Box>
       )}
-
     </Box>
   );
 }

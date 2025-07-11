@@ -156,7 +156,7 @@ export default function GutscheinLandingPage() {
   const [betrag, setBetrag] = useState<number | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
 
-  const kundenName = "Ihr Unternehmen";
+  const kundenName = "Rümenapf Buch am Erlbach";
   const beschreibung = "Ihr Gutschein kann direkt nach dem Kauf per E-Mail versendet oder ausgedruckt werden.";
 
   // Firebase Storage Bild laden

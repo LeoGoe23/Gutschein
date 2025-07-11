@@ -10,7 +10,7 @@ export default function Step1() {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setData({ ...data, image: file });
+      setData({ ...data, bild: file });
       const reader = new FileReader();
       reader.onload = () => {
         setImagePreview(reader.result as string);
