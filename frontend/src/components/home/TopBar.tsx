@@ -57,7 +57,7 @@ export default function TopBar() {
               textDecoration: 'none',
             }}
           >
-            Über uns
+            Vorteile
           </Typography>
 
           <Typography

@@ -14,13 +14,20 @@ export function GutscheinProvider({ children }: { children: React.ReactNode }) {
     dienstleistungen: [] as { desc: string; price: string }[],
     customValue: false,
     name: '',
-    bild: null as string | null, // Bild des Unternehmens
+    bild: null as File | null, // Bild des Unternehmens
     unternehmensname: '', // Unternehmensname
     design: 'light',
+    website: '', // Website-Link
+    kontoinhaber: '', // Neuer State für Kontoinhaber
+    iban: '', // Neuer State für IBAN
   });
 
+  const updateData = (newData: Partial<typeof data>) => {
+    setData((prevData) => ({ ...prevData, ...newData }));
+  };
+
   return (
-    <GutscheinContext.Provider value={{ data, setData }}>
+    <GutscheinContext.Provider value={{ data, setData: updateData }}>
       {children}
     </GutscheinContext.Provider>
   );
