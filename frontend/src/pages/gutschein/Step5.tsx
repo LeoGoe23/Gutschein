@@ -1,10 +1,16 @@
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Typography, Button, Stack } from '@mui/material';
 import { useGutschein } from '../../context/GutscheinContext';
 import { ReactElement } from 'react';
-import { Email, Phone, Person, Business, Image } from '@mui/icons-material';
+import { Email, Phone, Person, Business } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
 export default function Zusammenfassung() {
   const { data } = useGutschein();
+  const navigate = useNavigate();
+
+  const handlePreview = () => {
+    navigate('/checkoutdemo');
+  };
 
   return (
     <Box sx={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -18,36 +24,38 @@ export default function Zusammenfassung() {
 
       <Box sx={{ border: '1px solid #ddd', borderRadius: '1rem', padding: '2rem', backgroundColor: '#FAFAFA' }}>
         
-        <Typography sx={{ fontWeight: 500, mb: '0.5rem', color: '#333' }}>
+        <Typography sx={{ fontWeight: 500, mb: '1.5rem', color: '#333' }}>
           Persönliche Daten:
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Person sx={{ color: '#607D8B' }} />
-          <Typography>Name: {data.nachname}</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Email sx={{ color: '#607D8B' }} />
-          <Typography>E-Mail: {data.email}</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Phone sx={{ color: '#607D8B' }} />
-          <Typography>Telefon: {data.telefon}</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Business sx={{ color: '#607D8B' }} />
-          <Typography>IBAN: {data.geschaeftsart}</Typography>
-        </Box>
-
-        {data.bild && (
-          <Box sx={{ mt: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Image sx={{ color: '#607D8B' }} />
-            <img src={data.bild} alt="Bild" style={{ width: '100px', borderRadius: '0.5rem' }} />
-          </Box>
-        )}
+        
+        <Stack spacing={2}>
+          <Stack direction="row" spacing={4}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+              <Person sx={{ color: '#4CAF50', fontSize: '1.5rem' }} />
+              <Typography sx={{ fontWeight: 500 }}>Name: {data.nachname}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+              <Email sx={{ color: '#2196F3', fontSize: '1.5rem' }} />
+              <Typography sx={{ fontWeight: 500 }}>E-Mail: {data.email}</Typography>
+            </Box>
+          </Stack>
+          
+          <Stack direction="row" spacing={4}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+              <Phone sx={{ color: '#FF9800', fontSize: '1.5rem' }} />
+              <Typography sx={{ fontWeight: 500 }}>Telefon: {data.telefon}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+              <Business sx={{ color: '#9C27B0', fontSize: '1.5rem' }} />
+              <Typography sx={{ fontWeight: 500 }}>IBAN: {data.iban}</Typography>
+            </Box>
+          </Stack>
+        </Stack>
       </Box>
 
       <Button
         variant="contained"
+        onClick={handlePreview}
         sx={{
           mt: '2rem',
           backgroundColor: '#607D8B',

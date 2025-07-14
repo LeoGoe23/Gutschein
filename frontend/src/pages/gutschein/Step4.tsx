@@ -1,8 +1,14 @@
 import { Box, TextField, Typography } from '@mui/material';
 import { useState } from 'react';
+import { useGutschein } from '../../context/GutscheinContext'; // Importiere den Kontext
 
 export default function Zahlungsdaten() {
+  const { data, setData } = useGutschein(); // Hole den Kontext
   const [payoutLimit, setPayoutLimit] = useState('');
+
+  const handleInputChange = (field: string, value: string) => {
+    setData({ [field]: value }); // Aktualisiere den Kontext
+  };
 
   return (
     <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -20,6 +26,8 @@ export default function Zahlungsdaten() {
         variant="outlined" 
         required 
         fullWidth
+        value={data.kontoinhaber} // Wert aus dem Kontext
+        onChange={(e) => handleInputChange('kontoinhaber', e.target.value)} // Kontext aktualisieren
       />
 
       <TextField 
@@ -28,6 +36,8 @@ export default function Zahlungsdaten() {
         required 
         fullWidth 
         placeholder="DE..."
+        value={data.iban} // Wert aus dem Kontext
+        onChange={(e) => handleInputChange('iban', e.target.value)} // Kontext aktualisieren
       />
 
     </Box>

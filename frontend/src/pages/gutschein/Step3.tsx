@@ -18,14 +18,23 @@ interface Feld {
 export default function GutscheinEditor() {
   const [modus, setModus] = useState<'eigenes' | 'vorlage' | 'designen'>('eigenes');
   const [hintergrund, setHintergrund] = useState<string | null>(null);
+  const [hintergrundTyp, setHintergrundTyp] = useState<'image' | 'pdf' | null>(null);
   const [felder, setFelder] = useState<Feld[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState<boolean[]>([]); // State für Skalierung
 
   const handleBildUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      const url = URL.createObjectURL(e.target.files[0]);
+      const file = e.target.files[0];
+      const url = URL.createObjectURL(file);
       setHintergrund(url);
+      
+      // Bestimme den Dateityp
+      if (file.type === 'application/pdf') {
+        setHintergrundTyp('pdf');
+      } else if (file.type.startsWith('image/')) {
+        setHintergrundTyp('image');
+      }
     }
   };
 
@@ -121,7 +130,7 @@ export default function GutscheinEditor() {
               Wir erstellen den Gutschein!
             </Typography>
             <Typography variant="body1" sx={{ mt: 2 }}>
-              Unser Team wird Ihre Website analysieren und einen personalisierten Gutschein für Sie erstellen – frei Haus!
+              Unser Team wird Ihre Website analysieren und einen personalisierten Gutschein für Sie erstellen – frei Haus! Das kann später jederzeit in den Einstellungen geändert werden.
             </Typography>
           </Box>
         ) : (
@@ -136,7 +145,7 @@ export default function GutscheinEditor() {
               {modus === 'eigenes' && (
                 <Box sx={{ mb: 2 }}>
                   <Typography sx={{ fontWeight: 500, mb: '0.5rem' }}>
-                    Gutscheindesign hochladen (pdf):
+                    Gutscheindesign hochladen:
                   </Typography>
                   <Button
                     variant="contained"
@@ -146,7 +155,7 @@ export default function GutscheinEditor() {
                     Datei auswählen
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,application/pdf"
                       onChange={handleBildUpload}
                       hidden
                     />
@@ -240,11 +249,33 @@ export default function GutscheinEditor() {
               }}
             >
               {modus === 'eigenes' && hintergrund && (
-                <img
-                  src={hintergrund}
-                  alt="Hintergrund"
-                  style={{ width: '100%', height: '100%', position: 'absolute' }}
-                />
+                <>
+                  {hintergrundTyp === 'image' && (
+                    <img
+                      src={hintergrund}
+                      alt="Hintergrund"
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        position: 'absolute',
+                        objectFit: 'contain',
+                        objectPosition: 'center'
+                      }}
+                    />
+                  )}
+                  {hintergrundTyp === 'pdf' && (
+                    <embed
+                      src={hintergrund}
+                      type="application/pdf"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        position: 'absolute',
+                        border: 'none'
+                      }}
+                    />
+                  )}
+                </>
               )}
 
               {modus === 'eigenes' && felder.map((feld, index) => {
