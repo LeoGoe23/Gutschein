@@ -68,6 +68,15 @@ export default function Step1() {
       />
 
       <TextField 
+        label="Unternehmensname" 
+        variant="outlined" 
+        required 
+        fullWidth 
+        value={data.unternehmensname}
+        onChange={(e) => setData({ ...data, unternehmensname: e.target.value })}
+      />
+
+      <TextField 
         label="Website-Link" 
         variant="outlined" 
         type="url" 
@@ -78,6 +87,7 @@ export default function Step1() {
         error={websiteError}
         helperText={websiteError ? 'Bitte geben Sie eine gültige URL ein.' : ''}
       />
+      
       <TextField 
         label="Telefonnummer (optional)" 
         variant="outlined" 

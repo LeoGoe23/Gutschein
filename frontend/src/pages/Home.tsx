@@ -5,12 +5,14 @@ import HeroImage from '../components/home/HeroImage';
 import ContentSection from '../components/home/ContentSection';
 import Footer from '../components/home/Footer';
 import LogoTopLeft from '../components/home/TopLeftLogo';
+import FAQ from '../components/home/FAQ';
+import Vorteile from '../components/home/Vorteile';
 
 export default function HomeLayout() {
   return (
-    <Box sx={{ width: '100%', minHeight: '100vh', overflowX: 'hidden', fontFamily: 'system-ui, sans-serif', padding: { xs: '1rem', md: '0' } }}>
+    <Box sx={{ width: '100%', minHeight: '100vh', overflowX: 'hidden', fontFamily: 'system-ui, sans-serif', padding: { xs: '0', md: '0' } }}>
       
-      <Box sx={{ position: 'relative', width: '100%', height: { xs: 'auto', md: '100vh' }, backgroundColor: '#f4f4f4', overflow: 'hidden', padding: { xs: '2rem 1rem', md: '0' } }}>
+      <Box sx={{ position: 'relative', width: '100%', height: { xs: 'auto', md: '100vh' }, backgroundColor: '#f4f4f4', overflow: 'hidden', padding: { xs: '0', md: '0' } }}>
         
         <LogoTopLeft />
 
@@ -41,7 +43,15 @@ export default function HomeLayout() {
 
       </Box>
 
-      <ContentSection />
+      {/* Content Section */}
+      <Box sx={{ width: '100%', padding: { xs: '0', md: '0' } }}>
+        <ContentSection />
+      </Box>
+
+      {/* FAQ Section */}
+      <Box id="faq" sx={{ width: '100%', padding: { xs: '0', md: '0' } }}>
+        <FAQ />
+      </Box>
       <Footer />
     </Box>
   );

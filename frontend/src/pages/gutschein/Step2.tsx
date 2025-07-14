@@ -13,6 +13,7 @@ export default function GutscheinDetails() {
   const [serviceShortDesc, setServiceShortDesc] = useState('');
   const [serviceLongDesc, setServiceLongDesc] = useState('');
   const [servicePrice, setServicePrice] = useState('');
+  const [servicesEnabled, setServicesEnabled] = useState(data.dienstleistungen.length > 0);
 
   const handleAddService = () => {
     if (serviceShortDesc.trim() && servicePrice.trim()) {
@@ -36,7 +37,17 @@ export default function GutscheinDetails() {
   };
 
   const handleToggleServices = (checked: boolean) => {
-    setData({ ...data, art: checked ? 'dienstleistung' : 'wert' });
+    setServicesEnabled(checked);
+    if (checked) {
+      setData({ ...data, art: 'dienstleistung' });
+    } else {
+      // Wenn deaktiviert, lösche alle Dienstleistungen und setze auf 'wert'
+      setData({ 
+        ...data, 
+        art: 'wert', 
+        dienstleistungen: [] 
+      });
+    }
   };
 
   const handleDeleteService = (index: number) => {
@@ -55,22 +66,26 @@ export default function GutscheinDetails() {
       </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <Typography sx={{ fontWeight: 500 }}>Freie Wertangabe möglich</Typography>
+        <Typography sx={{ fontWeight: 500 }}>Freie Wertangabe für Kunden aktivieren</Typography>
         <Switch
           checked={data.customValue}
           onChange={(e) => handleToggleFreeValue(e.target.checked)}
         />
       </Box>
+      
+      <Typography sx={{ color: '#666', fontSize: '0.9rem' }}>
+        Wenn aktiviert, können Ihre Kunden selbst einen beliebigen Betrag eingeben.
+      </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <Typography sx={{ fontWeight: 500 }}>Feste Dienstleistungen</Typography>
+        <Typography sx={{ fontWeight: 500 }}>Feste Dienstleistungen anbieten</Typography>
         <Switch
-          checked={data.art === 'dienstleistung'}
+          checked={servicesEnabled}
           onChange={(e) => handleToggleServices(e.target.checked)}
         />
       </Box>
 
-      {data.art === 'dienstleistung' && (
+      {servicesEnabled && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <Typography>
             Fügen Sie mögliche Dienstleistungen hinzu:
@@ -109,22 +124,22 @@ export default function GutscheinDetails() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {data.dienstleistungen.map((serv: Dienstleistung, index: number) => (
               <Paper key={index} sx={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Typography sx={{ fontWeight: 500 }}>
-                {serv.shortDesc} – {serv.price} €
-              </Typography>
-              {serv.longDesc && (
-                <Typography sx={{ color: '#555' }}>
-                {serv.longDesc}
+                <Typography sx={{ fontWeight: 500 }}>
+                  {serv.shortDesc} – {serv.price} €
                 </Typography>
-              )}
-              <Box sx={{ display: 'flex', gap: '0.5rem' }}>
-                <Button variant="outlined" onClick={() => alert(`Details: ${serv.longDesc}`)}>
-                Details anzeigen
-                </Button>
-                <Button variant="outlined" color="error" onClick={() => handleDeleteService(index)}>
-                Löschen
-                </Button>
-              </Box>
+                {serv.longDesc && (
+                  <Typography sx={{ color: '#555' }}>
+                    {serv.longDesc}
+                  </Typography>
+                )}
+                <Box sx={{ display: 'flex', gap: '0.5rem' }}>
+                  <Button variant="outlined" onClick={() => alert(`Details: ${serv.longDesc}`)}>
+                    Details anzeigen
+                  </Button>
+                  <Button variant="outlined" color="error" onClick={() => handleDeleteService(index)}>
+                    Löschen
+                  </Button>
+                </Box>
               </Paper>
             ))}
           </Box>

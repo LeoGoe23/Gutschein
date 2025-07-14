@@ -9,8 +9,8 @@ export default function ContentSection() {
       <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', padding: { xs: '4rem 1rem', md: '6rem 2rem' }, overflow: 'hidden', backgroundColor: '#f4f4f4' }}>
         <Box
           sx={{
-            width: '90%',
-            maxWidth: 1200,
+            width: '100%',
+            maxWidth: 1200, // Einheitliche Breite
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
