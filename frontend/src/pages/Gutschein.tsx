@@ -27,6 +27,10 @@ export default function Gutschein() {
     if (currentIndex > 0) navigate(steps[currentIndex - 1]);
   };
 
+  const handleComplete = () => {
+    navigate('/success');
+  };
+
   return (
     <GutscheinProvider>
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
@@ -58,7 +62,7 @@ export default function Gutschein() {
             )}
 
             {currentIndex === steps.length - 1 && (
-              <Button variant="contained" sx={{ backgroundColor: '#2E7D66' }} onClick={() => console.log('Abgeschlossen')}>
+              <Button variant="contained" sx={{ backgroundColor: '#2E7D66' }} onClick={handleComplete}>
                 Abschließen
               </Button>
             )}

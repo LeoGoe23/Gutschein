@@ -14,6 +14,9 @@ import EinnahmenPage from './pages/profil/Einnahmen';
 import EinstellungenPage from './pages/profil/Einstellungen';
 import SelbstDesign from './pages/profil/design';
 import Checkout from './pages/checkout';
+import CheckputDemo from './pages/checkoutdemo';
+import Success from './pages/success';
+import { GutscheinProvider } from './context/GutscheinContext';
 
 export default function App() {
   return (
@@ -23,6 +26,16 @@ export default function App() {
         <Route path="/about" element={<About />} />
         <Route path="/ueberuns" element={<Ueberuns />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/success" element={
+          <GutscheinProvider>
+            <Success />
+          </GutscheinProvider>
+        } />
+        <Route path="/checkoutdemo" element={
+          <GutscheinProvider>
+            <CheckputDemo />
+          </GutscheinProvider>
+        } />
         <Route path="/profil" element={<Profil />}>
           <Route path="gutscheine" element={<GutscheinePage />} />
           <Route path="einnahmen" element={<EinnahmenPage />} />
