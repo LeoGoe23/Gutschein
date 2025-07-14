@@ -12,10 +12,16 @@ import AppleIcon from '@mui/icons-material/Apple';
 import GoogleIcon from '@mui/icons-material/Google';
 import PayPalIcon from '@mui/icons-material/AccountBalanceWallet'; // Beispiel-Icon für PayPal
 
+// Debug: Alle Umgebungsvariablen loggen
+console.log('Alle process.env:', process.env);
+console.log('REACT_APP_STRIPE_PUBLISHABLE_KEY:', process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+
 const publishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY as string;
 if (!publishableKey) {
+  console.error('REACT_APP_STRIPE_PUBLISHABLE_KEY ist nicht definiert!');
   throw new Error('Missing REACT_APP_STRIPE_PUBLISHABLE_KEY in environment');
 }
+console.log('Stripe Key geladen:', publishableKey);
 const stripePromise = loadStripe(publishableKey);
 
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
@@ -96,7 +102,7 @@ function PaymentForm({ betrag, customerEmail }: { betrag: number | null, custome
       return;
     }
 
-    const response = await fetch('/create-payment-intent', {
+    const response = await fetch('http://localhost:5000/api/zahlung/create-payment-intent', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,20 +110,37 @@ function PaymentForm({ betrag, customerEmail }: { betrag: number | null, custome
       body: JSON.stringify({ amount: betrag * 100, paymentMethod, customerEmail }),
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const { clientSecret } = await response.json();
 
-    const result = await stripe.confirmPayment({
-      clientSecret,
-      elements,
-      confirmParams: {
-        return_url: 'http://localhost:3000/success',
-      },
-    });
+    if (paymentMethod === 'card') {
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        alert('Kartenelement nicht gefunden');
+        return;
+      }
 
-    if (result.error) {
-      alert(`Zahlung fehlgeschlagen: ${result.error.message}`);
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            email: customerEmail,
+          },
+        },
+      });
+
+      if (result.error) {
+        alert(`Zahlung fehlgeschlagen: ${result.error.message}`);
+      } else {
+        alert('Zahlung erfolgreich!');
+        // Redirect zur Erfolgsseite oder weitere Aktionen
+        window.location.href = '/success';
+      }
     } else {
-      alert('Zahlung erfolgreich!');
+      alert('Andere Zahlungsmethoden sind noch nicht implementiert');
     }
   };
 
@@ -148,6 +171,7 @@ function PaymentForm({ betrag, customerEmail }: { betrag: number | null, custome
           mt: 2,
         }}
         onClick={handlePayment}
+        disabled={!paymentMethod}
       >
         Zahlung abschließen
       </Button>
