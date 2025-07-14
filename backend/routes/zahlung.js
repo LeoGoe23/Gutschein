@@ -33,21 +33,19 @@ router.get("/onboard/:accountId", async (req, res) => {
 });
 
 router.post("/create-payment-intent", async (req, res) => {
-  const { amount, firebaseUid } = req.body;
-  if (amount == null || !firebaseUid) {
-    return res.status(400).json({ error: "amount und firebaseUid sind erforderlich" });
+  const { amount, customerEmail } = req.body;
+  if (amount == null || !customerEmail) {
+    return res.status(400).json({ error: "amount und customerEmail sind erforderlich" });
   }
   try {
-    const firma = await Unternehmen.findOne({ firebaseUid });
-    if (!firma || !firma.stripeAccountId) {
-      return res.status(404).json({ error: "Unternehmen oder Stripe-Account nicht gefunden" });
-    }
+    // Für jetzt erstellen wir einfach einen Payment Intent ohne Connect
+    // Sie können später die Unternehmen-Logik hinzufügen
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100,
+      amount: amount,
       currency: "eur",
       payment_method_types: ["card"],
-      transfer_data: {
-        destination: firma.stripeAccountId
+      metadata: {
+        customerEmail: customerEmail
       }
     });
     res.json({ clientSecret: paymentIntent.client_secret });
