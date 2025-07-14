@@ -12,9 +12,11 @@ import AppleIcon from '@mui/icons-material/Apple';
 import GoogleIcon from '@mui/icons-material/Google';
 import PayPalIcon from '@mui/icons-material/AccountBalanceWallet'; // Beispiel-Icon für PayPal
 
-const stripePromise = loadStripe('pk_test_51RhHIRR2x5MTZQ6PvldGQhCgkDZMHXWxXOnesPE9SOslCdAl8B3RWN5eC2eWPtmwA0zBd4ptrpWSyamgaza6rs8a00OHFXf1DL')
-const router = express.Router();
-const stripe = new Stripe('sk_test_51RhHIRR2x5MTZQ6PvoOovToEeZ5nOJExSSGkkJH74JVfjMApM1vfoNEXWNjdHNKsAJm4wzjcONMQPFPgpFe6vp3u006m1jIbvy', { apiVersion: '2022-11-15' });
+const publishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY as string;
+if (!publishableKey) {
+  throw new Error('Missing REACT_APP_STRIPE_PUBLISHABLE_KEY in environment');
+}
+const stripePromise = loadStripe(publishableKey);
 
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
@@ -108,7 +110,7 @@ function PaymentForm({ betrag, customerEmail }: { betrag: number | null, custome
       clientSecret,
       elements,
       confirmParams: {
-        return_url: 'http://localhost:3001/success',
+        return_url: 'http://localhost:3000/success',
       },
     });
 
