@@ -1,7 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
-import About from './pages/About';
-import Ueberuns from './pages/ueberuns';
 import Gutschein from './pages/Gutschein';
 import Profil from './pages/Profile';
 import Step1 from './pages/gutschein/Step1';
@@ -15,7 +13,7 @@ import EinstellungenPage from './pages/profil/Einstellungen';
 import SelbstDesign from './pages/profil/design';
 import Checkout from './pages/checkout';
 import CheckputDemo from './pages/checkoutdemo';
-import Success from './pages/success';
+import Success from './pages/link';
 import { GutscheinProvider } from './context/GutscheinContext';
 
 export default function App() {
@@ -23,8 +21,6 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/ueberuns" element={<Ueberuns />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/success" element={
           <GutscheinProvider>

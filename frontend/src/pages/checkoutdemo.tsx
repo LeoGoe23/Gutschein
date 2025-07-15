@@ -380,9 +380,26 @@ function SuccessPage({ purchasedBetrag, selectedDienstleistung }: { purchasedBet
   );
 }
 
+function CheckoutDemo() {
+  const { data } = useGutschein();
+
+  const selectedBetrag = data.selectedBetrag || '0';
+  const selectedDienstleistung = data.selectedDienstleistung;
+
+  return (
+    <Box>
+      <Typography variant="h5">Checkout</Typography>
+      <Typography variant="body1">
+        {selectedDienstleistung
+          ? `Dienstleistung: ${selectedDienstleistung.shortDesc} (${selectedDienstleistung.price}€)`
+          : `Betrag: ${selectedBetrag}€`}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function GutscheinLandingPage() {
   const { data } = useGutschein();
-  const [hintergrundBild, setHintergrundBild] = useState<string | null>(null);
   const [betrag, setBetrag] = useState<number | null>(null);
   const [selectedDienstleistung, setSelectedDienstleistung] = useState<{ shortDesc: string; longDesc: string; price: string } | null>(null);
   const [purchasedBetrag, setPurchasedBetrag] = useState<number>(0);
@@ -393,8 +410,11 @@ export default function GutscheinLandingPage() {
   // Verwende Daten aus dem Kontext
   const kundenName = data.unternehmensname || data.name || "Ihr Unternehmen";
   
+  // Für das Hintergrundbild verwenden wir einfach data.bild
+  const hintergrundBild = data.bild ? (typeof data.bild === 'string' ? data.bild : URL.createObjectURL(data.bild)) : null;
+  
   // Prüfe ob sowohl Wert- als auch Dienstleistungsgutscheine verfügbar sind
-  const hasWertGutschein = data.customValue; // Wertgutschein ist verfügbar wenn customValue aktiviert ist
+  const hasWertGutschein = data.customValue;
   const hasDienstleistungGutschein = data.dienstleistungen && data.dienstleistungen.length > 0;
   const hasBoth = hasWertGutschein && hasDienstleistungGutschein;
 
@@ -423,29 +443,6 @@ export default function GutscheinLandingPage() {
       setGutscheinType('wert');
     }
   }, [hasWertGutschein, hasDienstleistungGutschein, hasBoth]);
-
-  // Verwende das hochgeladene Bild aus dem Kontext
-  useEffect(() => {
-    if (data.bild) {
-      if (typeof data.bild === 'string') {
-        setHintergrundBild(data.bild);
-      } else {
-        setHintergrundBild(URL.createObjectURL(data.bild));
-      }
-    } else {
-      // Fallback zu Firebase Bild
-      const loadStartImage = async () => {
-        try {
-          const imageRef = ref(storage, 'start.jpg');
-          const imageUrl = await getDownloadURL(imageRef);
-          setHintergrundBild(imageUrl);
-        } catch (error) {
-          console.error('Fehler beim Laden des Bildes:', error);
-        }
-      };
-      loadStartImage();
-    }
-  }, [data.bild]);
 
   const handleWeiterZurBestellung = () => {
     if (!betrag) {

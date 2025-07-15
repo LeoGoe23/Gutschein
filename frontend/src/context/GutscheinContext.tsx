@@ -24,19 +24,15 @@ const initialData = {
   
   // Neue Felder für Gutschein-Design
   gutscheinDesign: {
-    modus: 'eigenes' as 'eigenes' | 'designen',
+    modus: 'unser-design' as 'unser-design' | 'wir-designen' | 'eigenes',
     hintergrund: null as string | null,
-    hintergrundTyp: null as 'image' | 'pdf' | null,
-    selectedDesign: null as { id: number; name: string; image: string; description: string } | null,
-    felder: [] as Array<{
-      typ: 'CODE' | 'TEXT' | 'BETRAG';
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      text: string;
-      editing: boolean;
-    }>
+    hintergrundTyp: null as 'image' | 'pdf' | null
+  },
+  
+  // Gutschein-Konfiguration
+  gutscheinConfig: {
+    prefix: 'GS',
+    gueltigkeitTage: 365
   }
 };
 
