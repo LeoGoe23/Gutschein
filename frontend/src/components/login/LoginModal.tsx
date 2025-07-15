@@ -3,6 +3,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswor
 import { auth, db } from '../../auth/firebase';
 import { doc, setDoc, getDoc, DocumentReference } from "firebase/firestore";
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Importiere useNavigate
 
 interface Props {
   open: boolean;
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default function LoginModal({ open, onClose }: Props) {
+  const navigate = useNavigate(); // Initialisiere den Navigator
+
   const [email, setEmail] = useState('');
   const [passwort, setPasswort] = useState('');
   const [isRegister, setIsRegister] = useState(false);
@@ -112,6 +115,7 @@ export default function LoginModal({ open, onClose }: Props) {
       email,
       createdAt: new Date(),
       registrationFinished: false,
+      slug: "",
       Unternehmensdaten: {
         Vorname: "",
         Name: "",
@@ -119,7 +123,7 @@ export default function LoginModal({ open, onClose }: Props) {
         Branche: "",
         Telefon: "",
       },
-            Checkout: {
+      Checkout: {
         slug: "",
         Unternehmensname: "",
         Gutscheinarten: {},
@@ -155,16 +159,6 @@ export default function LoginModal({ open, onClose }: Props) {
       Gutscheindetails: {
         Gutscheindesign: {},
         Gutscheinarten: {
-            Standard: {
-              Preis: 10,
-              Beschreibung: "Standard-Gutschein",
-              Aktiv: true,
-            },
-            Premium: {
-              Preis: 20,
-              Beschreibung: "Premium-Gutschein",
-              Aktiv: true,
-            },
         },
       },
     };
@@ -183,9 +177,15 @@ export default function LoginModal({ open, onClose }: Props) {
         const user = res.user;
         const userDocRef = doc(db, "users", user.uid);
 
-        const newUserData = createDefaultUserData(user.email || "");
+        const userDoc = await getDoc(userDocRef);
+        const registrationFinished = userDoc.exists() && userDoc.data().registrationFinished;
 
-        await mergeUserData(userDocRef, newUserData);
+        if (registrationFinished) {
+          navigate('/profil'); // Navigiere zu /profil
+        } else {
+          navigate('/gutschein/step1'); // Navigiere zu /gutschein/step1
+        }
+
         setSuccess(true);
       })
       .catch((err) => {
@@ -201,16 +201,14 @@ export default function LoginModal({ open, onClose }: Props) {
 
     setLoginError("");
 
-      createUserWithEmailAndPassword(auth, email, passwort)
-    .then(async (res) => {
-      const newUserData = createDefaultUserData(res.user.email || "");
+    createUserWithEmailAndPassword(auth, email, passwort)
+      .then(async (res) => {
+        const newUserData = createDefaultUserData(res.user.email || "");
 
-      await setDoc(doc(db, "users", res.user.uid), newUserData);
-      setSuccess(true);
-      setTimeout(() => {
-          setIsRegister(false); // Zurück auf Login-Ansicht für das nächste Öffnen
-          onClose();
-        }, 1000);
+        await setDoc(doc(db, "users", res.user.uid), newUserData);
+
+        navigate('/gutschein/step1'); // Nach Registrierung immer zu /gutschein/step1
+        setSuccess(true);
       })
       .catch((err) => {
         switch (err.code) {

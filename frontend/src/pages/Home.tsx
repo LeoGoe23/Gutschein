@@ -8,7 +8,6 @@ import ContentSection from '../components/home/ContentSection';
 import Footer from '../components/home/Footer';
 import LogoTopLeft from '../components/home/TopLeftLogo';
 import FAQ from '../components/home/FAQ';
-import Vorteile from '../components/home/Vorteile';
 import LoginModal from '../components/login/LoginModal';
 import useAuth from '../auth/useAuth';
 

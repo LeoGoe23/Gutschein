@@ -1,20 +1,42 @@
 import { Box, Button, Typography, IconButton, Drawer, List, ListItem, ListItemText, Avatar, Menu, MenuItem, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import LoginModal from '../../components/login/LoginModal';
 import { auth } from '../../auth/firebase';
 import useAuth from '../../auth/useAuth';
 import { signOut } from "firebase/auth";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../auth/firebase';
 
 export default function TopBar() {
-  const navigate = useNavigate(); // Hook für Navigation
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [registrationFinished, setRegistrationFinished] = useState<boolean>(false);
 
   const user = useAuth();
   const menuOpen = Boolean(anchorEl);
+
+  // Firebase-Check für registrationFinished
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      if (user?.uid) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setRegistrationFinished(userData.registrationFinished || false);
+          }
+        } catch (error) {
+          console.error("Error checking registration status:", error);
+        }
+      }
+    };
+
+    checkRegistrationStatus();
+  }, [user]);
 
   const handleAvatarClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -26,7 +48,7 @@ export default function TopBar() {
 
   const handleLogout = () => {
     signOut(auth).then(() => {
-      navigate('/'); // Nach dem Abmelden zur Startseite navigieren
+      navigate('/');
     }).catch((error) => {
       console.error("Logout failed:", error);
     });
@@ -41,6 +63,16 @@ export default function TopBar() {
         faqElement.scrollIntoView({ behavior: 'smooth' });
       }
     }, 100);
+  };
+
+  const handleAccountClick = () => {
+    if (!user) {
+      setOpen(true);
+    } else if (registrationFinished) {
+      navigate('/profil');
+    } else {
+      navigate('/gutschein/step1');
+    }
   };
 
   return (
@@ -70,11 +102,7 @@ export default function TopBar() {
           </Typography>
 
           <Typography
-            component={Link}
-            to={user ? "/profil" : "#"}
-            onClick={() => {
-              if (!user) setOpen(true);
-            }}
+            onClick={handleAccountClick}
             sx={{
               cursor: 'pointer',
               fontSize: '1.1rem',
@@ -83,7 +111,7 @@ export default function TopBar() {
               textDecoration: 'none',
             }}
           >
-            Mein Konto
+            {user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Mein Konto"}
           </Typography>
 
           {user ? (
@@ -142,8 +170,8 @@ export default function TopBar() {
           <ListItem component="li" onClick={() => { handleVorteileClick(); setDrawerOpen(false); }}>
             <ListItemText primary="Vorteile" />
           </ListItem>
-          <ListItem component={Link} to="/roadmap" onClick={() => setDrawerOpen(false)}>
-            <ListItemText primary="Funktionen" />
+          <ListItem component="li" onClick={() => { handleAccountClick(); setDrawerOpen(false); }}>
+            <ListItemText primary={user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Mein Konto"} />
           </ListItem>
           {user ? (
             <ListItem component="li" onClick={() => { handleLogout(); setDrawerOpen(false); }}>

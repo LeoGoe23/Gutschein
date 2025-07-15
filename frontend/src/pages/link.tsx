@@ -326,25 +326,6 @@ export default function LinkGenerierung() {
             flexDirection: { xs: 'column', sm: 'row' }
           }}>
             <Button
-              variant="outlined"
-              onClick={handleNewGutschein}
-              sx={{
-                color: '#607D8B',
-                borderColor: '#607D8B',
-                padding: '1rem 2rem',
-                borderRadius: '2rem',
-                fontSize: '1rem',
-                fontWeight: 600,
-                minWidth: '200px',
-                '&:hover': {
-                  borderColor: '#546E7A',
-                  backgroundColor: 'rgba(96, 125, 139, 0.04)',
-                },
-              }}
-            >
-              Neuen Gutschein erstellen
-            </Button>
-            <Button
               variant="contained"
               onClick={handleFinish}
               sx={{
