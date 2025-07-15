@@ -1,7 +1,7 @@
-import { Box, Typography, Button, Stack } from '@mui/material';
+import { Box, Typography, Button, Stack, Card, CardContent } from '@mui/material';
 import { useGutschein } from '../../context/GutscheinContext';
-import { ReactElement } from 'react';
-import { Email, Phone, Person, Business } from '@mui/icons-material';
+import { Key, ReactElement } from 'react';
+import { Email, Phone, Person, Business, DesignServices, Image as ImageIcon, Build } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
 export default function Zusammenfassung() {
@@ -13,7 +13,7 @@ export default function Zusammenfassung() {
   };
 
   return (
-    <Box sx={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <Box sx={{ maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
       <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>
         Zusammenfassung
@@ -22,8 +22,8 @@ export default function Zusammenfassung() {
         Sie können Ihre Daten jederzeit auf unserer Website ändern.
       </Typography>
 
+      {/* Persönliche Daten */}
       <Box sx={{ border: '1px solid #ddd', borderRadius: '1rem', padding: '2rem', backgroundColor: '#FAFAFA' }}>
-        
         <Typography sx={{ fontWeight: 500, mb: '1.5rem', color: '#333' }}>
           Persönliche Daten:
         </Typography>
@@ -50,6 +50,140 @@ export default function Zusammenfassung() {
               <Typography sx={{ fontWeight: 500 }}>IBAN: {data.iban}</Typography>
             </Box>
           </Stack>
+        </Stack>
+      </Box>
+
+      {/* Gutschein-Design */}
+      <Box sx={{ border: '1px solid #ddd', borderRadius: '1rem', padding: '2rem', backgroundColor: '#FAFAFA' }}>
+        <Typography sx={{ fontWeight: 500, mb: '1.5rem', color: '#333' }}>
+          Gutschein-Design:
+        </Typography>
+        
+        <Stack spacing={2}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {data.gutscheinDesign.modus === 'designen' ? (
+              <Build sx={{ color: '#FF5722', fontSize: '1.5rem' }} />
+            ) : (
+              <DesignServices sx={{ color: '#2196F3', fontSize: '1.5rem' }} />
+            )}
+            <Typography sx={{ fontWeight: 500 }}>
+              Modus: {data.gutscheinDesign.modus === 'designen' ? 'Wir designen den Gutschein' : 'Eigenes Design'}
+            </Typography>
+          </Box>
+
+          {data.gutscheinDesign.modus === 'eigenes' && (
+            <>
+              {data.gutscheinDesign.selectedDesign && (
+                <Card sx={{ maxWidth: 400, mt: 2 }}>
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 80,
+                          height: 60,
+                          border: '1px solid #e0e0e0',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#f5f5f5',
+                        }}
+                      >
+                        <img
+                          src={data.gutscheinDesign.selectedDesign.image}
+                          alt={data.gutscheinDesign.selectedDesign.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                          }}
+                        />
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {data.gutscheinDesign.selectedDesign.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {data.gutscheinDesign.selectedDesign.description}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+
+              {data.gutscheinDesign.hintergrund && !data.gutscheinDesign.selectedDesign && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
+                    Hochgeladenes Design:
+                  </Typography>
+                  <Box
+                    sx={{
+                      width: 200,
+                      height: 150,
+                      border: '1px solid #e0e0e0',
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#f5f5f5',
+                    }}
+                  >
+                    {data.gutscheinDesign.hintergrundTyp === 'image' ? (
+                      <img
+                        src={data.gutscheinDesign.hintergrund}
+                        alt="Hochgeladenes Design"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    ) : (
+                      <Box sx={{ textAlign: 'center' }}>
+                        <ImageIcon sx={{ fontSize: 40, color: '#666' }} />
+                        <Typography variant="body2" color="text.secondary">
+                          PDF-Datei
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              )}
+
+              {data.gutscheinDesign.felder.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
+                    Platzierte Elemente: {data.gutscheinDesign.felder.length}
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {data.gutscheinDesign.felder.map((feld: { typ: string; }, index: Key | null | undefined) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          px: 1,
+                          py: 0.5,
+                          bgcolor: feld.typ === 'CODE' ? '#E3F2FD' : '#F3E5F5',
+                          borderRadius: 1,
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {feld.typ === 'CODE' ? 'Gutscheincode' : 'Betrag/Dienstleistung'}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </>
+          )}
+
+          {data.gutscheinDesign.modus === 'designen' && (
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              Unser Team erstellt ein individuelles Design basierend auf Ihrer Website und Ihren Angaben.
+            </Typography>
+          )}
         </Stack>
       </Box>
 
