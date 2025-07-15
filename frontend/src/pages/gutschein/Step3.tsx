@@ -1,17 +1,18 @@
+import React, { useState } from 'react';
 import { Box, Button, Typography, TextField, Card, CardActionArea, Modal, Grid, Stack } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import CloseIcon from '@mui/icons-material/Close';
-import { useState } from 'react';
-import { ResizableBox } from 'react-resizable'; // Hinzufügen der Resizable-Komponente
-import 'react-resizable/css/styles.css'; // CSS für Resizable-Komponente importieren
+import { ResizableBox } from 'react-resizable';
+import 'react-resizable/css/styles.css';
+import { useGutschein } from '../../context/GutscheinContext';
 
 interface Feld {
-  typ: 'CODE' | 'TEXT' | 'BETRAG';
+  typ: 'CODE' | 'TEXT' | 'BETRAG' | 'DIENSTLEISTUNG' | 'UNTERNEHMEN' | 'GUELTIG_BIS' | 'WEBSITE';
   x: number;
   y: number;
-  width: number; // Neue Eigenschaft für Breite
-  height: number; // Neue Eigenschaft für Höhe
+  width: number;
+  height: number;
   text: string;
   editing: boolean;
 }
@@ -24,15 +25,62 @@ interface DesignVorlage {
 }
 
 export default function GutscheinEditor() {
-  const [modus, setModus] = useState<'eigenes' | 'vorlage' | 'designen'>('eigenes');
-  const [hintergrund, setHintergrund] = useState<string | null>(null);
-  const [hintergrundTyp, setHintergrundTyp] = useState<'image' | 'pdf' | null>(null);
-  const [felder, setFelder] = useState<Feld[]>([]);
+  const { data, setData } = useGutschein();
+  
+  const [modus, setModus] = useState<'eigenes' | 'vorlage' | 'designen'>(data.gutscheinDesign.modus);
+  const [hintergrund, setHintergrund] = useState<string | null>(data.gutscheinDesign.hintergrund);
+  const [hintergrundTyp, setHintergrundTyp] = useState<'image' | 'pdf' | null>(data.gutscheinDesign.hintergrundTyp);
+  const [felder, setFelder] = useState<Feld[]>(data.gutscheinDesign.felder);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [isResizing, setIsResizing] = useState<boolean[]>([]); // State für Skalierung
+  const [isResizing, setIsResizing] = useState<boolean[]>([]);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
 
-  // Verbesserte Beispiel-Vorlagen für Gutscheindesigns im A4-Format
+  // Dynamische Daten aus dem Kontext
+  const unternehmen = data.unternehmensname || data.name || "Ihr Unternehmen";
+  const website = data.website || "www.ihr-unternehmen.de";
+  const beispielBetrag = data.betraege?.[0] || "50";
+  const beispielDienstleistung = data.dienstleistungen?.[0]?.shortDesc || "Beispiel Dienstleistung";
+  const beispielCode = `${data.gutscheinConfig?.prefix || 'GS'}-XXXX-XXXX`;
+  const gueltigBis = new Date(Date.now() + ((data.gutscheinConfig?.gueltigkeitTage || 365) * 24 * 60 * 60 * 1000)).toLocaleDateString('de-DE');
+
+  // Hilfsfunktion um dynamische Inhalte zu generieren
+  const getDynamicContent = (placeholder: string) => {
+    switch (placeholder) {
+      case 'UNTERNEHMEN':
+        return unternehmen;
+      case 'WEBSITE':
+        return website;
+      case 'BETRAG':
+        return `€ ${beispielBetrag}`;
+      case 'DIENSTLEISTUNG':
+        return beispielDienstleistung;
+      case 'CODE':
+        return beispielCode;
+      case 'GUELTIG_BIS':
+        return `Gültig bis: ${gueltigBis}`;
+      default:
+        return placeholder;
+    }
+  };
+
+  // Speichere Änderungen im Kontext
+  const saveToContext = () => {
+    setData({
+      gutscheinDesign: {
+        modus,
+        hintergrund,
+        hintergrundTyp,
+        selectedDesign: data.gutscheinDesign.selectedDesign,
+        felder
+      }
+    });
+  };
+
+  React.useEffect(() => {
+    saveToContext();
+  }, [modus, hintergrund, hintergrundTyp, felder]);
+
+  // Dynamische Gutschein-Designs mit echten Daten
   const designVorlagen: DesignVorlage[] = [
     {
       id: 1,
@@ -54,13 +102,17 @@ export default function GutscheinEditor() {
           <rect x="30" y="30" width="535" height="782" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="20,5" />
           <circle cx="297.5" cy="200" r="80" fill="rgba(255,255,255,0.9)" />
           <text x="297.5" y="210" text-anchor="middle" fill="#B8860B" font-size="24" font-weight="bold" font-family="serif">GUTSCHEIN</text>
+          <text x="297.5" y="280" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">${unternehmen}</text>
           <rect x="100" y="350" width="395" height="80" fill="rgba(255,255,255,0.85)" rx="10" />
-          <text x="297.5" y="390" text-anchor="middle" fill="#B8860B" font-size="18" font-weight="bold">Ihr Gutscheincode</text>
+          <text x="297.5" y="375" text-anchor="middle" fill="#B8860B" font-size="14">Gutscheincode:</text>
+          <text x="297.5" y="400" text-anchor="middle" fill="#B8860B" font-size="18" font-weight="bold">${beispielCode}</text>
           <rect x="100" y="500" width="395" height="60" fill="rgba(255,255,255,0.85)" rx="10" />
-          <text x="297.5" y="535" text-anchor="middle" fill="#B8860B" font-size="16">Wert: € 50,00</text>
-          <text x="297.5" y="700" text-anchor="middle" fill="#fff" font-size="14">Gültig bis: 31.12.2025</text>
+          <text x="297.5" y="535" text-anchor="middle" fill="#B8860B" font-size="20" font-weight="bold">€ ${beispielBetrag}</text>
+          <text x="297.5" y="620" text-anchor="middle" fill="#fff" font-size="14">Nicht gegen Barwert tauschbar</text>
+          <text x="297.5" y="700" text-anchor="middle" fill="#fff" font-size="14">Wir freuen uns auf Ihren Besuch!</text>
+          <text x="297.5" y="730" text-anchor="middle" fill="#fff" font-size="12">${website}</text>
           <rect x="50" y="750" width="495" height="60" fill="rgba(255,255,255,0.1)" rx="5" />
-          <text x="297.5" y="785" text-anchor="middle" fill="#fff" font-size="12">Bedingungen: Nicht mit anderen Aktionen kombinierbar</text>
+          <text x="297.5" y="785" text-anchor="middle" fill="#fff" font-size="12">Nicht mit anderen Aktionen kombinierbar</text>
         </svg>
       `),
       description: "Luxuriöser goldener Gutschein mit elegantem Design und Ornament-Muster"
@@ -85,14 +137,17 @@ export default function GutscheinEditor() {
           <rect x="40" y="40" width="515" height="762" fill="none" stroke="#fff" stroke-width="2" />
           <rect x="80" y="120" width="435" height="100" fill="rgba(255,255,255,0.95)" rx="15" />
           <text x="297.5" y="165" text-anchor="middle" fill="#0277BD" font-size="32" font-weight="bold" font-family="Arial">GUTSCHEIN</text>
-          <text x="297.5" y="195" text-anchor="middle" fill="#0277BD" font-size="16">Geschenkgutschein</text>
-          <rect x="100" y="300" width="395" height="80" fill="rgba(255,255,255,0.9)" rx="10" />
-          <text x="297.5" y="340" text-anchor="middle" fill="#0277BD" font-size="18" font-weight="bold">Gutscheincode</text>
-          <rect x="100" y="420" width="395" height="80" fill="rgba(255,255,255,0.9)" rx="10" />
-          <text x="297.5" y="470" text-anchor="middle" fill="#0277BD" font-size="24" font-weight="bold">€ 100,00</text>
+          <text x="297.5" y="195" text-anchor="middle" fill="#0277BD" font-size="18" font-weight="bold">${unternehmen}</text>
+          <rect x="100" y="280" width="395" height="70" fill="rgba(255,255,255,0.9)" rx="10" />
+          <text x="297.5" y="310" text-anchor="middle" fill="#0277BD" font-size="14">Gutscheincode:</text>
+          <text x="297.5" y="330" text-anchor="middle" fill="#0277BD" font-size="18" font-weight="bold">${beispielCode}</text>
+          <rect x="100" y="380" width="395" height="80" fill="rgba(255,255,255,0.9)" rx="10" />
+          <text x="297.5" y="410" text-anchor="middle" fill="#0277BD" font-size="16">Wert:</text>
+          <text x="297.5" y="440" text-anchor="middle" fill="#0277BD" font-size="32" font-weight="bold">€ ${beispielBetrag}</text>
+          <text x="297.5" y="520" text-anchor="middle" fill="#fff" font-size="14">Übertragbar und verschenkbar</text>
           <line x1="100" y1="600" x2="495" y2="600" stroke="#fff" stroke-width="1" />
-          <text x="297.5" y="650" text-anchor="middle" fill="#fff" font-size="14">Einlösbar bis: 31.12.2025</text>
-          <text x="297.5" y="750" text-anchor="middle" fill="#fff" font-size="12">www.ihr-unternehmen.de</text>
+          <text x="297.5" y="650" text-anchor="middle" fill="#fff" font-size="14">Wir freuen uns auf Ihren Besuch!</text>
+          <text x="297.5" y="750" text-anchor="middle" fill="#fff" font-size="12">${website}</text>
         </svg>
       `),
       description: "Modernes blaues Design mit geometrischen Mustern und klarer Struktur"
@@ -116,17 +171,19 @@ export default function GutscheinEditor() {
           <rect x="0" y="0" width="595" height="842" fill="url(#leafPattern)" />
           <ellipse cx="297.5" cy="150" rx="150" ry="80" fill="rgba(255,255,255,0.9)" />
           <text x="297.5" y="145" text-anchor="middle" fill="#2E7D32" font-size="28" font-weight="bold" font-family="Georgia">GUTSCHEIN</text>
-          <text x="297.5" y="170" text-anchor="middle" fill="#2E7D32" font-size="14">Für besondere Momente</text>
+          <text x="297.5" y="170" text-anchor="middle" fill="#2E7D32" font-size="16" font-weight="bold">${unternehmen}</text>
           <rect x="70" y="280" width="455" height="100" fill="rgba(255,255,255,0.85)" rx="20" />
-          <text x="297.5" y="320" text-anchor="middle" fill="#2E7D32" font-size="16">Ihr persönlicher Gutscheincode:</text>
-          <text x="297.5" y="350" text-anchor="middle" fill="#2E7D32" font-size="20" font-weight="bold">XXXX-XXXX-XXXX</text>
+          <text x="297.5" y="315" text-anchor="middle" fill="#2E7D32" font-size="14">Gutscheincode:</text>
+          <text x="297.5" y="340" text-anchor="middle" fill="#2E7D32" font-size="18" font-weight="bold">${beispielCode}</text>
+          <text x="297.5" y="365" text-anchor="middle" fill="#2E7D32" font-size="12">Teilweise einlösbar</text>
           <rect x="70" y="420" width="455" height="80" fill="rgba(255,255,255,0.85)" rx="20" />
-          <text x="297.5" y="470" text-anchor="middle" fill="#2E7D32" font-size="28" font-weight="bold">€ 75,00</text>
+          <text x="297.5" y="470" text-anchor="middle" fill="#2E7D32" font-size="28" font-weight="bold">€ ${beispielBetrag}</text>
           <rect x="100" y="550" width="395" height="2" fill="rgba(255,255,255,0.7)" />
-          <text x="297.5" y="600" text-anchor="middle" fill="#fff" font-size="14">Gültig bis: 31.12.2025</text>
+          <text x="297.5" y="600" text-anchor="middle" fill="#fff" font-size="14">Wir freuen uns auf Sie!</text>
           <text x="297.5" y="650" text-anchor="middle" fill="#fff" font-size="12">Einlösbar in allen Filialen</text>
+          <text x="297.5" y="700" text-anchor="middle" fill="#fff" font-size="12">${website}</text>
           <rect x="80" y="720" width="435" height="60" fill="rgba(255,255,255,0.1)" rx="10" />
-          <text x="297.5" y="755" text-anchor="middle" fill="#fff" font-size="11">Allgemeine Geschäftsbedingungen finden Sie unter www.ihr-unternehmen.de</text>
+          <text x="297.5" y="755" text-anchor="middle" fill="#fff" font-size="11">Allgemeine Geschäftsbedingungen finden Sie unter ${website}</text>
         </svg>
       `),
       description: "Natürliches grünes Design mit Blattmuster und organischen Formen"
@@ -141,19 +198,20 @@ export default function GutscheinEditor() {
           <rect x="40" y="40" width="515" height="762" fill="none" stroke="#000" stroke-width="1" />
           <rect x="80" y="100" width="435" height="120" fill="#000" />
           <text x="297.5" y="155" text-anchor="middle" fill="#fff" font-size="36" font-weight="bold" font-family="Times">GUTSCHEIN</text>
-          <text x="297.5" y="190" text-anchor="middle" fill="#fff" font-size="16">Geschenkgutschein</text>
+          <text x="297.5" y="190" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">${unternehmen}</text>
           <rect x="100" y="280" width="395" height="80" fill="none" stroke="#000" stroke-width="2" />
-          <text x="297.5" y="315" text-anchor="middle" fill="#000" font-size="14">GUTSCHEIN-CODE</text>
-          <text x="297.5" y="340" text-anchor="middle" fill="#000" font-size="18" font-weight="bold">XXXX-XXXX-XXXX</text>
+          <text x="297.5" y="310" text-anchor="middle" fill="#000" font-size="14">GUTSCHEIN-CODE</text>
+          <text x="297.5" y="335" text-anchor="middle" fill="#000" font-size="16" font-weight="bold">${beispielCode}</text>
           <rect x="100" y="400" width="395" height="80" fill="none" stroke="#000" stroke-width="2" />
           <text x="297.5" y="435" text-anchor="middle" fill="#000" font-size="14">WERT</text>
-          <text x="297.5" y="460" text-anchor="middle" fill="#000" font-size="32" font-weight="bold">€ 50,00</text>
+          <text x="297.5" y="460" text-anchor="middle" fill="#000" font-size="32" font-weight="bold">€ ${beispielBetrag}</text>
+          <text x="297.5" y="520" text-anchor="middle" fill="#000" font-size="12">Nicht gegen Barwert tauschbar</text>
           <line x1="100" y1="550" x2="495" y2="550" stroke="#000" stroke-width="1" />
-          <text x="297.5" y="580" text-anchor="middle" fill="#000" font-size="12">Gültig bis: 31.12.2025</text>
+          <text x="297.5" y="580" text-anchor="middle" fill="#000" font-size="12">Vielen Dank für Ihren Besuch!</text>
           <text x="297.5" y="620" text-anchor="middle" fill="#000" font-size="12">Nicht mit anderen Aktionen kombinierbar</text>
           <rect x="80" y="700" width="435" height="80" fill="none" stroke="#000" stroke-width="1" stroke-dasharray="5,5" />
-          <text x="297.5" y="735" text-anchor="middle" fill="#000" font-size="12">Ihr Unternehmen</text>
-          <text x="297.5" y="755" text-anchor="middle" fill="#000" font-size="11">Musterstraße 123, 12345 Musterstadt</text>
+          <text x="297.5" y="735" text-anchor="middle" fill="#000" font-size="14" font-weight="bold">${unternehmen}</text>
+          <text x="297.5" y="755" text-anchor="middle" fill="#000" font-size="11">${website}</text>
         </svg>
       `),
       description: "Elegantes schwarz-weißes Design im klassischen Stil"
@@ -179,16 +237,17 @@ export default function GutscheinEditor() {
           <rect x="50" y="50" width="495" height="742" fill="none" stroke="#FFD700" stroke-width="2" stroke-dasharray="10,5" />
           <ellipse cx="297.5" cy="180" rx="200" ry="100" fill="rgba(255,215,0,0.9)" />
           <text x="297.5" y="175" text-anchor="middle" fill="#B71C1C" font-size="32" font-weight="bold" font-family="Arial">GUTSCHEIN</text>
-          <text x="297.5" y="200" text-anchor="middle" fill="#B71C1C" font-size="16">Festlicher Geschenkgutschein</text>
+          <text x="297.5" y="200" text-anchor="middle" fill="#B71C1C" font-size="18" font-weight="bold">${unternehmen}</text>
           <rect x="100" y="320" width="395" height="90" fill="rgba(255,255,255,0.95)" rx="15" />
-          <text x="297.5" y="355" text-anchor="middle" fill="#B71C1C" font-size="16">Gutscheincode:</text>
-          <text x="297.5" y="385" text-anchor="middle" fill="#B71C1C" font-size="20" font-weight="bold">XXXX-XXXX-XXXX</text>
+          <text x="297.5" y="350" text-anchor="middle" fill="#B71C1C" font-size="14">Gutscheincode:</text>
+          <text x="297.5" y="375" text-anchor="middle" fill="#B71C1C" font-size="18" font-weight="bold">${beispielCode}</text>
+          <text x="297.5" y="395" text-anchor="middle" fill="#B71C1C" font-size="12">Verschenkbar & übertragbar</text>
           <rect x="100" y="450" width="395" height="90" fill="rgba(255,255,255,0.95)" rx="15" />
           <text x="297.5" y="485" text-anchor="middle" fill="#B71C1C" font-size="16">Gutscheinwert:</text>
-          <text x="297.5" y="515" text-anchor="middle" fill="#B71C1C" font-size="28" font-weight="bold">€ 25,00</text>
-          <text x="297.5" y="620" text-anchor="middle" fill="#FFD700" font-size="16" font-weight="bold">Frohe Festtage!</text>
-          <text x="297.5" y="680" text-anchor="middle" fill="#fff" font-size="14">Gültig bis: 31.12.2025</text>
-          <text x="297.5" y="720" text-anchor="middle" fill="#fff" font-size="12">Einlösbar online und in allen Filialen</text>
+          <text x="297.5" y="515" text-anchor="middle" fill="#B71C1C" font-size="28" font-weight="bold">€ ${beispielBetrag}</text>
+          <text x="297.5" y="620" text-anchor="middle" fill="#FFD700" font-size="16" font-weight="bold">Einlösbar in unserer Filiale.</text>
+          <text x="297.5" y="680" text-anchor="middle" fill="#fff" font-size="14">Wir freuen uns auf Ihren Besuch!</text>
+          <text x="297.5" y="710" text-anchor="middle" fill="#fff" font-size="12">${website}</text>
         </svg>
       `),
       description: "Festliches rotes Design mit goldenen Akzenten und Sternenmuster"
@@ -211,19 +270,22 @@ export default function GutscheinEditor() {
           <rect width="595" height="842" fill="url(#spaGrad)" />
           <rect x="0" y="0" width="595" height="842" fill="url(#wavePattern)" />
           <circle cx="297.5" cy="150" r="100" fill="rgba(255,255,255,0.8)" />
-          <text x="297.5" y="145" text-anchor="middle" fill="#0277BD" font-size="26" font-weight="bold" font-family="Arial">WELLNESS</text>
-          <text x="297.5" y="170" text-anchor="middle" fill="#0277BD" font-size="26" font-weight="bold" font-family="Arial">GUTSCHEIN</text>
-          <rect x="80" y="300" width="435" height="90" fill="rgba(255,255,255,0.85)" rx="25" />
-          <text x="297.5" y="335" text-anchor="middle" fill="#0277BD" font-size="16">Entspannung pur</text>
-          <text x="297.5" y="365" text-anchor="middle" fill="#0277BD" font-size="20" font-weight="bold">Gutscheincode: XXXX-XXXX</text>
+          <text x="297.5" y="135" text-anchor="middle" fill="#0277BD" font-size="22" font-weight="bold" font-family="Arial">WELLNESS</text>
+          <text x="297.5" y="160" text-anchor="middle" fill="#0277BD" font-size="22" font-weight="bold" font-family="Arial">GUTSCHEIN</text>
+          <text x="297.5" y="180" text-anchor="middle" fill="#0277BD" font-size="16" font-weight="bold">${unternehmen}</text>
+          <rect x="80" y="300" width="435" height="100" fill="rgba(255,255,255,0.85)" rx="25" />
+          <text x="297.5" y="330" text-anchor="middle" fill="#0277BD" font-size="14">Gutscheincode:</text>
+          <text x="297.5" y="355" text-anchor="middle" fill="#0277BD" font-size="18" font-weight="bold">${beispielCode}</text>
+          <text x="297.5" y="380" text-anchor="middle" fill="#0277BD" font-size="12">Für alle Behandlungen einlösbar</text>
           <rect x="120" y="430" width="355" height="80" fill="rgba(255,255,255,0.85)" rx="20" />
           <text x="297.5" y="465" text-anchor="middle" fill="#0277BD" font-size="16">Wert</text>
-          <text x="297.5" y="490" text-anchor="middle" fill="#0277BD" font-size="32" font-weight="bold">€ 150,00</text>
+          <text x="297.5" y="490" text-anchor="middle" fill="#0277BD" font-size="32" font-weight="bold">€ ${beispielBetrag}</text>
           <circle cx="150" cy="600" r="20" fill="rgba(255,255,255,0.6)" />
           <circle cx="297.5" cy="600" r="20" fill="rgba(255,255,255,0.6)" />
           <circle cx="445" cy="600" r="20" fill="rgba(255,255,255,0.6)" />
-          <text x="297.5" y="670" text-anchor="middle" fill="#0277BD" font-size="14">Gültig bis: 31.12.2025</text>
-          <text x="297.5" y="700" text-anchor="middle" fill="#0277BD" font-size="12">Für alle Wellness-Behandlungen einlösbar</text>
+          <text x="297.5" y="670" text-anchor="middle" fill="#0277BD" font-size="14">Wir freuen uns auf Sie!</text>
+          <text x="297.5" y="700" text-anchor="middle" fill="#0277BD" font-size="12">Terminvereinbarung erforderlich</text>
+          <text x="297.5" y="730" text-anchor="middle" fill="#0277BD" font-size="12">${website}</text>
           <text x="297.5" y="750" text-anchor="middle" fill="#0277BD" font-size="12">Ihr Wellness-Center</text>
         </svg>
       `),
@@ -237,12 +299,18 @@ export default function GutscheinEditor() {
       const url = URL.createObjectURL(file);
       setHintergrund(url);
       
-      // Bestimme den Dateityp
       if (file.type === 'application/pdf') {
         setHintergrundTyp('pdf');
       } else if (file.type.startsWith('image/')) {
         setHintergrundTyp('image');
       }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target?.result as string;
+        setHintergrund(base64String);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -250,6 +318,25 @@ export default function GutscheinEditor() {
     setHintergrund(design.image);
     setHintergrundTyp('image');
     setModalOpen(false);
+    
+    setData({
+      gutscheinDesign: {
+        ...data.gutscheinDesign,
+        selectedDesign: design,
+        hintergrund: design.image,
+        hintergrundTyp: 'image'
+      }
+    });
+  };
+
+  const setModusAndSave = (newModus: 'eigenes' | 'designen') => {
+    setModus(newModus);
+    setData({
+      gutscheinDesign: {
+        ...data.gutscheinDesign,
+        modus: newModus
+      }
+    });
   };
 
   const handleDragStart = (index: number) => {
@@ -307,6 +394,13 @@ export default function GutscheinEditor() {
         Gutschein Editor
       </Typography>
 
+      {/* Debug Info */}
+      <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          <strong>Vorschau mit Ihren Daten:</strong> {unternehmen} | €{beispielBetrag} | {beispielCode} | {website}
+        </Typography>
+      </Box>
+
       {/* Auswahl-Karten */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <Card
@@ -316,7 +410,7 @@ export default function GutscheinEditor() {
             boxShadow: modus === 'eigenes' ? '0 0 10px rgba(25, 118, 210, 0.5)' : 'none',
           }}
         >
-          <CardActionArea onClick={() => setModus('eigenes')} sx={{ p: 2, textAlign: 'center' }}>
+          <CardActionArea onClick={() => setModusAndSave('eigenes')} sx={{ p: 2, textAlign: 'center' }}>
             <ImageIcon sx={{ fontSize: 40, color: modus === 'eigenes' ? '#1976d2' : '#555' }} />
             <Typography mt={1}>Design hochladen/ Design auswählen</Typography>
           </CardActionArea>
@@ -329,7 +423,7 @@ export default function GutscheinEditor() {
             boxShadow: modus === 'designen' ? '0 0 10px rgba(25, 118, 210, 0.5)' : 'none',
           }}
         >
-          <CardActionArea onClick={() => setModus('designen')} sx={{ p: 2, textAlign: 'center' }}>
+          <CardActionArea onClick={() => setModusAndSave('designen')} sx={{ p: 2, textAlign: 'center' }}>
             <DesignServicesIcon sx={{ fontSize: 40, color: modus === 'designen' ? '#1976d2' : '#555' }} />
             <Typography mt={1}>Wir designen den Gutschein</Typography>
           </CardActionArea>
@@ -372,7 +466,7 @@ export default function GutscheinEditor() {
           </Button>
 
           <Typography variant="h5" mb={3} sx={{ fontWeight: 600 }}>
-            Professionelle Gutschein-Designs auswählen
+            Professionelle Gutschein-Designs mit Ihren Daten
           </Typography>
 
           <Stack spacing={3}>
@@ -549,7 +643,7 @@ export default function GutscheinEditor() {
                     y: e.clientY - rect.top - 15,
                     width: 100,
                     height: 50,
-                    text: 'Gutscheincode hier',
+                    text: beispielCode,
                     editing: false,
                   });
                 } else if (draggedIndex === -2) {
@@ -559,7 +653,7 @@ export default function GutscheinEditor() {
                     y: e.clientY - rect.top - 15,
                     width: 100,
                     height: 50,
-                    text: 'Betrag / Dienstleistung',
+                    text: `€ ${beispielBetrag}`,
                     editing: false,
                   });
                 }
@@ -599,6 +693,8 @@ export default function GutscheinEditor() {
               )}
 
               {modus === 'eigenes' && felder.map((feld, index) => {
+                const displayText = getDynamicContent(feld.typ) || feld.text;
+                
                 return (
                   <div
                     key={index}
@@ -642,9 +738,10 @@ export default function GutscheinEditor() {
                           justifyContent: 'center',
                           fontSize: Math.min(feld.width / 10, feld.height / 2),
                           textAlign: 'center',
+                          fontWeight: feld.typ === 'CODE' || feld.typ === 'BETRAG' ? 'bold' : 'normal',
                         }}
                       >
-                        <span>{feld.text}</span>
+                        <span>{displayText}</span>
                       </div>
                     </ResizableBox>
                   </div>

@@ -21,6 +21,23 @@ const initialData = {
   website: '', // Website-Link
   kontoinhaber: '', // Neuer State für Kontoinhaber
   iban: '', // Neuer State für IBAN
+  
+  // Neue Felder für Gutschein-Design
+  gutscheinDesign: {
+    modus: 'eigenes' as 'eigenes' | 'designen',
+    hintergrund: null as string | null,
+    hintergrundTyp: null as 'image' | 'pdf' | null,
+    selectedDesign: null as { id: number; name: string; image: string; description: string } | null,
+    felder: [] as Array<{
+      typ: 'CODE' | 'TEXT' | 'BETRAG';
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      text: string;
+      editing: boolean;
+    }>
+  }
 };
 
 // Hilfsfunktion zum Laden aus localStorage
