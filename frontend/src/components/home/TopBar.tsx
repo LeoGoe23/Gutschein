@@ -33,6 +33,16 @@ export default function TopBar() {
     handleMenuClose();
   };
 
+  const handleVorteileClick = () => {
+    navigate('/');
+    setTimeout(() => {
+      const faqElement = document.getElementById('faq');
+      if (faqElement) {
+        faqElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
   return (
     <>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: { xs: '0.5rem 1rem', md: '0' } }}>
@@ -47,8 +57,7 @@ export default function TopBar() {
         {/* Links for Desktop */}
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: '2rem' }}>
           <Typography
-            component={Link}
-            to="/ueberuns"
+            onClick={handleVorteileClick}
             sx={{
               cursor: 'pointer',
               fontSize: '1.1rem',
@@ -130,8 +139,8 @@ export default function TopBar() {
       {/* Drawer for Mobile */}
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <List sx={{ width: 250 }}>
-          <ListItem component="li" onClick={() => setDrawerOpen(false)}>
-            <ListItemText primary="Über uns" />
+          <ListItem component="li" onClick={() => { handleVorteileClick(); setDrawerOpen(false); }}>
+            <ListItemText primary="Vorteile" />
           </ListItem>
           <ListItem component={Link} to="/roadmap" onClick={() => setDrawerOpen(false)}>
             <ListItemText primary="Funktionen" />
