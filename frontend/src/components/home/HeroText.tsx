@@ -1,14 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Typography, Button, Stack, Modal, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import useAuth from '../../auth/useAuth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../auth/firebase';
+import LoginModal from '../login/LoginModal';
 
 export default function HeroText() {
   const navigate = useNavigate();
   const [anmeldenOpen, setAnmeldenOpen] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [registrationFinished, setRegistrationFinished] = useState<boolean>(false);
+
+  const user = useAuth();
+
+  // Firebase-Check für registrationFinished
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      if (user?.uid) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setRegistrationFinished(userData.registrationFinished || false);
+          }
+        } catch (error) {
+          console.error("Error checking registration status:", error);
+        }
+      }
+    };
+
+    checkRegistrationStatus();
+  }, [user]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -23,6 +49,16 @@ export default function HeroText() {
 
   const handleStartDemo = () => {
     navigate('/checkout', { state: { uploadedImage } });
+  };
+
+  const handleAccountClick = () => {
+    if (!user) {
+      setAnmeldenOpen(true);
+    } else if (registrationFinished) {
+      navigate('/profil');
+    } else {
+      navigate('/gutschein');
+    }
   };
 
   return (
@@ -63,7 +99,7 @@ export default function HeroText() {
 
         <Button
           variant="outlined"
-          onClick={() => navigate('/gutschein/step1')}
+          onClick={handleAccountClick}
           sx={{
             fontSize: '1.1rem',
             padding: '1rem 2.2rem',
@@ -78,7 +114,7 @@ export default function HeroText() {
             },
           }}
         >
-          Anmelden
+          {user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Anmelden"}
         </Button>
       </Stack>
 
@@ -156,6 +192,8 @@ export default function HeroText() {
           </Box>
         </Box>
       </Modal>
+
+      <LoginModal open={anmeldenOpen} onClose={() => setAnmeldenOpen(false)} />
     </Stack>
   );
 }

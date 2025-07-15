@@ -4,10 +4,39 @@ import { useGutschein } from '../../context/GutscheinContext'; // Importiere den
 
 export default function Zahlungsdaten() {
   const { data, setData } = useGutschein(); // Hole den Kontext
-  const [payoutLimit, setPayoutLimit] = useState('');
+  const [ibanError, setIbanError] = useState(false); // Fehlerstatus für IBAN
 
   const handleInputChange = (field: string, value: string) => {
-    setData({ [field]: value }); // Aktualisiere den Kontext
+    if (field === 'iban') {
+      const formattedIban = formatIban(value); // IBAN formatieren
+      setData({ [field]: formattedIban }); // Aktualisiere den Kontext
+    } else {
+      setData({ [field]: value }); // Aktualisiere den Kontext
+    }
+  };
+
+  const handleBlur = (field: string, value: string) => {
+    if (field === 'iban') {
+      const plainIban = value.replace(/\s+/g, ''); // Entferne Leerzeichen
+      setIbanError(!validateIban(plainIban)); // Validierung prüfen
+      setData({ [field]: plainIban }); // Speichere IBAN ohne Leerzeichen
+    }
+  };
+
+  const formatIban = (iban: string) => {
+    // Entferne alle Leerzeichen und füge nach 4 Zeichen ein Leerzeichen hinzu
+    return iban.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  const validateIban = (iban: string) => {
+    // Entferne Leerzeichen für die Validierung
+    const plainIban = iban.replace(/\s+/g, '');
+
+    // Prüfe, ob die IBAN 22 Zeichen lang ist und mit "DE" beginnt
+    const isCorrectLength = plainIban.length === 22;
+    const startsWithDE = plainIban.startsWith('DE');
+
+    return isCorrectLength && startsWithDE;
   };
 
   return (
@@ -38,6 +67,9 @@ export default function Zahlungsdaten() {
         placeholder="DE..."
         value={data.iban} // Wert aus dem Kontext
         onChange={(e) => handleInputChange('iban', e.target.value)} // Kontext aktualisieren
+        onBlur={(e) => handleBlur('iban', e.target.value)} // Validierung beim Verlassen des Feldes
+        error={ibanError} // Fehlerstatus anzeigen
+        helperText={ibanError ? 'Bitte geben Sie eine gültige IBAN ein.' : ''} // Fehlermeldung
       />
 
     </Box>
