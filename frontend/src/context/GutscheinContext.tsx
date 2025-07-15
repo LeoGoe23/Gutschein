@@ -21,6 +21,7 @@ const initialData = {
   website: '', // Website-Link
   kontoinhaber: '', // Neuer State für Kontoinhaber
   iban: '', // Neuer State für IBAN
+  maxStep: 1, // Höchster erreichter Step
   
   // Neue Felder für Gutschein-Design
   gutscheinDesign: {

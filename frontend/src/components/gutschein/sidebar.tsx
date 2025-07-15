@@ -1,7 +1,9 @@
 import { Box, Typography } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
+import ErrorIcon from '@mui/icons-material/Error';
 import { useNavigate } from 'react-router-dom';
-import TopLeftLogo from '../home/TopLeftLogo'; // Import für TopLeftLogo
+import { useGutschein } from '../../context/GutscheinContext';
+import TopLeftLogo from '../home/TopLeftLogo';
 
 interface SidebarProps {
   activeStep: number;
@@ -17,6 +19,37 @@ const steps = [
 
 export default function Sidebar({ activeStep }: SidebarProps) {
   const navigate = useNavigate();
+  const { data, setData } = useGutschein();
+
+  // Aktualisiere den maxStep wenn nötig
+  const maxStep = Math.max(data.maxStep || 1, activeStep);
+  if (maxStep !== data.maxStep) {
+    setData({ maxStep });
+  }
+
+  // Validierungsfunktionen für jeden Step
+  const validateStep = (stepNumber: number): boolean => {
+    switch (stepNumber) {
+      case 1:
+        return !!(data.vorname && data.nachname && data.email && data.unternehmensname && data.website && data.geschaeftsart);
+      case 2:
+        // Mindestens eine Option muss aktiviert sein
+        const hasCustomValue = data.customValue;
+        const hasServices = data.dienstleistungen && data.dienstleistungen.length > 0;
+        
+        // Mindestens eine der beiden Optionen muss aktiviert/ausgefüllt sein
+        return hasCustomValue || hasServices;
+      case 3:
+        // Step 3 hat keine Pflichtfelder, da alle Modi gültig sind
+        return true;
+      case 4:
+        return !!(data.kontoinhaber && data.iban);
+      case 5:
+        return true; // Zusammenfassung hat keine Pflichtfelder
+      default:
+        return false;
+    }
+  };
 
   return (
     <Box
@@ -37,8 +70,6 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         <TopLeftLogo />
       </Box>
 
-
-
       <Typography sx={{ fontSize: '1.4rem', fontWeight: 700, mb: '4rem', mt: '5rem', color: '#111' }}>
         Onboarding
       </Typography>
@@ -47,7 +78,17 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         {steps.map((step, index) => {
           const stepNumber = index + 1;
           const isActive = activeStep === stepNumber;
-          const isCompleted = activeStep > stepNumber;
+          const isValid = validateStep(stepNumber);
+          
+          // Step 5 ist immer completed wenn einmal besucht
+          const isCompleted = stepNumber === 5 
+            ? maxStep >= 5 
+            : maxStep > stepNumber && isValid;
+          
+          // Zeige Fehler wenn Step bereits erreicht wurde (maxStep > stepNumber) UND invalid ist
+          // Aber niemals für Step 5
+          const showError = stepNumber !== 5 && !isValid && maxStep > stepNumber;
+          
           const isLast = index === steps.length - 1;
 
           return (
@@ -69,7 +110,7 @@ export default function Sidebar({ activeStep }: SidebarProps) {
                     width: '36px',
                     height: '36px',
                     borderRadius: '50%',
-                    backgroundColor: isCompleted || isActive ? '#2E7D66' : '#ccc',
+                    backgroundColor: showError ? '#d32f2f' : (isCompleted || isActive ? '#2E7D66' : '#ccc'),
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
@@ -81,7 +122,13 @@ export default function Sidebar({ activeStep }: SidebarProps) {
                     zIndex: 1,
                   }}
                 >
-                  {isCompleted ? <CheckIcon sx={{ fontSize: '1.2rem' }} /> : stepNumber}
+                  {showError ? (
+                    <ErrorIcon sx={{ fontSize: '1.2rem' }} />
+                  ) : isCompleted ? (
+                    <CheckIcon sx={{ fontSize: '1.2rem' }} />
+                  ) : (
+                    stepNumber
+                  )}
                 </Box>
 
                 {!isLast && (
@@ -102,12 +149,26 @@ export default function Sidebar({ activeStep }: SidebarProps) {
                 sx={{
                   ml: '1rem',
                   mt: '0.4rem',
-                  color: isActive ? '#2E7D66' : '#555',
+                  color: showError ? '#d32f2f' : (isActive ? '#2E7D66' : '#555'),
                   fontWeight: isActive ? 600 : 400,
                   cursor: 'pointer',
                 }}
               >
                 {step.label}
+                {showError && (
+                  <Typography
+                    component="span"
+                    sx={{
+                      display: 'block',
+                      fontSize: '0.75rem',
+                      color: '#d32f2f',
+                      fontWeight: 400,
+                      mt: '0.25rem',
+                    }}
+                  >
+                    Fehlende Angaben
+                  </Typography>
+                )}
               </Typography>
             </Box>
           );

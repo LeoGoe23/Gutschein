@@ -1,4 +1,6 @@
 import { Box } from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import TopBar from '../components/home/TopBar';
 import HeroText from '../components/home/HeroText';
 import HeroImage from '../components/home/HeroImage';
@@ -7,8 +9,39 @@ import Footer from '../components/home/Footer';
 import LogoTopLeft from '../components/home/TopLeftLogo';
 import FAQ from '../components/home/FAQ';
 import Vorteile from '../components/home/Vorteile';
+import LoginModal from '../components/login/LoginModal';
+import useAuth from '../auth/useAuth';
 
 export default function HomeLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const user = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [intendedRoute, setIntendedRoute] = useState<string | null>(null);
+
+  // LoginModal öffnen wenn von ProtectedRoute weitergeleitet
+  useEffect(() => {
+    if (location.state?.from && !user) {
+      setIntendedRoute(location.state.from);
+      setShowLoginModal(true);
+    }
+  }, [location.state, user]);
+
+  // Nach erfolgreichem Login zur ursprünglich gewünschten Route weiterleiten
+  useEffect(() => {
+    if (user && intendedRoute) {
+      navigate(intendedRoute, { replace: true });
+      setIntendedRoute(null);
+    }
+  }, [user, intendedRoute, navigate]);
+
+  const handleCloseLoginModal = () => {
+    setShowLoginModal(false);
+    setIntendedRoute(null);
+    // State clearen
+    navigate('/', { replace: true });
+  };
+
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', overflowX: 'hidden', fontFamily: 'system-ui, sans-serif', padding: { xs: '0', md: '0' } }}>
       
@@ -53,6 +86,11 @@ export default function HomeLayout() {
         <FAQ />
       </Box>
       <Footer />
+
+      <LoginModal 
+        open={showLoginModal} 
+        onClose={handleCloseLoginModal} 
+      />
     </Box>
   );
 }
