@@ -5,7 +5,7 @@ import { Email, Phone, Person, Business, DesignServices, Image as ImageIcon, Bui
 import { useNavigate } from 'react-router-dom';
 
 export default function Zusammenfassung() {
-  const { data } = useGutschein();
+  const { data, clearData } = useGutschein();
   const navigate = useNavigate();
 
   const handlePreview = () => {
@@ -205,6 +205,27 @@ export default function Zusammenfassung() {
         }}
       >
         Vorschau: Was sieht Ihr Kunde
+      </Button>
+
+      {/* Reset-Button */}
+      <Button
+        variant="outlined"
+        onClick={() => clearData()}
+        sx={{
+          mt: '1rem',
+          color: '#FF5722',
+          borderColor: '#FF5722',
+          padding: '0.5rem 1.5rem',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          borderRadius: '2rem',
+          '&:hover': {
+            backgroundColor: '#FFEBEE',
+            borderColor: '#FF5722',
+          },
+        }}
+      >
+        Zurücksetzen
       </Button>
 
     </Box>
