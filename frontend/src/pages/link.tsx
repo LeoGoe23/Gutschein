@@ -1,18 +1,56 @@
-import { Box, Typography, Button, TextField, Paper, Alert } from '@mui/material';
+import { Box, Typography, Button, TextField, Paper, Alert, CircularProgress } from '@mui/material';
 import { useGutschein } from '../context/GutscheinContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ContentCopy, CheckCircle, Launch, Code } from '@mui/icons-material';
 import TopBar from '../components/home/TopBar';
 import LogoTopLeft from '../components/home/TopLeftLogo';
 import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../auth/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function LinkGenerierung() {
   const { data } = useGutschein();
   const [copied, setCopied] = useState(false);
+  const [slug, setSlug] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-  
-  // Dummy Link - später aus Backend
-  const checkoutLink = `https://gutscheinfabrik.de/checkout/${Math.random().toString(36).substr(2, 9)}`;
+
+  // Slug aus Firebase holen
+  useEffect(() => {
+    const fetchSlug = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setError('Nicht angemeldet');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.slug) {
+            setSlug(userData.slug);
+          } else {
+            setError('Kein Slug gefunden. Bitte Setup erneut durchführen.');
+          }
+        } else {
+          setError('Benutzerdaten nicht gefunden');
+        }
+      } catch (err) {
+        console.error('Fehler beim Laden des Slugs:', err);
+        setError('Fehler beim Laden der Daten');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSlug();
+  }, []);
+
+  // Checkout-Link mit echtem Slug erstellen
+  const checkoutLink = slug ? `http://localhost:3000/checkoutc/${slug}` : '';
 
   const handleCopyLink = async () => {
     try {
@@ -25,16 +63,47 @@ export default function LinkGenerierung() {
   };
 
   const handleTestLink = () => {
-    window.open(checkoutLink, '_blank');
-  };
-
-  const handleNewGutschein = () => {
-    navigate('/gutschein/step1');
+    if (checkoutLink) {
+      window.open(checkoutLink, '_blank');
+    }
   };
 
   const handleFinish = () => {
     navigate('/');
   };
+
+  // Loading State
+  if (loading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh' 
+      }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <Alert severity="error">{error}</Alert>
+        <Button variant="contained" onClick={() => navigate('/gutschein/step1')}>
+          Zurück zum Setup
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ 
@@ -45,7 +114,6 @@ export default function LinkGenerierung() {
       overflow: 'hidden'
     }}>
       
-      {/* TopBar und Logo genau wie bei Home */}
       <LogoTopLeft />
       
       <Box sx={{ 
@@ -57,25 +125,24 @@ export default function LinkGenerierung() {
         <TopBar />
       </Box>
 
-      {/* Content Container */}
       <Box sx={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'flex-start', // Geändert von 'center' zu 'flex-start'
+        alignItems: 'flex-start',
         minHeight: '100vh',
         padding: { xs: '2rem 1rem', md: '4rem 2rem' },
-        paddingTop: { xs: '4rem', md: '6rem' } // Mehr Abstand von oben
+        paddingTop: { xs: '4rem', md: '6rem' }
       }}>
         
         <Box sx={{ 
-          maxWidth: '1200px', // Erhöht von 800px auf 1200px
+          maxWidth: '1200px',
           width: '100%',
           display: 'flex', 
           flexDirection: 'column', 
           gap: '2rem',
           backgroundColor: '#fff',
           borderRadius: '2rem',
-          padding: { xs: '2rem', md: '4rem' }, // Erhöht von 3rem auf 4rem
+          padding: { xs: '2rem', md: '4rem' },
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
@@ -95,7 +162,7 @@ export default function LinkGenerierung() {
               maxWidth: '600px',
               margin: '0 auto'
             }}>
-              Glückwunsch! Ihr personalisierter Checkout-Link wurde erfolgreich erstellt.
+              Ihr personalisierter Checkout-Link mit Code <strong>{slug}</strong> wurde erfolgreich erstellt.
             </Typography>
           </Box>
           
@@ -118,12 +185,28 @@ export default function LinkGenerierung() {
           }}>
             <Typography sx={{ 
               fontWeight: 600, 
-              mb: '1.5rem', 
+              mb: '1rem', 
               color: '#333',
               fontSize: '1.1rem'
             }}>
               Ihr Checkout-Link:
             </Typography>
+            
+            <Box sx={{ 
+              backgroundColor: '#E8F5E8', 
+              padding: '0.75rem', 
+              borderRadius: '0.5rem', 
+              mb: '1rem',
+              border: '1px solid #C8E6C9'
+            }}>
+              <Typography sx={{ 
+                fontSize: '0.9rem', 
+                color: '#2E7D32',
+                fontWeight: 500
+              }}>
+                Website-Code: <strong>{slug}</strong>
+              </Typography>
+            </Box>
             
             <Box sx={{ display: 'flex', gap: '1rem', mb: '1.5rem', flexDirection: { xs: 'column', sm: 'row' } }}>
               <TextField

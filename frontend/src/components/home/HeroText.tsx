@@ -57,7 +57,7 @@ export default function HeroText() {
     } else if (registrationFinished) {
       navigate('/profil');
     } else {
-      navigate('/gutschein');
+      navigate('/gutschein/step1');
     }
   };
 
