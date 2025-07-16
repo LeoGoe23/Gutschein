@@ -25,9 +25,9 @@ export default function Zusammenfassung() {
       // Erfolgreich gespeichert
       console.log('✅ Gutschein-Setup abgeschlossen:', result);
       
-      // Daten löschen und zu Profil navigieren
+      // Daten löschen und zur Link-Seite navigieren
       clearData();
-      navigate('/profil');
+      navigate('/Success'); // ← Ändere von '/profil' zu '/link'
       
     } catch (error) {
       console.error('❌ Fehler beim Abschließen:', error);
