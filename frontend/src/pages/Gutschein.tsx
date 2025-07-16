@@ -90,9 +90,10 @@ function GutscheinContent() {
     if (currentIndex > 0) navigate(steps[currentIndex - 1]);
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (isAllValid()) {
-      navigate('/success');
+      // Navigiere zu Step 5 zum Abschließen
+      navigate('/gutschein/step5');
     }
   };
 
