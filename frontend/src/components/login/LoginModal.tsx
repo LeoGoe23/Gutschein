@@ -124,7 +124,6 @@ export default function LoginModal({ open, onClose }: Props) {
         Telefon: "",
       },
       Checkout: {
-        slug: "",
         Unternehmensname: "",
         Gutscheinarten: {},
         BildURL: "",
