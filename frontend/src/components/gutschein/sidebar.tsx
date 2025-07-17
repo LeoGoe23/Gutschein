@@ -21,10 +21,13 @@ export default function Sidebar({ activeStep }: SidebarProps) {
   const navigate = useNavigate();
   const { data, setData } = useGutschein();
 
-  // Aktualisiere den maxStep wenn nötig
-  const maxStep = Math.max(data.maxStep || 1, activeStep);
-  if (maxStep !== data.maxStep) {
-    setData({ maxStep });
+  // Nur maxStep erhöhen, wenn der User wirklich fortschreitet
+  // Nicht beim ersten Laden einer höheren Step-Nummer
+  const currentMaxStep = data.maxStep || 1;
+  
+  // Nur wenn der activeStep höher ist als der gespeicherte maxStep, dann erhöhen
+  if (activeStep > currentMaxStep) {
+    setData({ maxStep: activeStep });
   }
 
   // Validierungsfunktionen für jeden Step
@@ -82,12 +85,12 @@ export default function Sidebar({ activeStep }: SidebarProps) {
           
           // Step 5 ist immer completed wenn einmal besucht
           const isCompleted = stepNumber === 5 
-            ? maxStep >= 5 
-            : maxStep > stepNumber && isValid;
+            ? currentMaxStep >= 5 
+            : currentMaxStep > stepNumber && isValid;
           
-          // Zeige Fehler wenn Step bereits erreicht wurde (maxStep > stepNumber) UND invalid ist
+          // Zeige Fehler wenn Step bereits erreicht wurde (currentMaxStep > stepNumber) UND invalid ist
           // Aber niemals für Step 5
-          const showError = stepNumber !== 5 && !isValid && maxStep > stepNumber;
+          const showError = stepNumber !== 5 && !isValid && currentMaxStep > stepNumber;
           
           const isLast = index === steps.length - 1;
 
