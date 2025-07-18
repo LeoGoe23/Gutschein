@@ -29,7 +29,7 @@ const fileToBlob = (file: File | string): Promise<Blob> => {
 };
 
 // Lade Bild zu Storage hoch
-const uploadImageToStorage = async (file: File | string, path: string): Promise<string> => {
+export const uploadImageToStorage = async (file: File | string, path: string): Promise<string> => {
   console.log('🔄 Uploading file to:', path);
   console.log('📁 File type:', typeof file, file instanceof File ? 'File' : 'String');
   
