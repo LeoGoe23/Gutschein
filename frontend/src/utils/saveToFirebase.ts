@@ -64,12 +64,12 @@ export const saveGutscheinData = async (contextData: any) => {
   try {
     // 1. Bilder zu Storage hochladen
     let bildURL = '';
-    let gutscheinURL = '';
+    let gutscheinDesignURL = '';
 
     // Unternehmensbild hochladen
     if (contextData.bild) {
       console.log('📸 Uploading company image...');
-      const bildPath = `seiten/${slug}/screen`;
+      const bildPath = `seiten/${slug}/company-image`;
       bildURL = await uploadImageToStorage(contextData.bild, bildPath);
       console.log('✅ Company image uploaded:', bildURL);
     } else {
@@ -77,13 +77,13 @@ export const saveGutscheinData = async (contextData: any) => {
     }
 
     // Gutschein-Design hochladen (falls vorhanden)
-    if (contextData.gutscheinDesign?.hintergrund) {
-      console.log('🎨 Uploading voucher design...');
-      const gutscheinPath = `seiten/${slug}/gutschein`;
-      gutscheinURL = await uploadImageToStorage(contextData.gutscheinDesign.hintergrund, gutscheinPath);
-      console.log('✅ Voucher design uploaded:', gutscheinURL);
+    if (contextData.gutscheinDesign?.hintergrund && contextData.gutscheinDesign.modus === 'eigenes') {
+      console.log('🎨 Uploading custom voucher design...');
+      const designPath = `seiten/${slug}/voucher-design`;
+      gutscheinDesignURL = await uploadImageToStorage(contextData.gutscheinDesign.hintergrund, designPath);
+      console.log('✅ Custom voucher design uploaded:', gutscheinDesignURL);
     } else {
-      console.log('⚠️ No voucher design found');
+      console.log('⚠️ No custom voucher design to upload or using default design');
     }
 
     // Gutscheinarten verarbeiten
@@ -131,6 +131,14 @@ export const saveGutscheinData = async (contextData: any) => {
 
     console.log('🎯 Final voucher types:', gutscheinarten);
 
+    // Gutschein-Design Daten vorbereiten
+    const gutscheinDesignData = {
+      modus: contextData.gutscheinDesign?.modus || 'unser-design',
+      designURL: gutscheinDesignURL || null,
+      hintergrundTyp: contextData.gutscheinDesign?.hintergrundTyp || null,
+      // Weitere Design-Eigenschaften können hier hinzugefügt werden
+    };
+
     // 2. User-Dokument in Firestore aktualisieren
     const userDocRef = doc(db, 'users', user.uid);
     console.log('📄 Updating user document:', user.uid);
@@ -154,13 +162,13 @@ export const saveGutscheinData = async (contextData: any) => {
       // Checkout-Daten aktualisieren
       'Checkout.Unternehmensname': contextData.unternehmensname || '',
       'Checkout.BildURL': bildURL,
-      'Checkout.GutscheinURL': gutscheinURL,
+      'Checkout.GutscheinDesignURL': gutscheinDesignURL,
       'Checkout.Dienstleistung': contextData.dienstleistungen?.length > 0 || false,
       'Checkout.Freibetrag': contextData.customValue || false,
       'Checkout.Gutscheinarten': gutscheinarten,
 
       // Gutschein-Details aktualisieren
-      'Gutscheindetails.Gutscheindesign': contextData.gutscheinDesign || {},
+      'Gutscheindetails.GutscheinDesign': gutscheinDesignData,
       'Gutscheindetails.Gutscheinarten': gutscheinarten,
     };
 
@@ -174,11 +182,11 @@ export const saveGutscheinData = async (contextData: any) => {
     console.log('🎉 All data saved successfully:', {
       slug,
       bildURL,
-      gutscheinURL,
-      updateData
+      gutscheinDesignURL,
+      gutscheinDesignData
     });
 
-    return { slug, bildURL, gutscheinURL };
+    return { slug, bildURL, gutscheinDesignURL };
 
   } catch (error) {
     console.error('❌ Error in saveGutscheinData:', error);

@@ -39,10 +39,11 @@ export default function GutscheinEditor() {
         setHintergrund(base64String);
         setHintergrundTyp(typ);
         
-        // Speichere im Context
+        // Speichere im Context - KORRIGIERT
         setData({
           gutscheinDesign: {
             ...data.gutscheinDesign,
+            modus: 'eigenes', // Setze modus auf 'eigenes' wenn Datei hochgeladen
             hintergrund: base64String,
             hintergrundTyp: typ
           }
@@ -54,11 +55,22 @@ export default function GutscheinEditor() {
 
   const setModusAndSave = (newModus: 'unser-design' | 'wir-designen' | 'eigenes') => {
     setModus(newModus);
+    
+    // Wenn nicht 'eigenes' gewählt wird, lösche hochgeladene Dateien
+    const updatedDesign = {
+      ...data.gutscheinDesign,
+      modus: newModus
+    };
+    
+    if (newModus !== 'eigenes') {
+      updatedDesign.hintergrund = null;
+      updatedDesign.hintergrundTyp = null;
+      setHintergrund(null);
+      setHintergrundTyp(null);
+    }
+    
     setData({
-      gutscheinDesign: {
-        ...data.gutscheinDesign,
-        modus: newModus
-      }
+      gutscheinDesign: updatedDesign
     });
   };
 
