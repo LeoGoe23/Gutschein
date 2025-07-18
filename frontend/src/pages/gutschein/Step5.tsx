@@ -22,10 +22,8 @@ export default function Zusammenfassung() {
     try {
       const result = await saveGutscheinData(data);
       
-      // Erfolgreich gespeichert
       console.log('✅ Gutschein-Setup abgeschlossen:', result);
       
-      // Daten löschen und zur Link-Seite navigieren
       clearData();
       navigate('/Success'); // ← Ändere von '/profil' zu '/link'
       

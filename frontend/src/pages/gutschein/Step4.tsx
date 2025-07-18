@@ -1,77 +1,153 @@
-import { Box, TextField, Typography } from '@mui/material';
-import { useState } from 'react';
-import { useGutschein } from '../../context/GutscheinContext'; // Importiere den Kontext
+import { Box, Typography, Button, CircularProgress, TextField } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { useGutschein } from '../../context/GutscheinContext';
+import { getAuth } from 'firebase/auth';
 
 export default function Zahlungsdaten() {
-  const { data, setData } = useGutschein(); // Hole den Kontext
-  const [ibanError, setIbanError] = useState(false); // Fehlerstatus für IBAN
+  const { data } = useGutschein();
 
-  const handleInputChange = (field: string, value: string) => {
-    if (field === 'iban') {
-      const formattedIban = formatIban(value); // IBAN formatieren
-      setData({ [field]: formattedIban }); // Aktualisiere den Kontext
-    } else {
-      setData({ [field]: value }); // Aktualisiere den Kontext
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+  const firebaseUid = data.firebaseUid || currentUser?.uid || '';
+  const email = data.email || currentUser?.email || '';
+  const unternehmensname = data.unternehmensname;
+
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [onboardUrl, setOnboardUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const missingData = !firebaseUid || !unternehmensname || !email;
+
+  useEffect(() => {
+    async function setupAccount() {
+      if (missingData) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const createRes = await fetch(
+          'http://localhost:5001/api/zahlung/create-account',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firebaseUid,
+              name: unternehmensname,
+              email,
+            }),
+          }
+        );
+        if (!createRes.ok) {
+          const text = await createRes.text();
+          throw new Error(`Account-Erstellung fehlgeschlagen: ${createRes.status} ${text}`);
+        }
+        const { accountId } = await createRes.json();
+        setAccountId(accountId);
+
+        const linkRes = await fetch(
+          `http://localhost:5001/api/zahlung/onboard/${accountId}`
+        );
+        if (!linkRes.ok) {
+          const text = await linkRes.text();
+          throw new Error(`Onboarding-Link fehlgeschlagen: ${linkRes.status} ${text}`);
+        }
+        const linkData = await linkRes.json();
+        console.log('Onboarding-Antwort:', linkData);
+        const url =
+          linkData.url ||
+          linkData.link ||
+          linkData.accountLink?.url;
+        if (!url) {
+          throw new Error(`Keine URL in Antwort gefunden: ${JSON.stringify(linkData)}`);
+        }
+        setOnboardUrl(url);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
-  };
-
-  const handleBlur = (field: string, value: string) => {
-    if (field === 'iban') {
-      const plainIban = value.replace(/\s+/g, ''); // Entferne Leerzeichen
-      setIbanError(!validateIban(plainIban)); // Validierung prüfen
-      setData({ [field]: plainIban }); // Speichere IBAN ohne Leerzeichen
-    }
-  };
-
-  const formatIban = (iban: string) => {
-    // Entferne alle Leerzeichen und füge nach 4 Zeichen ein Leerzeichen hinzu
-    return iban.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
-  };
-
-  const validateIban = (iban: string) => {
-    // Entferne Leerzeichen für die Validierung
-    const plainIban = iban.replace(/\s+/g, '');
-
-    // Prüfe, ob die IBAN 22 Zeichen lang ist und mit "DE" beginnt
-    const isCorrectLength = plainIban.length === 22;
-    const startsWithDE = plainIban.startsWith('DE');
-
-    return isCorrectLength && startsWithDE;
-  };
+    setupAccount();
+  }, [firebaseUid, unternehmensname, email]);
 
   return (
-    <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>
-        Zahlungsdaten
+    <Box
+      sx={{
+        maxWidth: 500,
+        m: '0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+      }}
+    >
+      <Typography variant="h4">Zahlungsdaten</Typography>
+      <Typography color="textSecondary" mb={2}>
+        Bitte hinterlegen Sie Ihre Auszahlungskonten über Stripe:
       </Typography>
 
-      <Typography sx={{ color: '#555', mb: '1rem' }}>
-        Bitte hinterlegen Sie Ihre Bankverbindung für die Auszahlung der Gutscheinbeträge.
-      </Typography>
-
-      <TextField 
-        label="Kontoinhaber" 
-        variant="outlined" 
-        required 
+      {/* Anzeige der Basis-Daten aus Step 1 und Auth */}
+      <TextField
+        label="Unternehmensname"
+        variant="outlined"
+        required
         fullWidth
-        value={data.kontoinhaber} // Wert aus dem Kontext
-        onChange={(e) => handleInputChange('kontoinhaber', e.target.value)} // Kontext aktualisieren
+        value={unternehmensname}
+        disabled
+        sx={{ mb: 2 }}
+      />
+      <TextField
+        label="E-Mail-Adresse"
+        variant="outlined"
+        required
+        fullWidth
+        value={email}
+        disabled
+        sx={{ mb: 2 }}
+      />
+      <TextField
+        label="Firebase UID"
+        variant="outlined"
+        required
+        fullWidth
+        value={firebaseUid}
+        disabled
+        sx={{ mb: 2 }}
       />
 
-      <TextField 
-        label="IBAN" 
-        variant="outlined" 
-        required 
-        fullWidth 
-        placeholder="DE..."
-        value={data.iban} // Wert aus dem Kontext
-        onChange={(e) => handleInputChange('iban', e.target.value)} // Kontext aktualisieren
-        onBlur={(e) => handleBlur('iban', e.target.value)} // Validierung beim Verlassen des Feldes
-        error={ibanError} // Fehlerstatus anzeigen
-        helperText={ibanError ? 'Bitte geben Sie eine gültige IBAN ein.' : ''} // Fehlermeldung
-      />
+      {/* Fehlende Basis-Daten */}
+      {!loading && missingData && (
+        <Typography color="error" mb={2}>
+          Bitte füllen Sie zuerst Unternehmensname, E-Mail und UID aus.
+        </Typography>
+      )}
 
+      {/* Ladespinner */}
+      {loading && <CircularProgress />}
+
+      {/* Fehler beim Erstellen / Link-Generierung */}
+      {!loading && error && (
+        <Typography color="error" mb={2}>
+          Fehler beim Erzeugen des Onboarding-Links: {error}
+        </Typography>
+      )}
+
+      {/* Warte-Zustand, falls noch kein Link verfügbar */}
+      {!loading && !error && !onboardUrl && !missingData && (
+        <Typography mb={2}>Onboarding-Link wird erstellt…</Typography>
+      )}
+
+      {/* Button zum Öffnen des Stripe-Onboardings */}
+      {!loading && !error && onboardUrl && (
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => window.open(onboardUrl!, '_blank')}
+        >
+          Mit Stripe verbinden
+        </Button>
+      )}
     </Box>
   );
 }
