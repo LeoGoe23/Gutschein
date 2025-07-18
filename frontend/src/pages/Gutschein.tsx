@@ -32,7 +32,7 @@ function GutscheinContent() {
       case 3:
         return true;
       case 4:
-        return !!(data.kontoinhaber && data.iban);
+        return true; // Zahlungsinformationen sind nicht mehr Pflicht
       case 5:
         return true;
       default:
@@ -64,17 +64,7 @@ function GutscheinContent() {
       missing.push('Step 2 - Gutschein-Details: Mindestens eine Option (Freie Wertangabe oder Dienstleistungen) aktivieren');
     }
 
-    // Step 4
-    if (!validateStep(4)) {
-      const step4Missing = [];
-      if (!data.kontoinhaber) step4Missing.push('Kontoinhaber');
-      if (!data.iban) step4Missing.push('IBAN');
-      
-      if (step4Missing.length > 0) {
-        missing.push(`Step 4 - Zahlungsdaten: ${step4Missing.join(', ')}`);
-      }
-    }
-
+    // Step 4 (entfernt, da nicht mehr Pflicht)
     return missing;
   };
 
