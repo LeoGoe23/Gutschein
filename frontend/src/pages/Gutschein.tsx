@@ -1,14 +1,17 @@
 import { Box, Button, Typography } from '@mui/material';
 import Sidebar from '../components/gutschein/sidebar';
 import LogoTopLeft from '../components/home/TopLeftLogo';
-import TopBar from '../components/home/TopBar'; // Import der TopBar
+import TopBar from '../components/home/TopBar';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { GutscheinProvider, useGutschein } from '../context/GutscheinContext';
+import { saveGutscheinData } from '../utils/saveToFirebase';
+import { useState } from 'react';
 
 function GutscheinContent() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { data } = useGutschein();
+  const { data, clearData } = useGutschein();
+  const [isLoading, setIsLoading] = useState(false);
 
   const steps = [
     '/gutschein/step1',
@@ -24,12 +27,16 @@ function GutscheinContent() {
   const validateStep = (stepNumber: number): boolean => {
     switch (stepNumber) {
       case 1:
-        return !!(data.vorname && data.nachname && data.email && data.unternehmensname && data.website && data.geschaeftsart);
+        return !!(data.vorname && data.nachname && data.email && data.unternehmensname && data.website && data.geschaeftsart && data.bild);
       case 2:
         const hasCustomValue = data.customValue;
         const hasServices = data.dienstleistungen && data.dienstleistungen.length > 0;
         return hasCustomValue || hasServices;
       case 3:
+        // Wenn "eigenes" Design gewählt wurde, muss ein Hintergrund hochgeladen werden
+        if (data.gutscheinDesign?.modus === 'eigenes') {
+          return !!(data.gutscheinDesign.hintergrund);
+        }
         return true;
       case 4:
         return true; // Zahlungsinformationen sind nicht mehr Pflicht
@@ -53,6 +60,7 @@ function GutscheinContent() {
       if (!data.unternehmensname) step1Missing.push('Unternehmensname');
       if (!data.website) step1Missing.push('Website');
       if (!data.geschaeftsart) step1Missing.push('Geschäftsart');
+      if (!data.bild) step1Missing.push('Unternehmensbild');
       
       if (step1Missing.length > 0) {
         missing.push(`Step 1 - Unternehmensdaten: ${step1Missing.join(', ')}`);
@@ -64,7 +72,11 @@ function GutscheinContent() {
       missing.push('Step 2 - Gutschein-Details: Mindestens eine Option (Freie Wertangabe oder Dienstleistungen) aktivieren');
     }
 
-    // Step 4 (entfernt, da nicht mehr Pflicht)
+    // Step 3
+    if (!validateStep(3)) {
+      missing.push('Step 3 - Gutschein-Design: Bild für eigenes Design hochladen');
+    }
+
     return missing;
   };
 
@@ -82,8 +94,30 @@ function GutscheinContent() {
 
   const handleComplete = async () => {
     if (isAllValid()) {
-      // Navigiere zu Step 5 zum Abschließen
-      navigate('/gutschein/step5');
+      console.log('🔄 Starting completion process...');
+      console.log('📋 Current context data:', data);
+      
+      setIsLoading(true);
+      try {
+        const result = await saveGutscheinData(data);
+        
+        console.log('✅ Gutschein-Setup abgeschlossen:', result);
+        
+        clearData();
+        navigate('/Success');
+        
+      } catch (error) {
+        console.error('❌ Fehler beim Abschließen:', error);
+        
+        let errorMessage = 'Unbekannter Fehler beim Speichern.';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        
+        alert(`Fehler beim Speichern: ${errorMessage}\n\nBitte versuchen Sie es erneut oder kontaktieren Sie den Support.`);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -150,9 +184,9 @@ function GutscheinContent() {
                   }
                 }} 
                 onClick={handleComplete}
-                disabled={!isAllValid()}
+                disabled={!isAllValid() || isLoading}
               >
-                Abschließen
+                {isLoading ? 'Speichere...' : 'Abschließen'}
               </Button>
             )}
           </Box>

@@ -1,45 +1,14 @@
-import { Box, Typography, Button, Stack, Card, CardContent, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, Stack } from '@mui/material';
 import { useGutschein } from '../../context/GutscheinContext';
-import { Key, ReactElement, useState } from 'react';
 import { Email, Phone, Person, Business, DesignServices, Image as ImageIcon, Build } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { saveGutscheinData } from '../../utils/saveToFirebase';
 
 export default function Zusammenfassung() {
   const { data, clearData } = useGutschein();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
 
   const handlePreview = () => {
     navigate('/checkoutdemo');
-  };
-
-  const handleAbschliessen = async () => {
-    console.log('🔄 Starting completion process...');
-    console.log('📋 Current context data:', data);
-    
-    setIsLoading(true);
-    try {
-      const result = await saveGutscheinData(data);
-      
-      console.log('✅ Gutschein-Setup abgeschlossen:', result);
-      
-      clearData();
-      navigate('/Success'); // ← Ändere von '/profil' zu '/link'
-      
-    } catch (error) {
-      console.error('❌ Fehler beim Abschließen:', error);
-      
-      // Bessere Fehlerbehandlung
-      let errorMessage = 'Unbekannter Fehler beim Speichern.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      alert(`Fehler beim Speichern: ${errorMessage}\n\nBitte versuchen Sie es erneut oder kontaktieren Sie den Support.`);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -182,36 +151,6 @@ export default function Zusammenfassung() {
           }}
         >
           Vorschau: Was sieht Ihr Kunde
-        </Button>
-
-        <Button
-          variant="contained"
-          onClick={handleAbschliessen}
-          disabled={isLoading}
-          sx={{
-            backgroundColor: '#2E7D66',
-            color: '#fff',
-            padding: '0.75rem 2rem',
-            fontSize: '1rem',
-            fontWeight: 600,
-            borderRadius: '2rem',
-            boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.1)',
-            '&:hover': {
-              backgroundColor: '#245a4f',
-            },
-            '&:disabled': {
-              backgroundColor: '#ccc',
-            },
-          }}
-        >
-          {isLoading ? (
-            <>
-              <CircularProgress size={20} sx={{ mr: 1, color: 'white' }} />
-              Speichere...
-            </>
-          ) : (
-            'Abschließen'
-          )}
         </Button>
       </Stack>
 

@@ -34,7 +34,7 @@ export default function Sidebar({ activeStep }: SidebarProps) {
   const validateStep = (stepNumber: number): boolean => {
     switch (stepNumber) {
       case 1:
-        return !!(data.vorname && data.nachname && data.email && data.unternehmensname && data.website && data.geschaeftsart);
+        return !!(data.vorname && data.nachname && data.email && data.unternehmensname && data.website && data.geschaeftsart && data.bild);
       case 2:
         // Mindestens eine Option muss aktiviert sein
         const hasCustomValue = data.customValue;
@@ -43,7 +43,10 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         // Mindestens eine der beiden Optionen muss aktiviert/ausgefüllt sein
         return hasCustomValue || hasServices;
       case 3:
-        // Step 3 hat keine Pflichtfelder, da alle Modi gültig sind
+        // Wenn "eigenes" Design gewählt wurde, muss ein Hintergrund hochgeladen werden
+        if (data.gutscheinDesign?.modus === 'eigenes') {
+          return !!(data.gutscheinDesign.hintergrund);
+        }
         return true;
       case 4:
         return !!(data.kontoinhaber && data.iban);

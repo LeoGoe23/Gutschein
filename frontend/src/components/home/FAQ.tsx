@@ -46,7 +46,7 @@ export default function FAQ() {
       display: 'flex', 
       justifyContent: 'center', 
       padding: { xs: '4rem 1rem', md: '6rem 2rem' }, // Einheitliches Padding
-      backgroundColor: '#ffffff',
+      backgroundColor: '#f4f4f4', // Gleiche Farbe wie ContentSection
       overflow: 'hidden'
     }}>
       <Box

@@ -107,7 +107,7 @@ export default function Step1() {
       />
 
       <Typography sx={{ color: '#555', mt: '1rem' }}>
-        Unternehmensbild hochladen: (Für die Darstellung auf der Website)
+        Unternehmensbild hochladen: (Für die Darstellung auf der Website) *
       </Typography>
       <Button variant="contained" component="label">
         Bild auswählen
@@ -118,6 +118,12 @@ export default function Step1() {
           onChange={handleImageUpload} 
         />
       </Button>
+
+      {!data.bild && (
+        <Typography sx={{ color: '#d32f2f', fontSize: '0.875rem', mt: '0.25rem' }}>
+          Bitte laden Sie ein Unternehmensbild hoch.
+        </Typography>
+      )}
 
       {imagePreview && (
         <Box sx={{ mt: '1rem', textAlign: 'center' }}>

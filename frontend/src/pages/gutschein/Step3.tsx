@@ -340,6 +340,12 @@ export default function GutscheinEditor() {
                 />
               </Button>
               
+              {modus === 'eigenes' && !hintergrund && (
+                <Typography sx={{ color: '#d32f2f', fontSize: '0.875rem', mb: 1 }}>
+                  Bitte laden Sie ein Design hoch.
+                </Typography>
+              )}
+              
               <Typography variant="body2" sx={{ color: '#666', fontSize: '0.85rem', mb: 3 }}>
                 Wir passen Ihr Design leicht an, um Code und Betrag dynamisch anzupassen. 
                 Dies erfolgt in den nächsten 12h nach Registrierung.
