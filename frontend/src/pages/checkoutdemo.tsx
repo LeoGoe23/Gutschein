@@ -81,24 +81,30 @@ function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   );
 }
 
-function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null, onPaymentSuccess: (betrag: number) => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+function PaymentForm({ betrag, customerEmail }: { betrag: number | null; customerEmail: string }) {
+  const [method, setMethod] = useState<string | null>(null);
 
   const handlePayment = async () => {
-    if (!stripe || !elements || !betrag || !paymentMethod) {
+    if (!betrag || !method) {
       alert('Bitte wählen Sie eine Zahlungsmethode und geben Sie einen Betrag ein.');
       return;
     }
 
-    // Simuliere erfolgreiche Zahlung für Demo
-    alert('Zahlung erfolgreich!');
-    
-    // Übergebe den Betrag an die Parent-Komponente
-    onPaymentSuccess(betrag);
-  };
+    const response = await fetch('https://gutscheinery.de/api/zahlung/create-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: betrag * 100, customerEmail, method }),
+    });
 
+    if (!response.ok) {
+      alert('Zahlung fehlgeschlagen');
+      return;
+    }
+
+    const { paymentUrl } = await response.json();
+    window.location.href = paymentUrl;
+  };
+  
   return (
     <Box sx={{ mt: 4 }}>
       <Typography variant="body1" sx={{ mb: 2 }}>
