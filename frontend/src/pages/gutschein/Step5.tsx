@@ -8,7 +8,7 @@ export default function Zusammenfassung() {
   const navigate = useNavigate();
 
   const handlePreview = () => {
-    navigate('/checkoutdemo');
+    navigate('/checkoutc');
   };
 
   return (
