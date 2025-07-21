@@ -574,6 +574,8 @@ export default function GutscheinLandingPage() {
         alignItems: 'center',
         p: 2,
       }}
-    />
+    >
+      {/* Falls du später hier etwas anzeigen willst */}
+    </Box> {/* ← dieser war vorher als /> falsch geschlossen */}
   </Box>
 );
