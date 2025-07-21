@@ -104,18 +104,13 @@ function PaymentForm({ betrag, customerEmail }: { betrag: number | null; custome
     const { paymentUrl } = await response.json();
     window.location.href = paymentUrl;
   };
-  
+
   return (
     <Box sx={{ mt: 4 }}>
       <Typography variant="body1" sx={{ mb: 2 }}>
-        Wählen Sie Ihre Zahlungsmethode:
+        Zahlungsmethode wählen:
       </Typography>
-      <PaymentOptions onSelect={setPaymentMethod} />
-      {paymentMethod === 'card' && (
-        <Box sx={{ border: '1px solid #ccc', borderRadius: '8px', p: 2, mb: 4, mt: 2 }}>
-          <CardElement options={{ hidePostalCode: true }} />
-        </Box>
-      )}
+      <PaymentOptions onSelect={setMethod} />
       <Button
         variant="contained"
         size="large"
