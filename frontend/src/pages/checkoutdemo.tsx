@@ -4,8 +4,6 @@ import UploadIcon from '@mui/icons-material/Upload';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadIcon from '@mui/icons-material/Download';
 import TopLeftLogo from '../components/home/TopLeftLogo';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { storage } from '../auth/firebase';
 import { ref, getDownloadURL } from 'firebase/storage';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
