@@ -144,12 +144,12 @@ export default function GutscheinEditor() {
                 <Box
                   sx={{
                     width: '100%',
-                    height: '280px',
+                    height: '210px', // 1/4 von 842px (A4 Höhe)
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-                    borderBottom: '3px solid #1976d2',
+                    // borderBottom: '3px solid #1976d2', // ENTFERNT
                     mb: 3,
                   }}
                 >
@@ -157,11 +157,11 @@ export default function GutscheinEditor() {
                     src={typeof data.bild === 'string' ? data.bild : URL.createObjectURL(data.bild)}
                     alt="Unternehmensbild"
                     style={{
-                      maxWidth: '400px',
-                      maxHeight: '250px',
-                      objectFit: 'contain',
-                      borderRadius: '8px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      width: '100%', // Ganze Breite
+                      height: '100%', // Ganze Höhe des Containers
+                      objectFit: 'cover', // Ändere von 'contain' zu 'cover' für ganze Breite
+                      // borderRadius: '8px', // ENTFERNT für ganze Breite
+                      // boxShadow: '0 2px 8px rgba(0,0,0,0.1)', // ENTFERNT
                     }}
                   />
                 </Box>
@@ -175,7 +175,7 @@ export default function GutscheinEditor() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: 3,
-                  height: data.bild ? 'calc(100% - 280px)' : '100%',
+                  height: data.bild ? 'calc(100% - 210px)' : '100%', // Anpassung für neue Höhe
                   justifyContent: 'center',
                 }}
               >
