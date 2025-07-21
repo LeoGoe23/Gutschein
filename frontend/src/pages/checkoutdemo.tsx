@@ -14,8 +14,6 @@ import { useGutschein } from '../context/GutscheinContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-const stripePromise = loadStripe('your-publishable-key-here');
-
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mt: 4 }}>
