@@ -579,3 +579,4 @@ export default function GutscheinLandingPage() {
     </Box> {/* ← dieser war vorher als /> falsch geschlossen */}
   </Box>
 );
+}
