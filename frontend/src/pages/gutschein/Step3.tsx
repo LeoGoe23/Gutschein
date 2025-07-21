@@ -122,7 +122,7 @@ export default function GutscheinEditor() {
         </Card>
       </Box>
 
-      {/* Hauptbereich mit Editor und Gutscheincode-Elementen */}
+      {/* Hauptbereich mit Editor und Gutscheincode-Eldementen */}
       <Box sx={{ display: 'flex', gap: 2 }}>
         {modus === 'unser-design' ? (
           <Box sx={{ display: 'flex', gap: 2 }}>
