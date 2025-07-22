@@ -43,8 +43,6 @@ function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPa
     onPaymentSuccess(betrag, customerEmail); // <- E-Mail hier übergeben
     return;
 
-     PRODUCTION: Echte Zahlung (auskommentiert)
-    *
      try {
       const response = await fetch('https://gutscheinery.de/api/zahlung/create-payment', {
         method: 'POST',
