@@ -48,7 +48,7 @@ function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPa
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          amount: betrag * 100, // z.B. 10€ → 1000
+          amount: (betrag ?? 0) * 100, // z.B. 10€ → 1000
           method,
           customerEmail
         }),
