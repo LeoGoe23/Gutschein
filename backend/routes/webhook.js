@@ -1,7 +1,7 @@
 const express     = require("express");
 const router      = express.Router();
 const bodyParser  = require("body-parser");
-const createMollieClient = require('@mollie/api-client');
+const { createMollieClient } = require('@mollie/api-client'); // <- HIER: { } hinzufügen
 const mollie      = createMollieClient({ apiKey: process.env.MOLLIE_API_KEY });
 const Gutschein   = require("../models/Gutschein");
 
