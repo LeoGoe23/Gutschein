@@ -14,7 +14,7 @@ interface GutscheinData {
   };
 }
 
-export const generateGutscheinPDF = async (data: GutscheinData): Promise<void> => {
+export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> => { // <- Promise<Blob> statt Promise<void>
   // Container für PDF-Generierung erstellen
   const pdfContent = document.createElement('div');
   pdfContent.style.cssText = `
@@ -234,9 +234,10 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<void> =
     const imgData = canvas.toDataURL('image/png', 1.0);
     pdf.addImage(imgData, 'PNG', 0, 0, 595, 842, '', 'FAST');
     
-    // PDF speichern
-    const fileName = `Gutschein_${data.unternehmen.replace(/[^a-zA-Z0-9]/g, '_')}_${data.gutscheinCode}.pdf`;
-    pdf.save(fileName);
+    // PDF als Blob zurückgeben statt direkt zu speichern
+    const pdfBlob = pdf.output('blob');
+
+    return pdfBlob; // <- Blob zurückgeben für E-Mail-Versand
     
   } catch (error) {
     console.error('Fehler beim Generieren des PDFs:', error);
