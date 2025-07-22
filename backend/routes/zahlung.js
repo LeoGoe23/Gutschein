@@ -1,59 +1,128 @@
 require("dotenv").config();
-const Unternehmen = require("../models/Unternehmen");
 const express = require("express");
-const router  = express.Router();
+const querystring = require("querystring");
+const mongoose = require("mongoose");
+const Unternehmen = require("../models/Unternehmen");
 
-// Debugging: Check if environment variables are loaded
-console.log("MOLLIE_API_KEY exists:", !!process.env.MOLLIE_API_KEY);
-console.log("DOMAIN:", process.env.DOMAIN);
+const router = express.Router();
 
-const { createMollieClient } = require('@mollie/api-client');
-const mollie = createMollieClient({ apiKey: process.env.MOLLIE_API_KEY });
+// optional Mollie API usage if module is installed
+let mollie = null;
+try {
+  const createMollieClient = require("@mollie/api-client");
+  mollie = createMollieClient({ apiKey: process.env.MOLLIE_API_KEY });
+} catch (e) {
+  // module might not be installed in offline environment
+}
 
-router.post("/create-payment", async (req, res) => {
-  console.log("Received payment request:", req.body);
-  
-  const { amount, customerEmail, method } = req.body;
-  
-  if (amount == null || !customerEmail || !method) {
-    console.log("Validation failed:", { amount, customerEmail, method });
-    return res.status(400).json({ error: "amount, customerEmail und method sind erforderlich" });
+const CLIENT_ID = process.env.MOLLIE_CLIENT_ID;
+const CLIENT_SECRET = process.env.MOLLIE_CLIENT_SECRET;
+const DOMAIN = process.env.DOMAIN || "";
+
+// Konto erstellen und in der Datenbank verknüpfen
+router.post("/create-account", async (req, res) => {
+  const { firebaseUid, name, email } = req.body || {};
+  if (!firebaseUid || !name || !email) {
+    return res.status(400).json({ error: "firebaseUid, name und email erforderlich" });
   }
-  
   try {
-    console.log("Creating payment with:", {
-      amount: (amount / 100).toFixed(2),
-      customerEmail,
-      method
-    });
-
-    const payment = await mollie.payments.create({
-      amount: { value: (amount / 100).toFixed(2), currency: "EUR" },
-      description: "Gutschein",
-      redirectUrl: `${process.env.DOMAIN}/success`,
-      method: method,
-      metadata: { customerEmail }
-    });
-    
-    console.log("Payment created successfully:", payment.id);
-    res.json({ paymentUrl: payment._links.checkout.href });
+    let unternehmen = await Unternehmen.findOne({ firebaseUid });
+    if (!unternehmen) {
+      unternehmen = new Unternehmen({ firebaseUid, name, email });
+    }
+    if (!unternehmen.mollieAccountId) {
+      unternehmen.mollieAccountId = new mongoose.Types.ObjectId().toString();
+    }
+    await unternehmen.save();
+    res.json({ accountId: unternehmen.mollieAccountId });
   } catch (err) {
-    console.error("Mollie-Fehler (Full Error):", err);
-    console.error("Error message:", err.message);
-    console.error("Error details:", err.details || 'No details');
+    console.error("create-account error", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Express Connect: Konto anlegen
-// Mollie Connect would require an OAuth flow which is not implemented here
-router.post("/create-account", (req, res) => {
-  res.status(501).json({ error: "Mollie Connect nicht implementiert" });
+// OAuth Authorize URL für das Onboarding erzeugen
+router.get("/onboard/:accountId", (req, res) => {
+  const { accountId } = req.params;
+  const redirectUri = `${DOMAIN}/api/zahlung/oauth/callback`;
+  const query = querystring.stringify({
+    response_type: "code",
+    client_id: CLIENT_ID,
+    redirect_uri: redirectUri,
+    scope: "organizations.read organizations.write payments.write onboarding.read",
+    state: accountId,
+  });
+  const url = `https://my.mollie.com/oauth2/authorize?${query}`;
+  res.json({ url });
 });
 
-// Express Connect: Onboarding-Link generieren
-router.get("/onboard/:accountId", (req, res) => {
-  res.status(501).json({ error: "Mollie Connect nicht implementiert" });
+// OAuth Callback zum Tauschen des Codes gegen Tokens
+router.get("/oauth/callback", async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state) {
+    return res.status(400).send("Missing code or state");
+  }
+  try {
+    const body = querystring.stringify({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: `${DOMAIN}/api/zahlung/oauth/callback`,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+    });
+    const resp = await fetch("https://api.mollie.com/oauth2/tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    const data = await resp.json();
+    await Unternehmen.findOneAndUpdate(
+      { mollieAccountId: state },
+      { mollieAccessToken: data.access_token, mollieRefreshToken: data.refresh_token }
+    );
+    res.redirect(`${DOMAIN}/success?mollie=connected`);
+  } catch (err) {
+    console.error("OAuth callback error", err);
+    res.status(500).send("OAuth error");
+  }
 });
+
+// Accountdaten abrufen
+router.get("/account/:uid", async (req, res) => {
+  try {
+    const unternehmen = await Unternehmen.findOne({ firebaseUid: req.params.uid });
+    if (unternehmen && unternehmen.mollieAccountId) {
+      return res.json({ accountId: unternehmen.mollieAccountId });
+    }
+    res.json({});
+  } catch (err) {
+    console.error("account lookup error", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/create-payment", async (req, res) => {
+  const { amount, customerEmail, method } = req.body;
+  if (amount == null || !customerEmail || !method) {
+    return res.status(400).json({ error: "amount, customerEmail und method sind erforderlich" });
+  }
+  if (!mollie) {
+    return res.status(501).json({ error: "Mollie client not available" });
+  }
+  try {
+    const payment = await mollie.payments.create({
+      amount: { value: (amount / 100).toFixed(2), currency: "EUR" },
+      description: "Gutschein",
+      redirectUrl: `${process.env.DOMAIN}/success`,
+      webhookUrl: `${process.env.DOMAIN}/api/webhook`,
+      method,
+      metadata: { customerEmail }
+    });
+    res.json({ paymentUrl: payment._links.checkout.href });
+  } catch (err) {
+    console.error("Mollie-Fehler:", err);
+    res.status(500).json({ error: err.message });
+  }
+  });
 
 module.exports = router;
