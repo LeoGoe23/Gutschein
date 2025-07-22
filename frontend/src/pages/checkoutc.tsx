@@ -1,5 +1,5 @@
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert } from '@mui/material';
-import { useState, useEffect } from 'react';
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField } from '@mui/material';
+import { useState, useEffect, useRef } from 'react';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadIcon from '@mui/icons-material/Download';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
@@ -8,8 +8,8 @@ import GoogleIcon from '@mui/icons-material/Google';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import { useParams } from 'react-router-dom';
 import { loadCheckoutDataBySlug, CheckoutData } from '../utils/loadCheckoutData';
+import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
@@ -27,19 +27,32 @@ function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   );
 }
 
-function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPaymentSuccess: (betrag: number) => void }) {
+function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void }) {
   const [method, setMethod] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState<string>('');
 
   const handlePayment = async () => {
-    if (!betrag || !method) {
-      alert('Bitte wählen Sie eine Zahlungsmethode und geben Sie einen Betrag ein.');
+    if (!betrag || !method || !customerEmail) {
+      alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
 
+    // DEVELOPMENT: Zahlung umgehen - direkt erfolgreich
+    console.log('Zahlung simuliert für:', { betrag, method, customerEmail });
+    alert('Zahlung erfolgreich! (Development Mode)');
+    onPaymentSuccess(betrag, customerEmail); // <- E-Mail hier übergeben
+    return;
+
+    // PRODUCTION: Echte Zahlung (auskommentiert)
+    /*
     const response = await fetch('https://gutscheinery.de/api/zahlung/create-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: betrag * 100, method }),
+      body: JSON.stringify({ 
+        amount: betrag * 100, 
+        method,
+        customerEmail
+      }),
     });
 
     if (!response.ok) {
@@ -49,10 +62,20 @@ function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPa
 
     const { paymentUrl } = await response.json();
     window.location.href = paymentUrl;
+    */
   };
 
   return (
     <Box sx={{ mt: 4 }}>
+      <TextField
+        label="E-Mail-Adresse"
+        type="email"
+        value={customerEmail}
+        onChange={(e) => setCustomerEmail(e.target.value)}
+        required
+        fullWidth
+        sx={{ mb: 2 }}
+      />
       <Typography variant="body1" sx={{ mb: 2 }}>
         Zahlungsmethode wählen:
       </Typography>
@@ -83,160 +106,89 @@ function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPa
 function SuccessPage({ 
   purchasedBetrag, 
   selectedDienstleistung, 
-  checkoutData 
+  checkoutData,
+  customerEmail
 }: { 
   purchasedBetrag: number, 
   selectedDienstleistung?: { shortDesc: string; longDesc: string; price: string } | null,
-  checkoutData: CheckoutData
+  checkoutData: CheckoutData,
+  customerEmail: string
 }) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  
+  const [isSending, setIsSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const hasSentRef = useRef(false);
+
   const generateGutscheinCode = () => {
     return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
   };
 
-  const handleDownloadGutschein = async () => {
-    setIsGenerating(true);
-    
-    try {
-      const gutscheinCode = generateGutscheinCode();
-      
-      const pdfContent = document.createElement('div');
-      pdfContent.style.cssText = `
-        width: 595px;
-        height: 842px;
-        position: absolute;
-        top: -9999px;
-        left: -9999px;
-        background: white;
-      `;
-      
-      let contentHtml = '';
-      
-      if (checkoutData.gutscheinDesign.modus === 'eigenes' && checkoutData.gutscheinURL) {
-        contentHtml = `
-          <div style="position: relative; width: 595px; height: 842px;">
-            <img src="${checkoutData.gutscheinURL}" 
-                 style="width: 100%; height: 100%; object-fit: contain; object-position: center;" />
-            
-            ${checkoutData.gutscheinDesign.felder ? checkoutData.gutscheinDesign.felder.map((feld: any) => {
-              let feldContent = '';
-              
-              if (feld.typ === 'CODE') {
-                feldContent = gutscheinCode;
-              } else if (feld.typ === 'BETRAG') {
-                if (selectedDienstleistung) {
-                  feldContent = `${selectedDienstleistung.shortDesc} (${selectedDienstleistung.price}€)`;
-                } else {
-                  feldContent = `${purchasedBetrag}€`;
-                }
-              } else if (feld.typ === 'DIENSTLEISTUNG') {
-                feldContent = selectedDienstleistung ? selectedDienstleistung.longDesc || selectedDienstleistung.shortDesc : `Wert: ${purchasedBetrag}€`;
-              } else {
-                feldContent = feld.text;
-              }
-              
-              return `
-                <div style="
-                  position: absolute;
-                  left: ${feld.x}px;
-                  top: ${feld.y}px;
-                  width: ${feld.width}px;
-                  height: ${feld.height}px;
-                  background: rgba(255,255,255,0.9);
-                  border: 1px solid #ccc;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  font-size: ${Math.min(feld.width / 8, feld.height / 2)}px;
-                  font-weight: bold;
-                  color: #333;
-                  text-align: center;
-                  border-radius: 4px;
-                ">
-                  ${feldContent}
-                </div>
-              `;
-            }).join('') : ''}
-          </div>
-        `;
-      } else {
-        // Fallback Design
-        const gutscheinInhalt = selectedDienstleistung 
-          ? `<div style="font-size: 18px; color: #666; margin-bottom: 10px;">Dienstleistung:</div>
-             <div style="font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px;">${selectedDienstleistung.shortDesc}</div>
-             <div style="font-size: 16px; color: #666; margin-bottom: 10px;">${selectedDienstleistung.longDesc}</div>
-             <div style="font-size: 20px; font-weight: bold; color: #4caf50;">${selectedDienstleistung.price}€</div>`
-          : `<div style="font-size: 18px; color: #666; margin-bottom: 10px;">Wert:</div>
-             <div style="font-size: 32px; font-weight: bold; color: #4caf50;">${purchasedBetrag}€</div>`;
+  useEffect(() => {
+    if (hasSentRef.current) return;
+    hasSentRef.current = true;
+    const sendGutscheinEmail = async () => {
+      setIsSending(true);
+      try {
+        const gutscheinCode = generateGutscheinCode();
+        // PDF generieren
+        const pdfBlob = await generateGutscheinPDF({
+          unternehmen: checkoutData.unternehmensname,
+          betrag: purchasedBetrag.toString(),
+          gutscheinCode,
+          ausstelltAm: new Date().toLocaleDateString(),
+          website: checkoutData.website,
+          bildURL: checkoutData.bildURL,
+          dienstleistung: selectedDienstleistung ? {
+            shortDesc: selectedDienstleistung.shortDesc,
+            longDesc: selectedDienstleistung.longDesc,
+          } : undefined,
+        });
 
-        contentHtml = `
-          <div style="position: relative; width: 595px; height: 842px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; font-family: Arial, sans-serif;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="font-size: 36px; color: #fff; margin-bottom: 10px;">GUTSCHEIN</h1>
-              <h2 style="font-size: 24px; color: #fff; margin-bottom: 20px;">${checkoutData.unternehmensname}</h2>
-            </div>
-            
-            <div style="background: rgba(255,255,255,0.9); padding: 30px; border-radius: 10px; margin: 20px 0;">
-              <div style="text-align: center; margin-bottom: 20px;">
-                <div style="font-size: 18px; color: #666; margin-bottom: 10px;">Gutschein-Code:</div>
-                <div style="font-size: 24px; font-weight: bold; color: #333; background: #f0f0f0; padding: 10px; border-radius: 5px; display: inline-block;">${gutscheinCode}</div>
-              </div>
-              
-              <div style="text-align: center; margin-bottom: 20px;">
-                ${gutscheinInhalt}
-              </div>
-              
-              <div style="text-align: center; margin-bottom: 20px;">
-                <div style="font-size: 16px; color: #666;">Gültig bis: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')}</div>
-              </div>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px;">
-              <div style="font-size: 14px; color: #fff; line-height: 1.4;">
-                ${checkoutData.website ? `<div>Website: ${checkoutData.website}</div>` : ''}
-                <div style="margin-top: 10px;">Vielen Dank für Ihren Einkauf!</div>
-                <div>Wir freuen uns auf Ihren Besuch!</div>
-              </div>
-            </div>
-          </div>
-        `;
+        // PDF als Base64
+        const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+        
+        // PDF als Base64 (sicher, ohne Stack Overflow)
+        function arrayBufferToBase64(buffer: ArrayBuffer) {
+          let binary = '';
+          const bytes = new Uint8Array(buffer);
+          const len = bytes.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return window.btoa(binary);
+        }
+        const pdfBase64 = arrayBufferToBase64(pdfArrayBuffer);
+
+        const emailData = {
+          empfaengerEmail: customerEmail,
+          unternehmensname: checkoutData.unternehmensname,
+          gutscheinCode,
+          betrag: purchasedBetrag,
+          dienstleistung: selectedDienstleistung,
+          pdfBuffer: pdfBase64, // <--- PDF als Base64
+        };
+
+        const response = await fetch('/api/gutscheine/send-gutschein', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(emailData),
+        });
+
+        if (response.ok) {
+          setEmailSent(true);
+        } else {
+          const errorData = await response.json();
+          alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
+        }
+      } catch (error: any) {
+        alert(`Fehler beim E-Mail-Versand: ${error?.message || 'Unbekannter Fehler'}`);
+      } finally {
+        setIsSending(false);
       }
-      
-      pdfContent.innerHTML = contentHtml;
-      document.body.appendChild(pdfContent);
-      
-      // PDF erstellen
-      const canvas = await html2canvas(pdfContent, {
-        width: 595,
-        height: 842,
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-      
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px',
-        format: [595, 842]
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', 0, 0, 595, 842);
-      
-      const fileName = `Gutschein_${checkoutData.unternehmensname}_${gutscheinCode}.pdf`;
-      pdf.save(fileName);
-      
-      document.body.removeChild(pdfContent);
-      
-    } catch (error) {
-      console.error('Fehler beim Generieren des Gutscheins:', error);
-      alert('Fehler beim Generieren des Gutscheins. Bitte versuchen Sie es erneut.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+    };
+
+    sendGutscheinEmail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -251,28 +203,16 @@ function SuccessPage({
       <Typography variant="body1" sx={{ mb: 4, color: 'grey.600' }}>
         Wir freuen uns auf Ihren Besuch!
       </Typography>
-      
-      <Button
-        variant="contained"
-        size="large"
-        onClick={handleDownloadGutschein}
-        disabled={isGenerating}
-        startIcon={<DownloadIcon />}
-        sx={{
-          borderRadius: 2,
-          px: 4,
-          py: 1.5,
-          backgroundColor: '#4caf50',
-          color: '#fff',
-          fontWeight: 600,
-          textTransform: 'none',
-          boxShadow: 3,
-          '&:hover': { backgroundColor: '#45a049' },
-          '&:disabled': { backgroundColor: '#ccc' },
-        }}
-      >
-        {isGenerating ? 'Generiere PDF...' : 'Gutschein herunterladen'}
-      </Button>
+      {isSending && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Gutschein wird verschickt...
+        </Alert>
+      )}
+      {emailSent && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Gutschein wurde erfolgreich an {customerEmail} gesendet!
+        </Alert>
+      )}
     </Box>
   );
 }
@@ -289,6 +229,7 @@ export default function GutscheinLandingPage() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
+  const [customerEmail, setCustomerEmail] = useState<string>(''); // <- Neue State
 
   // Lade Daten basierend auf Slug
   useEffect(() => {
@@ -321,7 +262,7 @@ export default function GutscheinLandingPage() {
   if (loading) {
     return (
       <Box sx={{ 
-        display: 'flex', 
+        display: 'flex',
         justifyContent: 'center', 
         alignItems: 'center', 
         minHeight: '100vh',
@@ -390,8 +331,9 @@ export default function GutscheinLandingPage() {
     }
   };
 
-  const handlePaymentSuccess = (betrag: number) => {
+  const handlePaymentSuccess = (betrag: number, email: string) => { // <- E-Mail-Parameter hinzufügen
     setPurchasedBetrag(betrag);
+    setCustomerEmail(email); // <- E-Mail speichern
     setShowSuccessPage(true);
   };
 
@@ -540,6 +482,7 @@ export default function GutscheinLandingPage() {
                 purchasedBetrag={purchasedBetrag} 
                 selectedDienstleistung={selectedDienstleistung}
                 checkoutData={checkoutData}
+                customerEmail={customerEmail} // <- Neue Prop
               />
             )}
           </Box>

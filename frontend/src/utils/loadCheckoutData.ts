@@ -39,7 +39,7 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
     const checkoutData: CheckoutData = {
       unternehmensname: userData.Checkout?.Unternehmensname || userData.Unternehmensdaten?.Unternehmensname || '',
       bildURL: userData.Checkout?.BildURL || '',
-      gutscheinURL: userData.Checkout?.GutscheinURL || '',
+      gutscheinURL: userData.Checkout?.GutscheinDesignURL || '', // ✅ KORRIGIERT: GutscheinDesignURL statt GutscheinURL
       dienstleistungen: extractDienstleistungen(userData.Checkout?.Gutscheinarten || {}),
       customValue: userData.Checkout?.Freibetrag || false,
       gutscheinDesign: userData.Gutscheindetails?.Gutscheindesign || {},
