@@ -11,7 +11,10 @@ const unternehmenRoute = require("./routes/unternehmen");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+
+// HIER LIMIT ERHÖHEN:
+app.use(express.json({ limit: '70mb' }));
+app.use(express.urlencoded({ limit: '70mb', extended: true }));
 
 app.use("/api/gutscheine", gutscheineRoute);
 app.use("/api/zahlung", zahlungRoute);
