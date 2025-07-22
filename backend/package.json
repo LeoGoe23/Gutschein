@@ -9,14 +9,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@mollie/api-client": "^4.3.3",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
     "mongoose": "^8.16.1",
     "nodemailer": "^7.0.5",
-    "pdfkit": "^0.17.1",
-    "@mollie/api-client": "^5.0.0"
+    "pdfkit": "^0.17.1"
   },
   "description": "",
   "devDependencies": {
