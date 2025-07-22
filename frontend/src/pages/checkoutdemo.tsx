@@ -559,24 +559,3 @@ export default function GutscheinLandingPage() {
         )}
       </Box>
     </Box>
-
-    <Box
-      sx={{
-        width: { xs: '100%', md: '50%' },
-        position: 'relative',
-        backgroundImage: hintergrundBild ? `url(${hintergrundBild})` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundColor: '#222',
-        minHeight: hintergrundBild ? { xs: '300px', md: 'auto' } : { xs: '0', md: 'auto' },
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        p: 2,
-      }}
-    >
-      {/* Falls du später hier etwas anzeigen willst */}
-    </Box> {/* ← dieser war vorher als /> falsch geschlossen */}
-  </Box>
-);
-}

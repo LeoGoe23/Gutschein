@@ -37,32 +37,37 @@ function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPa
       return;
     }
 
-    // DEVELOPMENT: Zahlung umgehen - direkt erfolgreich
+
     console.log('Zahlung simuliert für:', { betrag, method, customerEmail });
     alert('Zahlung erfolgreich! (Development Mode)');
     onPaymentSuccess(betrag, customerEmail); // <- E-Mail hier übergeben
     return;
 
-    // PRODUCTION: Echte Zahlung (auskommentiert)
-    /*
-    const response = await fetch('https://gutscheinery.de/api/zahlung/create-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        amount: betrag * 100, 
-        method,
-        customerEmail
-      }),
-    });
-
-    if (!response.ok) {
-      alert('Zahlung fehlgeschlagen');
-      return;
+     PRODUCTION: Echte Zahlung (auskommentiert)
+    *
+     try {
+      const response = await fetch('https://gutscheinery.de/api/zahlung/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          amount: betrag * 100, // z.B. 10€ → 1000
+          method,
+          customerEmail
+        }),
+      });
+  
+      if (!response.ok) {
+        const errData = await response.json();
+        alert('Zahlung fehlgeschlagen: ' + (errData?.error || 'Unbekannter Fehler'));
+        return;
+      }
+  
+      const { paymentUrl } = await response.json();
+      window.location.href = paymentUrl;
+    } catch (err: any) {
+      console.error('Fehler bei der Mollie-Zahlung:', err);
+      alert('Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
     }
-
-    const { paymentUrl } = await response.json();
-    window.location.href = paymentUrl;
-    */
   };
 
   return (
