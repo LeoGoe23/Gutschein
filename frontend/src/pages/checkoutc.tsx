@@ -10,6 +10,7 @@ import { useParams } from 'react-router-dom';
 import { loadCheckoutDataBySlug, CheckoutData } from '../utils/loadCheckoutData';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import jsPDF from 'jspdf';
+import { saveSoldGutscheinToShop } from '../utils/saveSoldGutscheinToShop';
 
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
@@ -175,6 +176,15 @@ function SuccessPage({
 
         if (response.ok) {
           setEmailSent(true);
+          // Gutschein in Firebase speichern
+        console.log('Speichere Gutscheinverkauf unter slug:', checkoutData.slug);
+        await saveSoldGutscheinToShop({
+          gutscheinCode,
+          betrag: purchasedBetrag,
+          kaufdatum: new Date().toISOString(),
+          empfaengerEmail: customerEmail,
+          slug: checkoutData.slug,
+        });
         } else {
           const errorData = await response.json();
           alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
@@ -187,7 +197,6 @@ function SuccessPage({
     };
 
     sendGutscheinEmail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
