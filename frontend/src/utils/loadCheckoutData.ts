@@ -12,6 +12,7 @@ export interface CheckoutData {
   telefon: string;
   iban: string;
   gutscheinarten: any;
+  slug: string; // <--- HIER ergänzen!
   // Weitere Felder nach Bedarf
 }
 
@@ -47,6 +48,7 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
       telefon: userData.Unternehmensdaten?.Telefon || '',
       iban: userData.Zahlungsdaten?.IBAN || '',
       gutscheinarten: userData.Checkout?.Gutscheinarten || {},
+      slug: userData.slug || '', // <--- HIER ergänzt!
     };
     
     console.log('📦 Processed checkout data:', checkoutData);
