@@ -22,7 +22,8 @@ const initialData = {
   kontoinhaber: '', // Neuer State für Kontoinhaber
   iban: '', // Neuer State für IBAN
   maxStep: 1, // Höchster erreichter Step
-  
+  stripeAccountId: '', // Neuer State für Stripe Account ID
+
   // Neue Felder für Gutschein-Design
   gutscheinDesign: {
     modus: 'unser-design' as 'unser-design' | 'wir-designen' | 'eigenes',

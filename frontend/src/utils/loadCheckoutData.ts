@@ -13,6 +13,7 @@ export interface CheckoutData {
   iban: string;
   gutscheinarten: any;
   slug: string; // <--- HIER ergänzen!
+  StripeAccountId: string; // <--- HIER ergänzen!
   // Weitere Felder nach Bedarf
 }
 
@@ -49,6 +50,7 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
       iban: userData.Zahlungsdaten?.IBAN || '',
       gutscheinarten: userData.Checkout?.Gutscheinarten || {},
       slug: userData.slug || '', // <--- HIER ergänzt!
+      StripeAccountId: userData.Zahlungsdaten?.StripeAccountId || '',
     };
     
     console.log('📦 Processed checkout data:', checkoutData);

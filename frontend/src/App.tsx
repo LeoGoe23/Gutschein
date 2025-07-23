@@ -11,8 +11,7 @@ import GutscheinePage from './pages/profil/Gutscheine';
 import EinnahmenPage from './pages/profil/Einnahmen';
 import EinstellungenPage from './pages/profil/Einstellungen';
 import SelbstDesign from './pages/profil/design';
-import Checkout from './pages/checkout';
-import CheckoutC from './pages/checkoutc';
+import Checkout from './pages/checkoutc';
 import Success from './pages/link';
 import { GutscheinProvider } from './context/GutscheinContext';
 
@@ -21,10 +20,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkoutc" element={<Checkout />} />
-        {/* Dynamische Route für Slug */}
-        <Route path="/checkoutc/:slug" element={<CheckoutC />} />
+        <Route path="/checkoutc/:slug" element={<Checkout />} />
         <Route path="/success" element={
           <GutscheinProvider>
             <Success />

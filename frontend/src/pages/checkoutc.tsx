@@ -15,29 +15,56 @@ import { saveSoldGutscheinToShop } from '../utils/saveSoldGutscheinToShop';
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mt: 2 }}>
-      <Button variant="outlined" startIcon={<CreditCardIcon />} onClick={() => onSelect('creditcard')} sx={{ flex: 1 }}>
-        Kreditkarte
+      <Button variant="outlined" startIcon={<CreditCardIcon />} onClick={() => onSelect('stripe')} sx={{ flex: 1 }}>
+        Kreditkarte / Debitkarte
       </Button>
-      <Button variant="outlined" startIcon={<AppleIcon />} onClick={() => onSelect('applepay')} sx={{ flex: 1 }}>
-        Apple Pay
+      <Button variant="outlined" startIcon={<AppleIcon />} onClick={() => onSelect('stripe')} sx={{ flex: 1 }}>
+        Apple Pay / Google Pay
       </Button>
-      <Button variant="outlined" startIcon={<GoogleIcon />} onClick={() => onSelect('googlepay')} sx={{ flex: 1 }}>
-        Google Pay
-      </Button>
+      {/* Weitere Stripe-Methoden kannst du nach Wunsch ergänzen */}
     </Box>
   );
 }
 
-function PaymentForm({ betrag, onPaymentSuccess }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void }) {
+function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string }) {
   const [method, setMethod] = useState<string | null>(null);
   const [customerEmail, setCustomerEmail] = useState<string>('');
 
   const handlePayment = async () => {
+    console.log('DEBUG Payment:', {
+      betrag,
+      method,
+      customerEmail,
+      stripeAccountId
+    });
+
     if (!betrag || !method || !customerEmail) {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
 
+    if (method === 'stripe') {
+      try {
+        const response = await fetch('/api/zahlung/create-stripe-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: betrag * 100,
+            customerEmail,
+            stripeAccountId,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          alert('Zahlung fehlgeschlagen: ' + (data?.error || 'Unbekannter Fehler'));
+          return;
+        }
+        window.location.href = data.paymentUrl;
+      } catch (err: any) {
+        alert('Stripe-Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
+      }
+      return;
+    }
 
     console.log('Zahlung simuliert für:', { betrag, method, customerEmail });
     alert('Zahlung erfolgreich! (Development Mode)');
@@ -487,7 +514,7 @@ export default function GutscheinLandingPage() {
                   </>
                 )}
 
-                {showPaymentForm && <PaymentForm betrag={betrag} onPaymentSuccess={handlePaymentSuccess} />}
+                {showPaymentForm && <PaymentForm betrag={betrag} onPaymentSuccess={handlePaymentSuccess} stripeAccountId={checkoutData.StripeAccountId} />}
               </>
             ) : (
               <SuccessPage 

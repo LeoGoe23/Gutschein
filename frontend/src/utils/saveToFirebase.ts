@@ -171,6 +171,8 @@ export const saveGutscheinData = async (contextData: any) => {
       // Zahlungsdaten aktualisieren
       'Zahlungsdaten.Zahlungsempfänger': contextData.kontoinhaber || '',
       'Zahlungsdaten.IBAN': contextData.iban || '',
+      // Stripe Account ID hinzufügen:
+      'Zahlungsdaten.StripeAccountId': contextData.stripeAccountId || '',
 
       // Checkout-Daten aktualisieren
       'Checkout.Unternehmensname': contextData.unternehmensname || '',
