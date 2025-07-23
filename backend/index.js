@@ -7,6 +7,7 @@ const gutscheineRoute  = require("./routes/gutscheine");
 const zahlungRoute     = require("./routes/zahlung");
 const webhookRoute     = require("./routes/webhook");
 const unternehmenRoute = require("./routes/unternehmen");
+const stripeconnect = require("./routes/stripeconnect");
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api/gutscheine", gutscheineRoute);
 app.use("/api/zahlung", zahlungRoute);
 app.use("/api/webhook", webhookRoute);
 app.use("/api/unternehmen", unternehmenRoute);
+app.use("/api/stripeconnect", stripeconnect);
 
 app.get("/", (req, res) => res.send("API läuft"));
 

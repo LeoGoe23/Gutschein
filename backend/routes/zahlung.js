@@ -125,4 +125,37 @@ router.post("/create-payment", async (req, res) => {
   }
   });
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+router.post('/create-stripe-session', async (req, res) => {
+  const { amount, customerEmail, stripeAccountId } = req.body;
+  if (!amount || !customerEmail || !stripeAccountId) {
+    return res.status(400).json({ error: "amount, customerEmail und stripeAccountId sind erforderlich" });
+  }
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card', 'sofort', 'giropay', 'klarna', 'bancontact', 'ideal', 'eps'], // Passe nach Wunsch an
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: { name: 'Gutschein' },
+          unit_amount: amount, // in Cent
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      customer_email: customerEmail,
+      success_url: `${process.env.DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.DOMAIN}/cancel`,
+    }, {
+      stripeAccount: stripeAccountId // <- Connect-Account!
+    });
+
+    res.json({ paymentUrl: session.url });
+  } catch (err) {
+    console.error("Stripe-Fehler:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

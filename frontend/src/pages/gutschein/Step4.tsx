@@ -2,72 +2,39 @@ import { Box, Typography, Button, CircularProgress, TextField } from '@mui/mater
 import { useState, useEffect } from 'react';
 import { useGutschein } from '../../context/GutscheinContext';
 import { getAuth } from 'firebase/auth';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 export default function Zahlungsdaten() {
-  const { data } = useGutschein();
+  const { data, setData } = useGutschein();
 
   const auth = getAuth();
   const currentUser = auth.currentUser;
   const firebaseUid = data.firebaseUid || currentUser?.uid || '';
   const email = data.email || currentUser?.email || '';
-  const unternehmensname = data.unternehmensname || '';
 
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [onboardUrl, setOnboardUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [existingAccountChecked, setExistingAccountChecked] = useState(false);
 
-  // reset all Mollie-connect state when the Firebase user changes
-  useEffect(() => {
-    setAccountId(null);
-    setOnboardUrl(null);
-    setError(null);
-    setLoading(true);
-    setExistingAccountChecked(false);
-  }, [firebaseUid]);
+  const missingData = !email;
 
-  // check if we've already created a Mollie account for this UID
-  useEffect(() => {
-    if (!firebaseUid) {
-      setExistingAccountChecked(true);
-      return;
-    }
-    fetch(`https://gutscheinery.de/api/zahlung/account/${firebaseUid}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.accountId) {
-          setAccountId(data.accountId);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setExistingAccountChecked(true));
-  }, [firebaseUid]);
-
-  const missingData = !firebaseUid || !unternehmensname || !email;
-
-  const connectMollie = async () => {
+  const connectStripe = async () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create Mollie account
-      const createRes = await fetch('https://gutscheinery.de/api/zahlung/create-account', {
+      const res = await fetch('http://localhost:5000/api/stripeconnect/stripe-connect-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebaseUid, name: unternehmensname, email }),
+        body: JSON.stringify({ firebaseUid, email }),
       });
-      if (!createRes.ok) throw new Error('Account-Erstellung fehlgeschlagen');
-      const { accountId: newAccountId } = await createRes.json();
-      setAccountId(newAccountId);
-
-      // 2. Generate onboarding link
-      const linkRes = await fetch(`https://gutscheinery.de/api/zahlung/onboard/${newAccountId}`);
-      if (!linkRes.ok) throw new Error('Onboarding-Link fehlgeschlagen');
-      const linkData = await linkRes.json();
-      const url = linkData.url || linkData.link || linkData.accountLink?.url;
-      if (!url) throw new Error('Keine URL gefunden');
-      setOnboardUrl(url);
-      window.open(url, '_blank');
+      const data = await res.json();
+      if (!res.ok) {
+        // Zeige Backend-Fehlerdetails an
+        throw new Error(data.error + (data.details && data.details.message ? ` (${data.details.message})` : ''));
+      }
+      if (!data.url) throw new Error('Keine URL erhalten');
+      // Stripe-Account-ID im Context speichern
+      setData({ stripeAccountId: data.stripeAccountId });
+      window.open(data.url, '_blank');
     } catch (err: any) {
       setError(err.message || 'Unbekannter Fehler');
     } finally {
@@ -76,22 +43,14 @@ export default function Zahlungsdaten() {
   };
 
   return (
-    <Box sx={{ maxWidth: 500, m: '0 auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Typography variant="h4">Zahlungsdaten</Typography>
-      <Typography color="textSecondary" mb={2}>
-        Bitte hinterlegen Sie Ihre Auszahlungskonten über Mollie:
+    <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>
+        Zahlungsdaten
+      </Typography>
+      <Typography sx={{ color: '#555', mb: '1rem' }}>
+        Sie werden zu Stripe weitergeleitet, um Ihr Auszahlungskonto zu verbinden.
       </Typography>
 
-      {/* Basis-Daten aus Step 1 */}
-      <TextField
-        label="Unternehmensname"
-        variant="outlined"
-        required
-        fullWidth
-        value={unternehmensname}
-        disabled
-        sx={{ mb: 2 }}
-      />
       <TextField
         label="E-Mail-Adresse"
         variant="outlined"
@@ -102,40 +61,31 @@ export default function Zahlungsdaten() {
         sx={{ mb: 2 }}
       />
 
-      {/* Fehlende Basis-Daten */}
       {!loading && missingData && (
         <Typography color="error" mb={2}>
-          Bitte füllen Sie zuerst Unternehmensname, E-Mail und UID aus.
+          Bitte stellen Sie sicher, dass Ihre E-Mail vorhanden ist.
         </Typography>
       )}
 
-      {/* Spinner */}
       {loading && <CircularProgress />}
 
-      {/* Fehler */}
       {!loading && error && (
         <Typography color="error" mb={2}>
-          Fehler beim Erzeugen des Onboarding-Links: {error}
+          Fehler: {error}
         </Typography>
       )}
 
-      {/* Generierung läuft */}
-      {!loading && !error && !onboardUrl && !missingData && (
-        <Typography mb={2}>Onboarding-Link wird erstellt…</Typography>
-      )}
-
-      {/* Bereits verbunden */}
-      {!loading && existingAccountChecked && accountId && (
-        <Typography color="primary" mb={2}>
-          Mollie-Konto erfolgreich erstellt.
-        </Typography>
-      )}
-
-      {/* Button nur für neue UIDs */}
-      {!loading && existingAccountChecked && !accountId && !error && !missingData && (
-        <Button variant="contained" color="primary" onClick={connectMollie}>
-          Mit Mollie verbinden
+      {!loading && !missingData && (
+        <Button variant="contained" color="primary" onClick={connectStripe}>
+          Mit Stripe verbinden
         </Button>
+      )}
+
+      {data.stripeAccountId && (
+        <Box sx={{ display: 'flex', alignItems: 'center', color: 'green', mb: 2 }}>
+          <CheckCircleIcon sx={{ mr: 1 }} />
+          <Typography>Stripe-Konto erfolgreich verbunden!</Typography>
+        </Box>
       )}
     </Box>
   );

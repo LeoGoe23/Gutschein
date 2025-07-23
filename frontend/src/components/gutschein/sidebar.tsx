@@ -49,7 +49,8 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         }
         return true;
       case 4:
-        return !!(data.kontoinhaber && data.iban);
+        // Stripe-Account-ID ist Pflicht für "abgeschlossen"
+        return !!(data.stripeAccountId);
       case 5:
         return true; // Zusammenfassung hat keine Pflichtfelder
       default:
