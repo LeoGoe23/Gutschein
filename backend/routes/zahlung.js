@@ -128,32 +128,49 @@ router.post("/create-payment", async (req, res) => {
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 router.post('/create-stripe-session', async (req, res) => {
-  const { amount, customerEmail, stripeAccountId } = req.body;
-  if (!amount || !customerEmail || !stripeAccountId) {
-    return res.status(400).json({ error: "amount, customerEmail und stripeAccountId sind erforderlich" });
+  const { amount, customerEmail, stripeAccountId, slug } = req.body;
+  if (!amount || !customerEmail || !stripeAccountId || !slug) {
+    return res.status(400).json({ error: "amount, customerEmail, stripeAccountId und slug sind erforderlich" });
   }
   try {
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'sofort', 'giropay', 'klarna', 'bancontact', 'ideal', 'eps'], // Passe nach Wunsch an
+      payment_method_types: ['card', 'sofort', 'giropay', 'klarna', 'bancontact', 'ideal', 'eps'],
       line_items: [{
         price_data: {
           currency: 'eur',
           product_data: { name: 'Gutschein' },
-          unit_amount: amount, // in Cent
+          unit_amount: amount,
         },
         quantity: 1,
       }],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.DOMAIN}/cancel`,
+      success_url: `${process.env.DOMAIN}/checkoutc/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.DOMAIN}/checkoutc/${slug}?canceled=true`,
     }, {
-      stripeAccount: stripeAccountId // <- Connect-Account!
+      stripeAccount: stripeAccountId
     });
 
-    res.json({ paymentUrl: session.url });
+    res.json({ paymentUrl: session.url, sessionId: session.id }); // sessionId für redirectToCheckout
   } catch (err) {
     console.error("Stripe-Fehler:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/stripe-session-info', async (req, res) => {
+  const { session_id, stripeAccountId } = req.query;
+  if (!session_id) return res.status(400).json({ error: 'session_id erforderlich' });
+  if (!stripeAccountId) return res.status(400).json({ error: 'stripeAccountId erforderlich' });
+  try {
+    const session = await stripe.checkout.sessions.retrieve(session_id, {
+      stripeAccount: stripeAccountId
+    });
+    res.json({
+      amount: session.amount_total,
+      customerEmail: session.customer_email
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
