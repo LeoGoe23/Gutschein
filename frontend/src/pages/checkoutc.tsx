@@ -6,7 +6,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import AppleIcon from '@mui/icons-material/Apple';
 import GoogleIcon from '@mui/icons-material/Google';
 import TopLeftLogo from '../components/home/TopLeftLogo';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { loadCheckoutDataBySlug, CheckoutData } from '../utils/loadCheckoutData';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import jsPDF from 'jspdf';
@@ -27,72 +27,47 @@ function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
 }
 
 function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string }) {
-  const [method, setMethod] = useState<string | null>(null);
   const [customerEmail, setCustomerEmail] = useState<string>('');
 
   const handlePayment = async () => {
     console.log('DEBUG Payment:', {
       betrag,
-      method,
       customerEmail,
       stripeAccountId
     });
 
-    if (!betrag || !method || !customerEmail) {
+    if (!betrag || !customerEmail) {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
 
-    if (method === 'stripe') {
-      try {
-        const response = await fetch('/api/zahlung/create-stripe-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: betrag * 100,
-            customerEmail,
-            stripeAccountId,
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          alert('Zahlung fehlgeschlagen: ' + (data?.error || 'Unbekannter Fehler'));
-          return;
-        }
-        window.location.href = data.paymentUrl;
-      } catch (err: any) {
-        alert('Stripe-Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
-      }
-      return;
-    }
+    // Immer Stripe verwenden
+    try {
+      const slug = window.location.pathname.split('/').pop();
 
-    console.log('Zahlung simuliert für:', { betrag, method, customerEmail });
-    alert('Zahlung erfolgreich! (Development Mode)');
-    onPaymentSuccess(betrag, customerEmail); // <- E-Mail hier übergeben
-    return;
-
-     try {
-      const response = await fetch('https://gutscheinery.de/api/zahlung/create-payment', {
+      const response = await fetch('/api/zahlung/create-stripe-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: (betrag ?? 0) * 100, // z.B. 10€ → 1000
-          method,
-          customerEmail
+        body: JSON.stringify({
+          amount: betrag * 100,
+          customerEmail,
+          stripeAccountId,
+          slug
         }),
       });
-  
+      const data = await response.json();
       if (!response.ok) {
-        const errData = await response.json();
-        alert('Zahlung fehlgeschlagen: ' + (errData?.error || 'Unbekannter Fehler'));
+        alert('Zahlung fehlgeschlagen: ' + (data?.error || 'Unbekannter Fehler'));
         return;
       }
-  
-      const { paymentUrl } = await response.json();
-      window.location.href = paymentUrl;
+      const stripe = (window as any).Stripe?.(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
+      if (stripe && data.paymentUrl) {
+        stripe.redirectToCheckout({ sessionId: data.sessionId });
+      } else {
+        window.open(data.paymentUrl, '_blank');
+      }
     } catch (err: any) {
-      console.error('Fehler bei der Mollie-Zahlung:', err);
-      alert('Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
+      alert('Stripe-Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
     }
   };
 
@@ -107,10 +82,6 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId }: { betrag: nu
         fullWidth
         sx={{ mb: 2 }}
       />
-      <Typography variant="body1" sx={{ mb: 2 }}>
-        Zahlungsmethode wählen:
-      </Typography>
-      <PaymentOptions onSelect={setMethod} />
       <Button
         variant="contained"
         size="large"
@@ -258,6 +229,7 @@ function SuccessPage({
 
 export default function GutscheinLandingPage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation(); // <--- NEU
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -296,6 +268,28 @@ export default function GutscheinLandingPage() {
 
     loadData();
   }, [slug]);
+
+  // Prüfe Stripe-Redirect
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('success') === 'true') {
+      const sessionId = params.get('session_id');
+      setShowSuccessPage(true);
+
+      // Lade die Stripe-Session-Daten vom Backend
+      if (sessionId && checkoutData) {
+        fetch(`/api/zahlung/stripe-session-info?session_id=${sessionId}&stripeAccountId=${checkoutData.StripeAccountId}`)
+          .then(res => res.json())
+          .then(data => {
+            console.log("Stripe-Session-Info:", data);
+            if (data && data.amount && data.customerEmail) {
+              setPurchasedBetrag(data.amount / 100);
+              setCustomerEmail(data.customerEmail);
+            }
+          });
+      }
+    }
+  }, [location, checkoutData]);
 
   // Loading State
   if (loading) {
@@ -517,12 +511,19 @@ export default function GutscheinLandingPage() {
                 {showPaymentForm && <PaymentForm betrag={betrag} onPaymentSuccess={handlePaymentSuccess} stripeAccountId={checkoutData.StripeAccountId} />}
               </>
             ) : (
-              <SuccessPage 
-                purchasedBetrag={purchasedBetrag} 
-                selectedDienstleistung={selectedDienstleistung}
-                checkoutData={checkoutData}
-                customerEmail={customerEmail} // <- Neue Prop
-              />
+              purchasedBetrag > 0 && customerEmail ? (
+                <SuccessPage 
+                  purchasedBetrag={purchasedBetrag} 
+                  selectedDienstleistung={selectedDienstleistung}
+                  checkoutData={checkoutData}
+                  customerEmail={customerEmail}
+                />
+              ) : (
+                <Box sx={{ textAlign: 'center', mt: 4 }}>
+                  <CircularProgress />
+                  <Typography sx={{ mt: 2 }}>Zahlungsdaten werden geladen...</Typography>
+                </Box>
+              )
             )}
           </Box>
         </Box>
