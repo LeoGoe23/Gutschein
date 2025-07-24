@@ -6,6 +6,7 @@ const GutscheinSchema = new mongoose.Schema({
   empfaengerEmail: { type: String, required: true },
   erstelltAm:      { type: Date,   default: Date.now },
   eingelöst:       { type: Boolean, default: false     },
+  stripeSessionId: { type: String, required: false, unique: true } // NEU!
 });
 
 module.exports = mongoose.model("Gutschein", GutscheinSchema);

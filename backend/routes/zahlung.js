@@ -133,6 +133,9 @@ router.post('/create-stripe-session', async (req, res) => {
     return res.status(400).json({ error: "amount, customerEmail, stripeAccountId und slug sind erforderlich" });
   }
   try {
+    // 6% Provision berechnen
+    const provision = Math.round(amount * 0.06);
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'sofort', 'giropay', 'klarna', 'bancontact', 'ideal', 'eps'],
       line_items: [{
@@ -147,6 +150,9 @@ router.post('/create-stripe-session', async (req, res) => {
       customer_email: customerEmail,
       success_url: `${process.env.DOMAIN}/checkoutc/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.DOMAIN}/checkoutc/${slug}?canceled=true`,
+      payment_intent_data: {
+        application_fee_amount: provision // <--- Provision an Plattform
+      }
     }, {
       stripeAccount: stripeAccountId
     });
