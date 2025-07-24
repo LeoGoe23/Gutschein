@@ -109,8 +109,6 @@ export default function LoginModal({ open, onClose }: Props) {
 
   // Funktion zur Erstellung von Standard-Benutzerdaten
   const createDefaultUserData = (email: string) => {
-    const currentMonth = new Date().toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit' }); // Format: MM.YYYY
-
     return {
       email,
       createdAt: new Date(),
@@ -122,43 +120,16 @@ export default function LoginModal({ open, onClose }: Props) {
         Unternehmensname: "",
         Branche: "",
         Telefon: "",
+        Website: "",
       },
       Checkout: {
         Unternehmensname: "",
         Gutscheinarten: {},
         BildURL: "",
         GutscheinURL: "",
-        Dienstleistung: false, // Ändere Boolean zu boolean
-        Freibetrag: false,     // Ändere Boolean zu boolean
-      },
-      Einnahmen: {
-        gesamtUmsatz: 0,
-        anzahlVerkäufe: 0,
-        letzterVerkauf: null,
-        umsatzLetzterMonat: 0,
-        verkäufeLetzterMonat: 0,
-        monatlich: {
-          [currentMonth]: {
-            verkaufteGutscheine: 0,
-            gesamtUmsatz: 0,
-          },
-        },
-      },
-      Zahlungsdaten: {
-        Zahlungsempfänger: "",
-        IBAN: "",
-      },
-      Gutscheine: {
-        Beispiel123: {
-          gutscheinCode: "Beispiel123",
-          wert: 0,
-          verkauftAm: null
-        }
-      },
-      Gutscheindetails: {
-        Gutscheindesign: {},
-        Gutscheinarten: {
-        },
+        Dienstleistung: false,
+        Freibetrag: false,
+        GutscheinDesignURL: "",
       },
     };
   };

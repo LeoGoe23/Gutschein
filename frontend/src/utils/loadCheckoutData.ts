@@ -7,55 +7,46 @@ export interface CheckoutData {
   gutscheinURL: string;
   dienstleistungen: any[];
   customValue: boolean;
-  gutscheinDesign: any;
+  gutscheinarten: any;
+  slug: string;
+  StripeAccountId: string;
   website: string;
   telefon: string;
-  iban: string;
-  gutscheinarten: any;
-  slug: string; // <--- HIER ergänzen!
-  StripeAccountId: string; // <--- HIER ergänzen!
-  // Weitere Felder nach Bedarf
 }
 
 export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData | null> => {
   try {
     console.log('🔍 Loading data for slug:', slug);
-    
-    // Suche nach User mit diesem Slug
+
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('slug', '==', slug));
     const querySnapshot = await getDocs(q);
-    
+
     if (querySnapshot.empty) {
       console.log('❌ No user found with slug:', slug);
       return null;
     }
-    
-    // Nimm den ersten (und hoffentlich einzigen) User
+
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data();
-    
-    console.log('✅ Found user data:', userData);
-    
-    // Extrahiere die relevanten Checkout-Daten
+
+    // Nur aus Unternehmensdaten und Checkout lesen!
     const checkoutData: CheckoutData = {
       unternehmensname: userData.Checkout?.Unternehmensname || userData.Unternehmensdaten?.Unternehmensname || '',
       bildURL: userData.Checkout?.BildURL || '',
-      gutscheinURL: userData.Checkout?.GutscheinDesignURL || '', // ✅ KORRIGIERT: GutscheinDesignURL statt GutscheinURL
+      gutscheinURL: userData.Checkout?.GutscheinDesignURL || '',
       dienstleistungen: extractDienstleistungen(userData.Checkout?.Gutscheinarten || {}),
       customValue: userData.Checkout?.Freibetrag || false,
-      gutscheinDesign: userData.Gutscheindetails?.Gutscheindesign || {},
+      gutscheinarten: userData.Checkout?.Gutscheinarten || {},
+      slug: userData.slug || '',
+      StripeAccountId: userData.Checkout?.StripeAccountId || '',
       website: userData.Unternehmensdaten?.Website || '',
       telefon: userData.Unternehmensdaten?.Telefon || '',
-      iban: userData.Zahlungsdaten?.IBAN || '',
-      gutscheinarten: userData.Checkout?.Gutscheinarten || {},
-      slug: userData.slug || '', // <--- HIER ergänzt!
-      StripeAccountId: userData.Zahlungsdaten?.StripeAccountId || '',
     };
-    
+
     console.log('📦 Processed checkout data:', checkoutData);
     return checkoutData;
-    
+
   } catch (error) {
     console.error('❌ Error loading checkout data:', error);
     return null;

@@ -159,32 +159,25 @@ export const saveGutscheinData = async (contextData: any) => {
     const updateData: any = {
       registrationFinished: true,
       slug: slug,
-      
-      // Unternehmensdaten aktualisieren
-      'Unternehmensdaten.Vorname': contextData.vorname || '',
-      'Unternehmensdaten.Name': contextData.nachname || '',
-      'Unternehmensdaten.Unternehmensname': contextData.unternehmensname || '',
-      'Unternehmensdaten.Branche': contextData.geschaeftsart || '',
-      'Unternehmensdaten.Telefon': contextData.telefon || '',
-      'Unternehmensdaten.Website': contextData.website || '',
 
-      // Zahlungsdaten aktualisieren
-      'Zahlungsdaten.Zahlungsempfänger': contextData.kontoinhaber || '',
-      'Zahlungsdaten.IBAN': contextData.iban || '',
-      // Stripe Account ID hinzufügen:
-      'Zahlungsdaten.StripeAccountId': contextData.stripeAccountId || '',
+      Unternehmensdaten: {
+        Vorname: contextData.vorname || '',
+        Name: contextData.nachname || '',
+        Unternehmensname: contextData.unternehmensname || '',
+        Branche: contextData.geschaeftsart || '',
+        Telefon: contextData.telefon || '',
+        Website: contextData.website || '',
+      },
 
-      // Checkout-Daten aktualisieren
-      'Checkout.Unternehmensname': contextData.unternehmensname || '',
-      'Checkout.BildURL': bildURL,
-      'Checkout.GutscheinDesignURL': gutscheinDesignURL || null, // Entfernt: unserDesignPdfURL
-      'Checkout.Dienstleistung': contextData.dienstleistungen?.length > 0 || false,
-      'Checkout.Freibetrag': contextData.customValue || false,
-      'Checkout.Gutscheinarten': gutscheinarten,
-
-      // Gutschein-Details aktualisieren
-      'Gutscheindetails.GutscheinDesign': gutscheinDesignData,
-      'Gutscheindetails.Gutscheinarten': gutscheinarten,
+      Checkout: {
+        Unternehmensname: contextData.unternehmensname || '',
+        BildURL: bildURL,
+        GutscheinDesignURL: gutscheinDesignURL || null,
+        Dienstleistung: contextData.dienstleistungen?.length > 0 || false,
+        Freibetrag: contextData.customValue || false,
+        Gutscheinarten: gutscheinarten,
+        StripeAccountId: contextData.stripeAccountId || '', // StripeAccountId wieder speichern!
+      },
     };
 
     console.log('📝 Update data prepared:', updateData);
