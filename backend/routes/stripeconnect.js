@@ -18,6 +18,10 @@ router.post('/stripe-connect-link', async (req, res) => {
     const account = await stripe.accounts.create({
       type: 'express',
       email,
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true }
+      }
     });
 
     // Erstelle einen Onboarding-Link
