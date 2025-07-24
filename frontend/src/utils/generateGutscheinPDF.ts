@@ -104,6 +104,21 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
           ${data.unternehmen}
         </div>
 
+        ${data.dienstleistung ? `
+        <!-- Dienstleistung -->
+        <div style="
+          text-align: center;
+          color: #666;
+          font-size: 16px;
+          margin: 8px 0;
+          font-family: Arial, sans-serif;
+          max-width: 400px;
+          word-wrap: break-word;
+          line-height: 1.4;
+        ">
+          <div style="font-size:32px;font-weight:bold;color:#1976d2;">${data.dienstleistung.shortDesc}</div>
+          <div style="font-size:16px;color:#666;">${data.dienstleistung.longDesc}</div>
+        </div>` : `
         <!-- Betrag -->
         <div style="
           background: linear-gradient(45deg, #1976d2 30%, #42a5f5 90%);
@@ -123,22 +138,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
           ">
             € ${data.betrag}
           </div>
-        </div>
-
-        ${data.dienstleistung ? `
-        <!-- Dienstleistung -->
-        <div style="
-          text-align: center;
-          color: #666;
-          font-size: 16px;
-          margin: 8px 0;
-          font-family: Arial, sans-serif;
-          max-width: 400px;
-          word-wrap: break-word;
-          line-height: 1.4;
-        ">
-          ${data.dienstleistung.longDesc || data.dienstleistung.shortDesc}
-        </div>` : ''}
+        </div>`}
 
         <!-- Gutscheincode -->
         <div style="

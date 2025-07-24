@@ -120,13 +120,20 @@ function SuccessPage({
   const [emailSent, setEmailSent] = useState(false);
   const hasSentRef = useRef(false);
 
+  // NEU: Session-ID aus URL holen
+  const sessionId = new URLSearchParams(window.location.search).get('session_id');
+  const sentKey = `gutschein_sent_${sessionId}`;
+
   const generateGutscheinCode = () => {
     return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
   };
 
   useEffect(() => {
+    // Prüfe, ob für diese Session schon ein Gutschein verschickt wurde
+    if (!sessionId || localStorage.getItem(sentKey)) return; // <--- Hier wird abgebrochen, wenn schon verschickt
     if (hasSentRef.current) return;
     hasSentRef.current = true;
+
     const sendGutscheinEmail = async () => {
       setIsSending(true);
       try {
@@ -134,15 +141,17 @@ function SuccessPage({
         // PDF generieren
         const pdfBlob = await generateGutscheinPDF({
           unternehmen: checkoutData.unternehmensname,
-          betrag: purchasedBetrag.toString(),
+          betrag: selectedDienstleistung ? '' : purchasedBetrag.toString(), // <--- Betrag nur bei Wertgutschein!
           gutscheinCode,
           ausstelltAm: new Date().toLocaleDateString(),
           website: checkoutData.website,
           bildURL: checkoutData.bildURL,
-          dienstleistung: selectedDienstleistung ? {
-            shortDesc: selectedDienstleistung.shortDesc,
-            longDesc: selectedDienstleistung.longDesc,
-          } : undefined,
+          dienstleistung: selectedDienstleistung
+            ? {
+                shortDesc: selectedDienstleistung.shortDesc,
+                longDesc: selectedDienstleistung.longDesc,
+              }
+            : undefined,
         });
 
         // PDF als Base64
@@ -153,6 +162,7 @@ function SuccessPage({
           let binary = '';
           const bytes = new Uint8Array(buffer);
           const len = bytes.byteLength;
+          
           for (let i = 0; i < len; i++) {
             binary += String.fromCharCode(bytes[i]);
           }
@@ -166,7 +176,8 @@ function SuccessPage({
           gutscheinCode,
           betrag: purchasedBetrag,
           dienstleistung: selectedDienstleistung,
-          pdfBuffer: pdfBase64, // <--- PDF als Base64
+          pdfBuffer: pdfBase64,
+          stripeSessionId: sessionId, // <--- NEU!
         };
 
         const response = await fetch('/api/gutscheine/send-gutschein', {
@@ -177,15 +188,16 @@ function SuccessPage({
 
         if (response.ok) {
           setEmailSent(true);
+          localStorage.setItem(sentKey, 'true'); // <--- Gutschein als verschickt markieren
           // Gutschein in Firebase speichern
-        console.log('Speichere Gutscheinverkauf unter slug:', checkoutData.slug);
-        await saveSoldGutscheinToShop({
-          gutscheinCode,
-          betrag: purchasedBetrag,
-          kaufdatum: new Date().toISOString(),
-          empfaengerEmail: customerEmail,
-          slug: checkoutData.slug,
-        });
+          console.log('Speichere Gutscheinverkauf unter slug:', checkoutData.slug);
+          await saveSoldGutscheinToShop({
+            gutscheinCode,
+            betrag: purchasedBetrag,
+            kaufdatum: new Date().toISOString(),
+            empfaengerEmail: customerEmail,
+            slug: checkoutData.slug,
+          });
         } else {
           const errorData = await response.json();
           alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
@@ -198,7 +210,7 @@ function SuccessPage({
     };
 
     sendGutscheinEmail();
-  }, []);
+  }, [sessionId]);
 
   return (
     <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -276,12 +288,18 @@ export default function GutscheinLandingPage() {
       const sessionId = params.get('session_id');
       setShowSuccessPage(true);
 
+      // Dienstleistung aus LocalStorage wiederherstellen
+      const dienstleistungStr = localStorage.getItem('selectedDienstleistung');
+      if (dienstleistungStr) {
+        setSelectedDienstleistung(JSON.parse(dienstleistungStr));
+        localStorage.removeItem('selectedDienstleistung');
+      }
+
       // Lade die Stripe-Session-Daten vom Backend
       if (sessionId && checkoutData) {
         fetch(`/api/zahlung/stripe-session-info?session_id=${sessionId}&stripeAccountId=${checkoutData.StripeAccountId}`)
           .then(res => res.json())
           .then(data => {
-            console.log("Stripe-Session-Info:", data);
             if (data && data.amount && data.customerEmail) {
               setPurchasedBetrag(data.amount / 100);
               setCustomerEmail(data.customerEmail);
@@ -347,6 +365,12 @@ export default function GutscheinLandingPage() {
     if (!betrag) {
       alert('Bitte wählen Sie einen Betrag oder eine Dienstleistung aus.');
       return;
+    }
+    // Dienstleistung im LocalStorage sichern
+    if (selectedDienstleistung) {
+      localStorage.setItem('selectedDienstleistung', JSON.stringify(selectedDienstleistung));
+    } else {
+      localStorage.removeItem('selectedDienstleistung');
     }
     setShowPaymentForm(true);
   };

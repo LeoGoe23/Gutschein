@@ -6,14 +6,14 @@ const path       = require("path");
 const fs         = require("fs");
 
 // Erweiterte Transporter-Konfiguration mit Debug
-const transporter = nodemailer.createTransport({  // <- KORREKTUR: createTransport (ohne "er")
+const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  debug: true, // Aktiviert Debug-Logs
-  logger: true // Aktiviert Logger
+  debug: true,
+  logger: true
 });
 
 // Transporter-Verbindung testen beim Start
@@ -66,14 +66,14 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Verbesserte Route für Gutschein-E-Mail mit PDF-Anhang
+// Verbesserte Route für Gutschein-E-Mail mit PDF-Anhang und Stripe-Session-Absicherung
 router.post("/send-gutschein", async (req, res) => {
   console.log("=== DEBUG: /send-gutschein Route aufgerufen ===");
   console.log("Timestamp:", new Date().toISOString());
   console.log("Request headers:", req.headers);
   console.log("Request body keys:", Object.keys(req.body));
   
-  const { empfaengerEmail, unternehmensname, pdfBuffer, gutscheinCode, betrag, dienstleistung } = req.body;
+  const { empfaengerEmail, unternehmensname, pdfBuffer, gutscheinCode, betrag, dienstleistung, stripeSessionId } = req.body;
 
   console.log("=== EINGABE-PARAMETER ===");
   console.log("Empfänger E-Mail:", empfaengerEmail);
@@ -85,6 +85,7 @@ router.post("/send-gutschein", async (req, res) => {
   console.log("PDF Buffer type:", typeof pdfBuffer);
   console.log("PDF Buffer length:", pdfBuffer ? pdfBuffer.length : 'undefined');
   console.log("Dienstleistung:", dienstleistung);
+  console.log("Stripe-Session-ID:", stripeSessionId);
 
   // Erweiterte Validierung
   if (!empfaengerEmail || !unternehmensname || !pdfBuffer || !gutscheinCode) {
@@ -101,6 +102,15 @@ router.post("/send-gutschein", async (req, res) => {
   if (!emailRegex.test(empfaengerEmail)) {
     console.log("=== UNGÜLTIGE E-MAIL-ADRESSE ===");
     return res.status(400).json({ error: "Ungültige E-Mail-Adresse" });
+  }
+
+  // Stripe-Session-Absicherung: Prüfe, ob für diese Session schon ein Gutschein existiert
+  if (stripeSessionId) {
+    const existing = await Gutschein.findOne({ stripeSessionId });
+    if (existing) {
+      console.log("=== Gutschein für diese Stripe-Session existiert bereits ===");
+      return res.status(409).json({ error: "Für diese Zahlung wurde bereits ein Gutschein verschickt." });
+    }
   }
 
   try {
@@ -123,6 +133,15 @@ router.post("/send-gutschein", async (req, res) => {
       console.error(bufferError);
       return res.status(400).json({ error: "Ungültiger PDF Buffer" });
     }
+
+    // Gutschein speichern inkl. stripeSessionId
+    const neuerGutschein = new Gutschein({
+      code: gutscheinCode,
+      betrag,
+      empfaengerEmail,
+      stripeSessionId
+    });
+    await neuerGutschein.save();
 
     // E-Mail-Text basierend auf Gutschein-Typ
     const emailText = dienstleistung 
