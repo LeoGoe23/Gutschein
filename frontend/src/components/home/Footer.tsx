@@ -1,4 +1,5 @@
 import { Box, Typography, Link } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 
 export default function Footer() {
   return (
@@ -30,10 +31,16 @@ export default function Footer() {
         <Box sx={{ flex: '1 1 180px', minWidth: '150px' }}>
           <Typography sx={{ fontSize: '1.2rem', fontWeight: 600, color: '#4F46E5', mb: '1rem' }}>
             Rechtliches
-          </Typography>
-          <Link href="#" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>AGB</Link>
-          <Link href="#" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>Datenschutz</Link>
-          <Link href="#" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>Impressum</Link>
+            </Typography>
+          <Link component={RouterLink} to="/agb" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+            AGB
+          </Link>
+          <Link component={RouterLink} to="/datenschutz" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+            Datenschutz
+          </Link>
+          <Link component={RouterLink} to="/impressum" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+            Impressum
+          </Link>
         </Box>
 
         {/* Kontakt */}
@@ -42,10 +49,10 @@ export default function Footer() {
             Kontakt
           </Typography>
           <Typography sx={{ color: '#bbb', mb: '0.5rem' }}>
-            Konrad Blesch, Leonhard Götz
+            Konrad Blersch, Leonhard Götz
           </Typography>
           <Typography sx={{ color: '#bbb' }}>
-            Musterstraße 12<br />12345 Berlin
+            Stünzbach 4a<br />Buch am Erlbach
           </Typography>
         </Box>
       </Box>

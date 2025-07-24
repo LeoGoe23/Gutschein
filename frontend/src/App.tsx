@@ -11,17 +11,23 @@ import GutscheinePage from './pages/profil/Gutscheine';
 import EinnahmenPage from './pages/profil/Einnahmen';
 import EinstellungenPage from './pages/profil/Einstellungen';
 import SelbstDesign from './pages/profil/design';
-import Checkout from './pages/checkoutc';
+import Checkout from './pages/checkoutdemo';
+import CheckoutC from './pages/checkoutc';
 import Success from './pages/link';
 import { GutscheinProvider } from './context/GutscheinContext';
+import AGB from './components/home/legal/AGB';
+import Datenschutz from './components/home/legal/Datenschutz';
+import Impressum from './components/home/legal/Impressum';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkoutc" element={<Checkout />} />
-        <Route path="/checkoutc/:slug" element={<Checkout />} />
+        {/* Dynamische Route für Slug */}
+        <Route path="/checkoutc/:slug" element={<CheckoutC />} />
         <Route path="/success" element={
           <GutscheinProvider>
             <Success />
@@ -40,6 +46,9 @@ export default function App() {
           <Route path="step4" element={<Step4 />} />
           <Route path="step5" element={<Step5 />} />
         </Route>
+        <Route path="/agb" element={<AGB />} />
+        <Route path="/datenschutz" element={<Datenschutz />} />
+        <Route path="/impressum" element={<Impressum />} />
       </Routes>
     </BrowserRouter>
   );
