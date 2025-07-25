@@ -10,7 +10,9 @@ import { useParams, useLocation } from 'react-router-dom';
 import { loadCheckoutDataBySlug, CheckoutData } from '../utils/loadCheckoutData';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import jsPDF from 'jspdf';
-import { saveSoldGutscheinToShop } from '../utils/saveSoldGutscheinToShop';
+import { saveSoldGutscheinToShop, updateUserEinnahmenStats } from '../utils/saveSoldGutscheinToShop';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '../auth/firebase';
 
 function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
   return (
@@ -188,9 +190,8 @@ function SuccessPage({
 
         if (response.ok) {
           setEmailSent(true);
-          localStorage.setItem(sentKey, 'true'); // <--- Gutschein als verschickt markieren
+          localStorage.setItem(sentKey, 'true');
           // Gutschein in Firebase speichern
-          console.log('Speichere Gutscheinverkauf unter slug:', checkoutData.slug);
           await saveSoldGutscheinToShop({
             gutscheinCode,
             betrag: purchasedBetrag,
@@ -198,6 +199,16 @@ function SuccessPage({
             empfaengerEmail: customerEmail,
             slug: checkoutData.slug,
           });
+
+          // Statistiken beim User updaten
+          if (checkoutData.userId) {
+            await updateUserEinnahmenStats({
+              userId: checkoutData.userId,
+              betrag: purchasedBetrag,
+              dienstleistung: selectedDienstleistung?.shortDesc,
+              isFreierBetrag: !selectedDienstleistung,
+            });
+          }
         } else {
           const errorData = await response.json();
           alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
@@ -239,9 +250,21 @@ function SuccessPage({
   );
 }
 
+// Hilfsfunktion für Hit-Tracking
+const trackWebsiteHit = async (userId: string) => {
+  const now = new Date();
+  const monat = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const userRef = doc(db, 'users', userId);
+
+  await updateDoc(userRef, {
+    'Einnahmen.gesamtHits': increment(1),
+    [`Einnahmen.monatlich.${monat}.hits`]: increment(1),
+  });
+};
+
 export default function GutscheinLandingPage() {
   const { slug } = useParams<{ slug: string }>();
-  const location = useLocation(); // <--- NEU
+  const location = useLocation();
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -253,6 +276,7 @@ export default function GutscheinLandingPage() {
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
   const [customerEmail, setCustomerEmail] = useState<string>(''); // <- Neue State
+  const hitTrackedRef = useRef(false); // <--- NEU
 
   // Lade Daten basierend auf Slug
   useEffect(() => {
@@ -267,6 +291,12 @@ export default function GutscheinLandingPage() {
         const data = await loadCheckoutDataBySlug(slug);
         if (data) {
           setCheckoutData(data);
+          // Nur Hit zählen, wenn KEIN Stripe-Redirect (success) vorliegt und noch nicht getrackt
+          const params = new URLSearchParams(window.location.search);
+          if (!params.get('success') && data.userId && !hitTrackedRef.current) {
+            hitTrackedRef.current = true;
+            trackWebsiteHit(data.userId);
+          }
         } else {
           setError('Unternehmen nicht gefunden');
         }
@@ -447,89 +477,93 @@ export default function GutscheinLandingPage() {
                 )}
 
                 {!showPaymentForm && (
-                  <>
-                    <Box sx={{ minHeight: '200px', mb: 4 }}>
-                      {/* Wertgutschein */}
-                      {gutscheinType === 'wert' && hasWertGutschein && (
-                        <Box>
-                          <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
-                            Welchen Betrag möchten Sie schenken?
-                          </Typography>
-                          <Box sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-start' }, alignItems: 'center' }}>
-                            <input
-                              type="number"
-                              placeholder="Betrag eingeben"
-                              value={betrag || ''}
-                              onChange={(e) => {
-                                setBetrag(Number(e.target.value));
-                                setSelectedDienstleistung(null);
-                              }}
-                              style={{
-                                padding: '1rem',
-                                borderRadius: '8px',
-                                border: '1px solid #ccc',
-                                width: '250px',
-                                fontSize: '1.1rem',
-                                marginRight: '0.5rem',
-                              }}
-                            />
-                            <Typography variant="body1" sx={{ fontSize: '1.2rem', fontWeight: 600 }}>€</Typography>
-                          </Box>
+                  <Box sx={{ minHeight: '200px', mb: 4 }}>
+                    {/* Wertgutschein */}
+                    {gutscheinType === 'wert' && hasWertGutschein && (
+                      <Box>
+                        <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
+                          Welchen Betrag möchten Sie schenken?
+                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-start' }, alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            placeholder="Betrag eingeben"
+                            value={betrag || ''}
+                            onChange={(e) => {
+                              setBetrag(Number(e.target.value));
+                              setSelectedDienstleistung(null);
+                            }}
+                            style={{
+                              padding: '1rem',
+                              borderRadius: '8px',
+                              border: '1px solid #ccc',
+                              width: '250px',
+                              fontSize: '1.1rem',
+                              marginRight: '0.5rem',
+                            }}
+                          />
+                          <Typography variant="body1" sx={{ fontSize: '1.2rem', fontWeight: 600 }}>€</Typography>
                         </Box>
-                      )}
+                      </Box>
+                    )}
 
-                      {/* Dienstleistungen */}
-                      {gutscheinType === 'dienstleistung' && hasDienstleistungGutschein && (
-                        <Box>
-                          <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
-                            Welche Dienstleistung möchten Sie verschenken?
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {checkoutData.dienstleistungen.map((dienstleistung, index) => (
-                              <Button
-                                key={index}
-                                variant={selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? "contained" : "outlined"}
-                                onClick={() => handleDienstleistungSelect(dienstleistung)}
-                                sx={{
-                                  borderRadius: 2,
-                                  px: 2,
-                                  py: 1.5,
-                                  textTransform: 'none',
-                                  textAlign: 'left',
-                                  justifyContent: 'space-between',
-                                  display: 'flex',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                <span>{dienstleistung.shortDesc}</span>
-                                <span>{dienstleistung.price}€</span>
-                              </Button>
-                            ))}
-                          </Box>
+                    {/* Dienstleistungen */}
+                    {((hasBoth && gutscheinType === 'dienstleistung') || (!hasWertGutschein && hasDienstleistungGutschein)) && (
+                      <Box>
+                        <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
+                          Welche Dienstleistung möchten Sie verschenken?
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {checkoutData.dienstleistungen.map((dienstleistung, index) => (
+                            <Button
+                              key={index}
+                              variant={selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? "contained" : "outlined"}
+                              onClick={() => handleDienstleistungSelect(dienstleistung)}
+                              sx={{
+                                borderRadius: 2,
+                                px: 2,
+                                py: 1.5,
+                                textTransform: 'none',
+                                textAlign: 'left',
+                                justifyContent: 'space-between',
+                                display: 'flex',
+                                fontWeight: 600,
+                              }}
+                            >
+                              <span>{dienstleistung.shortDesc}</span>
+                              <span>{dienstleistung.price}€</span>
+                            </Button>
+                          ))}
                         </Box>
-                      )}
-                    </Box>
+                      </Box>
+                    )}
 
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={handleWeiterZurBestellung}
-                      endIcon={<ArrowForwardIosIcon />}
-                      sx={{
-                        borderRadius: 2,
-                        px: 4,
-                        py: 1.5,
-                        backgroundColor: '#607D8B',
-                        color: '#fff',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        boxShadow: 3,
-                        '&:hover': { backgroundColor: '#546E7A' },
-                      }}
-                    >
-                      Weiter zur Bestellung
-                    </Button>
-                  </>
+                    {/* Hinweis, falls nichts verfügbar */}
+                    {!hasWertGutschein && !hasDienstleistungGutschein && (
+                      <Typography variant="body2" color="text.secondary">
+                        Es sind aktuell keine Gutscheine verfügbar.
+                      </Typography>
+                    )}
+
+                    {/* Weiter zur Bestellung Button */}
+                    {!showPaymentForm && (
+                      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="large"
+                          sx={{ borderRadius: 2, px: 4, py: 1.5, fontWeight: 600 }}
+                          onClick={handleWeiterZurBestellung}
+                          disabled={
+                            (gutscheinType === 'wert' && (!betrag || betrag <= 0)) ||
+                            (gutscheinType === 'dienstleistung' && !selectedDienstleistung)
+                          }
+                        >
+                          Jetzt zahlen
+                        </Button>
+                      </Box>
+                    )}
+                  </Box>
                 )}
 
                 {showPaymentForm && <PaymentForm betrag={betrag} onPaymentSuccess={handlePaymentSuccess} stripeAccountId={checkoutData.StripeAccountId} />}

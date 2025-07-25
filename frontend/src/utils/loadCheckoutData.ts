@@ -12,6 +12,7 @@ export interface CheckoutData {
   StripeAccountId: string;
   website: string;
   telefon: string;
+  userId: string; // <--- NEU
 }
 
 export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData | null> => {
@@ -30,7 +31,6 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data();
 
-    // Nur aus Unternehmensdaten und Checkout lesen!
     const checkoutData: CheckoutData = {
       unternehmensname: userData.Checkout?.Unternehmensname || userData.Unternehmensdaten?.Unternehmensname || '',
       bildURL: userData.Checkout?.BildURL || '',
@@ -42,6 +42,7 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
       StripeAccountId: userData.Checkout?.StripeAccountId || '',
       website: userData.Unternehmensdaten?.Website || '',
       telefon: userData.Unternehmensdaten?.Telefon || '',
+      userId: userDoc.id, // <--- NEU
     };
 
     console.log('📦 Processed checkout data:', checkoutData);

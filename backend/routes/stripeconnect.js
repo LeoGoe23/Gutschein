@@ -41,4 +41,26 @@ router.post('/stripe-connect-link', async (req, res) => {
   }
 });
 
+router.post('/check-account', async (req, res) => {
+  const { firebaseUid } = req.body;
+  // Hole Stripe-Account-ID aus deiner DB anhand firebaseUid
+  const stripeAccountId = await getStripeAccountIdFromDB(firebaseUid); // Implementiere diese Funktion!
+
+  if (!stripeAccountId) {
+    return res.status(404).json({ error: 'Kein Stripe-Account gefunden.' });
+  }
+
+  try {
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+    if (account.charges_enabled) {
+      // Stripe-Konto ist wirklich aktiviert!
+      return res.json({ stripeAccountId });
+    } else {
+      return res.status(400).json({ error: 'Stripe-Konto noch nicht aktiviert.' });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
