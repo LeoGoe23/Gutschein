@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import Launch from '@mui/icons-material/Launch';
+import ImageIcon from '@mui/icons-material/Image'; // Neu hinzufügen
 import { auth, db } from '../../auth/firebase';
 import PageContainer from '../../components/profil/PageContainer';
 import { uploadImageToStorage } from '../../utils/saveToFirebase'; // Importiere die Funktion zum Hochladen
@@ -142,31 +143,60 @@ export default function GutscheinEditorPage() {
         </Paper>
       )}
 
-      {/* Bild ändern Button */}
-      <Button
-        variant="contained"
-        component="label"
-        startIcon={<ContentCopy />}
+      {/* Bild ändern Bereich */}
+      <Box
         sx={{
-          backgroundColor: '#607D8B',
-          minWidth: '120px',
-          '&:hover': {
-            backgroundColor: '#546E7A',
-          },
+          mt: 4,
+          mb: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
         }}
       >
-        Bild ändern
-        <input
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            if (e.target.files && e.target.files[0]) {
-              handleChangeImage(e.target.files[0]);
-            }
+        <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+          Bild für den Gutscheinkauf ändern
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            mb: 2,
+            color: 'text.secondary',
+            textAlign: 'center',
+            maxWidth: 400,
           }}
-        />
-      </Button>
+        >
+          Ändern Sie das Bild, das Ihren Kunden beim Gutscheinkauf angezeigt wird.
+        </Typography>
+        <Button
+          variant="contained"
+          component="label"
+          startIcon={<ImageIcon />}
+          sx={{
+            backgroundColor: '#607D8B',
+            minWidth: '180px',
+            fontWeight: 600,
+            fontSize: '1rem',
+            py: 1.2,
+            borderRadius: '0.7rem',
+            boxShadow: 2,
+            '&:hover': {
+              backgroundColor: '#546E7A',
+            },
+          }}
+        >
+          Bild ändern
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                handleChangeImage(e.target.files[0]);
+              }
+            }}
+          />
+        </Button>
+      </Box>
 
       {/* Snackbar für Benachrichtigungen */}
       <Snackbar

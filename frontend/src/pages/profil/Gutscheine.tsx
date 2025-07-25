@@ -36,7 +36,8 @@ export default function GutscheinePage() {
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        const gutscheine = userData?.Gutscheindetails?.Gutscheinarten || {};
+        // Richtiges Feld: Checkout.Gutscheinarten
+        const gutscheine = userData?.Checkout?.Gutscheinarten || {};
 
         // Prüfe ob freier Betrag aktiv ist
         const freieBetragAktiv = Object.values(gutscheine).some((g: any) => g.typ === 'frei');
@@ -106,10 +107,6 @@ export default function GutscheinePage() {
 
     const updatedData = {
       ...data,
-      Gutscheindetails: {
-        ...data.Gutscheindetails,
-        Gutscheinarten: formData.Gutscheine
-      },
       Checkout: {
         ...data.Checkout,
         Gutscheinarten: formData.Gutscheine,

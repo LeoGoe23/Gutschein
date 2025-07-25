@@ -107,7 +107,7 @@ export default function Sidebar() {
             <ListItemIcon sx={{ color: location.pathname === '/profil/selbstdesign' ? '#4F46E5' : 'white', minWidth: 'auto' }}>
               <DesignServicesIcon sx={{ fontSize: '2rem' }} /> {/* Neues Icon */}
             </ListItemIcon>
-            <ListItemText primary="Gutscheindesign" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
+            <ListItemText primary="Design" sx={{ display: { xs: 'none', md: 'block' }, color: 'white', ml: 2 }} />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>

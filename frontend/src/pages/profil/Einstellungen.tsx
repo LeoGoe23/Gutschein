@@ -169,47 +169,25 @@ export default function EinstellungenPage() {
         {/* Zahlungsinformationen */}
         <Box sx={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: 1, p: 4 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Zahlungsinformationen</Typography>
-          <TextField
-            label="IBAN"
-            fullWidth
+          <Typography sx={{ mb: 2 }}>
+            Deine Auszahlungen und Zahlungsdaten werden sicher über Stripe verwaltet.
+            Änderungen an Bankdaten, Auszahlungsintervallen oder Steuerinformationen kannst du direkt im Stripe-Dashboard vornehmen.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            href="https://dashboard.stripe.com/" // Optional: dynamisch generieren, falls du einen eigenen Stripe-Link hast
+            target="_blank"
+            rel="noopener"
             sx={{ mb: 2 }}
-            value={formData?.['Zahlungsdaten']?.IBAN || ''}
-            disabled={!editZahlungsinformationen}
-            onChange={(e) => {
-              setFormData({
-                ...formData,
-                Zahlungsdaten: {
-                  ...formData.Zahlungsdaten,
-                  IBAN: e.target.value
-                }
-              });
-            }}
-          />
-          <TextField
-            label="Zahlungsempfänger"
-            fullWidth
-            value={formData?.['Zahlungsdaten']?.Zahlungsempfänger || ''}
-            disabled={!editZahlungsinformationen}
-            onChange={(e) => {
-              setFormData({
-                ...formData,
-                Zahlungsdaten: {
-                  ...formData.Zahlungsdaten,
-                  Zahlungsempfänger: e.target.value
-                }
-              });
-            }}
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
-            {!editZahlungsinformationen ? (
-              <Button variant="contained" onClick={() => setEditZahlungsinformationen(true)}>Bearbeiten</Button>
-            ) : (
-              <>
-                <Button variant="contained" color="success" onClick={saveChanges}>Speichern</Button>
-                <Button variant="outlined" color="inherit" onClick={() => { setFormData(data); setEditZahlungsinformationen(false); }}>Abbrechen</Button>
-              </>
-            )}
-          </Box>
+          >
+            Zahlungsdaten bei Stripe verwalten
+          </Button>
+          {formData?.Checkout?.StripeAccountId && (
+            <Typography variant="body2" sx={{ color: '#888' }}>
+              Stripe Account ID: {formData.Checkout.StripeAccountId}
+            </Typography>
+          )}
         </Box>
       </Box>
     </PageContainer>
