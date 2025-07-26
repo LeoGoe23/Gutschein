@@ -14,8 +14,8 @@ const app = express();
 app.use(cors());
 
 // HIER LIMIT ERHÖHEN:
-app.use(express.json({ limit: '70mb' }));
-app.use(express.urlencoded({ limit: '70mb', extended: true }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 app.use("/api/gutscheine", gutscheineRoute);
 app.use("/api/zahlung", zahlungRoute);
