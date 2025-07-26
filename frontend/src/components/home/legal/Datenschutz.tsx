@@ -1,9 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Typography, Link } from '@mui/material';
+import LogoTopLeft from '../TopLeftLogo';
 
 export default function Datenschutz() {
-  return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', py: 4, px: 2 }}>
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
+    return (
+        <>
+          <LogoTopLeft />
+          <Box sx={{ pt: '6rem', px: 2, maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>Datenschutzerklärung</Typography>
 
       <Typography variant="h5" gutterBottom>1. Datenschutz auf einen Blick</Typography>
@@ -142,6 +148,7 @@ export default function Datenschutz() {
       <Typography paragraph>
         Die von Ihnen an uns per Kontaktanfragen übersandten Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere gesetzliche Aufbewahrungsfristen – bleiben unberührt.
       </Typography>
-    </Box>
+      </Box>
+    </>
   );
 }

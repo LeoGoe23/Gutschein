@@ -1,9 +1,15 @@
-import React from 'react';
-import { Container, Typography, Link } from '@mui/material';
+import React, { useEffect } from 'react';
+import { Container, Typography, Link, Box } from '@mui/material';
+import LogoTopLeft from '../TopLeftLogo';
 
 export default function Impressum() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   return (
     <Container sx={{ py: 4, px: 2, maxWidth: 800, mx: 'auto' }}>
+      <LogoTopLeft />
+      <Box sx={{ pt: '6rem', px: 2, maxWidth: 800, mx: 'auto' }}></Box>
       <Typography variant="h4" gutterBottom>
         Impressum
       </Typography>
@@ -18,8 +24,8 @@ export default function Impressum() {
         Vertreten durch:
       </Typography>
       <Typography variant="body1" paragraph>
-        Herrn Leonhard Götz<br />
-        Herrn Konrad Blersch
+        Leonhard Götz<br />
+        Konrad Blersch
       </Typography>
 
       <Typography variant="h6" gutterBottom>

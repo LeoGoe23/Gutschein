@@ -1,9 +1,18 @@
 import React from 'react';
+import { useEffect } from 'react';
 import { Container, Typography, Link } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import LogoTopLeft from '../TopLeftLogo';
+
 
 export default function AGB() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   return (
-    <Container sx={{ py: 4, px: 2, maxWidth: 800, mx: 'auto' }}>
+    <>
+      <LogoTopLeft />
+      <Container sx={{ pt: '6rem', px: 2, maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
         Allgemeine Geschäftsbedingungen (AGB) der Gutscheinfabrik GbR
       </Typography>
@@ -97,6 +106,7 @@ export default function AGB() {
         (2) Gerichtsstand für alle Streitigkeiten aus diesem Vertrag ist Regensburg, sofern der Kunde Kaufmann, juristische Person des öffentlichen Rechts oder öffentlich-rechtliches Sondervermögen ist.<br />
         (3) Sollten einzelne Bestimmungen dieser AGB unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt.
       </Typography>
-    </Container>
+      </Container>
+    </>
   );
 }
