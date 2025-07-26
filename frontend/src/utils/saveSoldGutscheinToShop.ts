@@ -7,6 +7,7 @@ export interface SoldGutscheinData {
   kaufdatum: string; // ISO-String
   empfaengerEmail: string;
   slug: string; // Shop-Slug
+  provision: number; // Provision in Cent
 }
 
 export const saveSoldGutscheinToShop = async (data: SoldGutscheinData) => {
@@ -18,6 +19,7 @@ export const saveSoldGutscheinToShop = async (data: SoldGutscheinData) => {
         betrag: data.betrag,
         kaufdatum: data.kaufdatum,
         empfaengerEmail: data.empfaengerEmail,
+        provision: data.provision, // <--- Wirkliche Provision speichern!
       }
     );
     console.log('✅ Gutscheinverkauf im Shop gespeichert:', docRef.id);
@@ -34,6 +36,7 @@ export interface GutscheinVerkaufsStatistik {
   betrag: number;
   dienstleistung?: string; // Name der Dienstleistung, falls vorhanden
   isFreierBetrag: boolean;
+  provision: number; // Provision in Cent, falls relevant  
 }
 
 export const updateUserEinnahmenStats = async ({

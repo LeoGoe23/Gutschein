@@ -134,24 +134,6 @@ export const saveGutscheinData = async (contextData: any) => {
     }
 
     console.log('🎯 Final voucher types:', gutscheinarten);
-
-    // Gutschein-Design Daten vorbereiten
-    const gutscheinDesignData = {
-      modus: contextData.gutscheinDesign?.modus || 'unser-design',
-      designURL: gutscheinDesignURL || null, // Entfernt: unserDesignPdfURL
-      hintergrundTyp: contextData.gutscheinDesign?.modus === 'eigenes' 
-        ? contextData.gutscheinDesign?.hintergrundTyp 
-        : null, // Geändert von 'pdf' zu null
-      // Platzhalter für dynamische Ersetzung
-      dynamicPlaceholders: contextData.gutscheinDesign?.modus === 'unser-design' 
-        ? {
-            betrag: '{{BETRAG}}',
-            code: '{{CODE}}',
-            gueltigBis: '{{GUELTIG_BIS}}'
-          }
-        : null
-    };
-
     // 2. User-Dokument in Firestore aktualisieren
     const userDocRef = doc(db, 'users', user.uid);
     console.log('📄 Updating user document:', user.uid);
@@ -159,6 +141,7 @@ export const saveGutscheinData = async (contextData: any) => {
     const updateData: any = {
       registrationFinished: true,
       slug: slug,
+      Provision: contextData.provision || 0.08, // <--- NEU: Standard 8%, überschreibbar
 
       Unternehmensdaten: {
         Vorname: contextData.vorname || '',
