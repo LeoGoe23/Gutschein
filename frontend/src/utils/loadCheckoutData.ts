@@ -13,6 +13,7 @@ export interface CheckoutData {
   website: string;
   telefon: string;
   userId: string; // <--- NEU
+  Provision: number;
 }
 
 export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData | null> => {
@@ -43,6 +44,7 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
       website: userData.Unternehmensdaten?.Website || '',
       telefon: userData.Unternehmensdaten?.Telefon || '',
       userId: userDoc.id, // <--- NEU
+      Provision: userData.Provision || 0
     };
 
     console.log('📦 Processed checkout data:', checkoutData);

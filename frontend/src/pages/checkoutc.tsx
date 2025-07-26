@@ -9,7 +9,7 @@ import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { saveAdminStats, saveAdminHit } from '../utils/saveAdminStats';
 
-function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string }) {
+function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string, provision: number }) {
   const [customerEmail, setCustomerEmail] = useState<string>('');
 
   const handlePayment = async () => {
@@ -35,7 +35,8 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId }: { betrag: nu
           amount: betrag * 100,
           customerEmail,
           stripeAccountId,
-          slug
+          slug,
+          provision // <--- NEU
         }),
       });
       const data = await response.json();
@@ -179,6 +180,7 @@ function SuccessPage({
             kaufdatum: new Date().toISOString(),
             empfaengerEmail: customerEmail,
             slug: checkoutData.slug,
+            provision: checkoutData.Provision // <--- NEU: Provision wirklich mitschicken!
           });
 
           // Statistiken beim User updaten
@@ -188,6 +190,7 @@ function SuccessPage({
               betrag: purchasedBetrag,
               dienstleistung: selectedDienstleistung?.shortDesc,
               isFreierBetrag: !selectedDienstleistung,
+              provision: checkoutData.Provision // <-- Hinzugefügt
             });
           }
 
@@ -560,7 +563,14 @@ export default function GutscheinLandingPage() {
                   </Box>
                 )}
 
-                {showPaymentForm && <PaymentForm betrag={betrag} onPaymentSuccess={handlePaymentSuccess} stripeAccountId={checkoutData.StripeAccountId} />}
+                {showPaymentForm && (
+                  <PaymentForm
+                    betrag={betrag}
+                    onPaymentSuccess={handlePaymentSuccess}
+                    stripeAccountId={checkoutData.StripeAccountId}
+                    provision={checkoutData.Provision || 0.08} // <--- NEU
+                  />
+                )}
               </>
             ) : (
               purchasedBetrag > 0 && customerEmail ? (
