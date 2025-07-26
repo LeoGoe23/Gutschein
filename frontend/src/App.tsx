@@ -19,6 +19,7 @@ import AGB from './components/home/legal/AGB';
 import Datenschutz from './components/home/legal/Datenschutz';
 import Impressum from './components/home/legal/Impressum';
 import AdminPage from './pages/Admin';
+import Kontakt from './pages/Kontakt';
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/datenschutz" element={<Datenschutz />} />
         <Route path="/impressum" element={<Impressum />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/kontakt" element={<Kontakt />} />
       </Routes>
     </BrowserRouter>
   );
