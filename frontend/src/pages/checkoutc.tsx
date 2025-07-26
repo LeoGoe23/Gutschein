@@ -1,32 +1,13 @@
 import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import DownloadIcon from '@mui/icons-material/Download';
-import CreditCardIcon from '@mui/icons-material/CreditCard';
-import AppleIcon from '@mui/icons-material/Apple';
-import GoogleIcon from '@mui/icons-material/Google';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import { useParams, useLocation } from 'react-router-dom';
 import { loadCheckoutDataBySlug, CheckoutData } from '../utils/loadCheckoutData';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
-import jsPDF from 'jspdf';
 import { saveSoldGutscheinToShop, updateUserEinnahmenStats } from '../utils/saveSoldGutscheinToShop';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../auth/firebase';
-
-function PaymentOptions({ onSelect }: { onSelect: (method: string) => void }) {
-  return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mt: 2 }}>
-      <Button variant="outlined" startIcon={<CreditCardIcon />} onClick={() => onSelect('stripe')} sx={{ flex: 1 }}>
-        Kreditkarte / Debitkarte
-      </Button>
-      <Button variant="outlined" startIcon={<AppleIcon />} onClick={() => onSelect('stripe')} sx={{ flex: 1 }}>
-        Apple Pay / Google Pay
-      </Button>
-      {/* Weitere Stripe-Methoden kannst du nach Wunsch ergänzen */}
-    </Box>
-  );
-}
+import { saveAdminStats, saveAdminHit } from '../utils/saveAdminStats';
 
 function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string }) {
   const [customerEmail, setCustomerEmail] = useState<string>('');
@@ -209,6 +190,18 @@ function SuccessPage({
               isFreierBetrag: !selectedDienstleistung,
             });
           }
+
+          // Nach Gutscheinverkauf:
+          await saveAdminStats({
+            adminId: 'globalAdmin',
+            gutschein: {
+              gutscheinCode,
+              betrag: purchasedBetrag,
+              kaufdatum: new Date().toISOString(),
+              empfaengerEmail: customerEmail,
+              dienstleistung: selectedDienstleistung?.shortDesc,
+            }
+          });
         } else {
           const errorData = await response.json();
           alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
@@ -260,6 +253,7 @@ const trackWebsiteHit = async (userId: string) => {
     'Einnahmen.gesamtHits': increment(1),
     [`Einnahmen.monatlich.${monat}.hits`]: increment(1),
   });
+  await saveAdminHit('globalAdmin'); // <--- NEU: Admin-Hit speichern
 };
 
 export default function GutscheinLandingPage() {
