@@ -18,6 +18,7 @@ import { GutscheinProvider } from './context/GutscheinContext';
 import AGB from './components/home/legal/AGB';
 import Datenschutz from './components/home/legal/Datenschutz';
 import Impressum from './components/home/legal/Impressum';
+import AdminPage from './pages/Admin';
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/agb" element={<AGB />} />
         <Route path="/datenschutz" element={<Datenschutz />} />
         <Route path="/impressum" element={<Impressum />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>
   );

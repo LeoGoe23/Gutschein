@@ -5,7 +5,9 @@ import TopBar from '../components/home/TopBar';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { GutscheinProvider, useGutschein } from '../context/GutscheinContext';
 import { saveGutscheinData } from '../utils/saveToFirebase';
+import { saveAdminNewShop } from '../utils/saveAdminStats';
 import { useState } from 'react';
+import { auth } from '../auth/firebase';
 
 function GutscheinContent() {
   const location = useLocation();
@@ -96,16 +98,19 @@ function GutscheinContent() {
     if (isAllValid()) {
       console.log('🔄 Starting completion process...');
       console.log('📋 Current context data:', data);
-      
+
       setIsLoading(true);
       try {
         const result = await saveGutscheinData(data);
-        
+
+        // Admin-Statistik für neuen Shop aktualisieren
+        await saveAdminNewShop('globalAdmin');
+
         console.log('✅ Gutschein-Setup abgeschlossen:', result);
-        
+
         clearData();
         navigate('/Success');
-        
+
       } catch (error) {
         console.error('❌ Fehler beim Abschließen:', error);
         
