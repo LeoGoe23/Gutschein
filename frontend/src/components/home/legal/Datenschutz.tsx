@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box, Typography, Link } from '@mui/material';
 import LogoTopLeft from '../TopLeftLogo';
+import Footer from '../Footer';
 
 export default function Datenschutz() {
     useEffect(() => {
@@ -149,6 +150,7 @@ export default function Datenschutz() {
         Die von Ihnen an uns per Kontaktanfragen übersandten Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere gesetzliche Aufbewahrungsfristen – bleiben unberührt.
       </Typography>
       </Box>
+      <Footer />
     </>
   );
 }

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Container, Typography, Link } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import LogoTopLeft from '../TopLeftLogo';
+import Footer from '../Footer';
 
 
 export default function AGB() {
@@ -107,6 +108,7 @@ export default function AGB() {
         (3) Sollten einzelne Bestimmungen dieser AGB unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt.
       </Typography>
       </Container>
+      <Footer />
     </>
   );
 }

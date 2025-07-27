@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import { Box, Button, Typography, Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import TopBar from '../components/home/TopBar';
@@ -17,6 +17,25 @@ export default function HomeLayout() {
   const user = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [intendedRoute, setIntendedRoute] = useState<string | null>(null);
+
+  const [showCookieDialog, setShowCookieDialog] = useState(false);
+
+  useEffect(() => {
+    const consent = document.cookie.split('; ').find(row => row.startsWith('cookieConsent='));
+    if (!consent) {
+      setShowCookieDialog(true);
+    }
+  }, []);
+
+  const acceptAllCookies = () => {
+    document.cookie = 'cookieConsent=all; path=/; max-age=' + 60 * 60 * 24 * 365;
+    setShowCookieDialog(false);
+  };
+
+  const acceptTechnicalCookies = () => {
+    document.cookie = 'cookieConsent=technical; path=/; max-age=' + 60 * 60 * 24 * 365;
+    setShowCookieDialog(false);
+  };
 
   // LoginModal öffnen wenn von ProtectedRoute weitergeleitet
   useEffect(() => {
@@ -90,6 +109,23 @@ export default function HomeLayout() {
         open={showLoginModal} 
         onClose={handleCloseLoginModal} 
       />
+
+      <Dialog open={showCookieDialog} disableEscapeKeyDown>
+        <DialogTitle>Cookie-Einstellungen</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Wir verwenden Cookies, um Ihnen die bestmögliche Funktionalität unserer Website zu bieten. Sie können wählen, ob Sie alle Cookies akzeptieren oder nur die technisch notwendigen zulassen möchten.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" color="primary" onClick={acceptAllCookies}>
+            Alle Cookies akzeptieren
+          </Button>
+          <Button variant="outlined" color="primary" onClick={acceptTechnicalCookies}>
+            Nur notwendige Cookies zulassen
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
