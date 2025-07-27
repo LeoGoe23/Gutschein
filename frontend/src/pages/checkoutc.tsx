@@ -9,6 +9,8 @@ import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { saveAdminStats, saveAdminHit } from '../utils/saveAdminStats';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string, provision: number }) {
   const [customerEmail, setCustomerEmail] = useState<string>('');
 
@@ -28,7 +30,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     try {
       const slug = window.location.pathname.split('/').pop();
 
-      const response = await fetch('/api/zahlung/create-stripe-session', {
+      const response = await fetch(`${API_URL}/api/zahlung/create-stripe-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -36,7 +38,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           customerEmail,
           stripeAccountId,
           slug,
-          provision // <--- NEU
+          provision
         }),
       });
       const data = await response.json();
@@ -164,7 +166,7 @@ function SuccessPage({
           stripeSessionId: sessionId, // <--- NEU!
         };
 
-        const response = await fetch('/api/gutscheine/send-gutschein', {
+        const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(emailData),
@@ -324,7 +326,7 @@ export default function GutscheinLandingPage() {
 
       // Lade die Stripe-Session-Daten vom Backend
       if (sessionId && checkoutData) {
-        fetch(`/api/zahlung/stripe-session-info?session_id=${sessionId}&stripeAccountId=${checkoutData.StripeAccountId}`)
+        fetch(`${API_URL}/api/zahlung/stripe-session-info?session_id=${sessionId}&stripeAccountId=${checkoutData.StripeAccountId}`)
           .then(res => res.json())
           .then(data => {
             if (data && data.amount && data.customerEmail) {
