@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../../auth/firebase';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
@@ -20,6 +20,7 @@ import TableRow from '@mui/material/TableRow';
 export default function EinnahmenPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [verkaufteGutscheine, setVerkaufteGutscheine] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,37 +37,45 @@ export default function EinnahmenPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    // ShopID ist der slug aus den Userdaten!
+    const SHOP_ID = data?.slug;
+    if (!SHOP_ID) return;
+
+    const fetchGutscheine = async () => {
+      const gutscheineRef = collection(db, 'shops', SHOP_ID, 'verkaufte_gutscheine');
+      const q = query(gutscheineRef, orderBy('kaufdatum', 'desc'), limit(10));
+      const querySnapshot = await getDocs(q);
+      const gutscheine = querySnapshot.docs.map(doc => doc.data());
+      setVerkaufteGutscheine(gutscheine);
+    };
+
+    fetchGutscheine();
+  }, [data]);
+
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
+
+  // Hilfsfunktionen für aktuelle Monatsdaten
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monatData = data?.Einnahmen?.monatlich?.[currentMonth] || {};
 
   const chartData = Object.entries(data?.Einnahmen?.monatlich || {}).map(([monat, werte]: any) => ({
     monat,
     umsatz: werte.gesamtUmsatz || 0,
-    anzahl: werte.verkaufteGutscheine || 0
+    anzahl: werte.anzahlVerkäufe || 0,
+    hits: werte.hits || 0
   })).sort((a, b) => a.monat.localeCompare(b.monat));
-
-  const verkaufteGutscheine = Object.values(data?.Gutscheine || {})
-    .filter((g: any) => g.verkauftAm)
-    .sort((a: any, b: any) => new Date(b.verkauftAm).getTime() - new Date(a.verkauftAm).getTime());
 
   return (
     <PageContainer title="Einnahmen">
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
-        <StatCard label="Gesamtumsatz" value={`${data?.Einnahmen?.gesamtUmsatz} €`} icon={<MonetizationOnIcon />} color="#3b82f6" />
-        <StatCard label="Gesamtverkäufe" value={data?.Einnahmen?.anzahlVerkäufe} icon={<LocalActivityIcon />} color="#10b981" />
-        <StatCard label="Umsatz letzter Monat" value={`${data?.Einnahmen?.umsatzLetzterMonat ?? 0} €`} icon={<TrendingUpIcon />} color="#f59e0b" />
+        <StatCard label="Gesamtumsatz" value={`${data?.Einnahmen?.gesamtUmsatz ?? 0} €`} icon={<MonetizationOnIcon />} color="#3b82f6" />
+        <StatCard label="Gesamtverkäufe" value={data?.Einnahmen?.anzahlVerkäufe ?? 0} icon={<LocalActivityIcon />} color="#10b981" />
+        <StatCard label="Umsatz aktueller Monat" value={`${monatData.gesamtUmsatz ?? 0} €`} icon={<TrendingUpIcon />} color="#f59e0b" />
         <StatCard 
-          label="Letzter Verkauf" 
-          value={
-            data?.Einnahmen?.letzterVerkauf?.toDate
-              ? new Date(data.Einnahmen.letzterVerkauf.toDate()).toLocaleString('de-DE', {
-                  day: '2-digit',
-                  month: '2-digit', // Monat als Zahl
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
-              : '-'
-          }
+          label="Aufrufe aktueller Monat" 
+          value={monatData.hits ?? 0}
           icon={<AccessTimeIcon />} 
           color="#6366f1" 
         />
@@ -103,16 +112,18 @@ export default function EinnahmenPage() {
                   <TableCell>Code</TableCell>
                   <TableCell>Wert (€)</TableCell>
                   <TableCell>Verkauft am</TableCell>
+                  <TableCell>Empfänger</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {verkaufteGutscheine.map((gutschein: any, index: number) => {
-                  const verkauftAmDate = new Date(gutschein.verkauftAm); // Konvertiere Datum
+                  const verkauftAmDate = new Date(gutschein.kaufdatum);
                   return (
                     <TableRow key={index}>
                       <TableCell>{gutschein.gutscheinCode}</TableCell>
-                      <TableCell>{gutschein.wert}</TableCell>
+                      <TableCell>{gutschein.betrag}</TableCell>
                       <TableCell>{verkauftAmDate.toLocaleString()}</TableCell>
+                      <TableCell>{gutschein.empfaengerEmail}</TableCell>
                     </TableRow>
                   );
                 })}
