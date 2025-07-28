@@ -55,52 +55,56 @@ export default function Vorteile() {
             Deine Vorteile mit GutscheinFabrik
           </Typography>
 
-          <Box sx={{ position: 'relative' }}>
-            {benefits.map((b, i) => {
-              const isLeft = i % 2 === 0
-              return (
-                <Box
-                  key={i}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: isLeft ? 'flex-start' : 'flex-end',
-                    mt: (i + 1) * 6,
-                    mb: 20,
-                    '&:last-of-type': { mb: 0 },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: { xs: '100%', md: '40%' },
-                      p: 3,
-                      bgcolor: 'background.paper',
-                      boxShadow: 3,
-                      borderRadius: 2,
-                      textAlign: 'left',
-                      position: 'relative',
-                      '&::before': {
-                        content: '""',
+          {/*
+            Absolute positioning logic for benefits
+          */}
+          {(() => {
+            const positions = [
+              { top: '17%', left: '3%' },
+              { top: '35%', right: '-5%' },
+              { top: '55%', left: '-2%' },
+              { top: '85%', right: '-7%' },
+            ];
+            return (
+              <Box sx={{ position: 'relative', height: '1000px' }}>
+                {benefits.map((b, i) => {
+                  const pos = positions[i];
+                  return (
+                    <Box
+                      key={i}
+                      sx={{
                         position: 'absolute',
-                        top: '1rem',
-                        [isLeft ? 'right' : 'left']: '-12px',
-                        width: '24px',
-                        height: '24px',
-                        bgcolor: '#4F46E5',
-                        borderRadius: '50%',
-                      },
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                      {b.title}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {b.description}
-                    </Typography>
-                  </Box>
-                </Box>
-              )
-            })}
-          </Box>
+                        ...pos,
+                        width: { xs: '90%', md: '40%' },
+                        p: 3,
+                        bgcolor: 'background.paper',
+                        boxShadow: 3,
+                        borderRadius: 2,
+                        textAlign: 'left',
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: '1rem',
+                          [pos.left ? 'right' : 'left']: '-12px',
+                          width: '24px',
+                          height: '24px',
+                          bgcolor: '#4F46E5',
+                          borderRadius: '50%',
+                        },
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                        {b.title}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {b.description}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            );
+          })()}
         </Container>
       </Box>
     </Box> {}

@@ -56,13 +56,7 @@ export default function TopBar() {
   };
 
   const handleVorteileClick = () => {
-    navigate('/');
-    setTimeout(() => {
-      const faqElement = document.getElementById('faq');
-      if (faqElement) {
-        faqElement.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
+    navigate('/vorteile');
   };
 
   const handleAccountClick = () => {
@@ -167,7 +161,7 @@ export default function TopBar() {
       {/* Drawer for Mobile */}
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <List sx={{ width: 250 }}>
-          <ListItem component="li" onClick={() => { handleVorteileClick(); setDrawerOpen(false); }}>
+          <ListItem component="li" onClick={() => { navigate('/vorteile'); setDrawerOpen(false); }}>
             <ListItemText primary="Vorteile" />
           </ListItem>
           <ListItem component="li" onClick={() => { handleAccountClick(); setDrawerOpen(false); }}>

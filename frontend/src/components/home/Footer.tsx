@@ -22,7 +22,9 @@ export default function Footer() {
           <Typography sx={{ fontSize: '1.2rem', fontWeight: 600, color: '#4F46E5', mb: '1rem' }}>
             Unternehmen
           </Typography>
-          <Link href="#" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>Für Partner</Link>
+          <Link component={RouterLink} to="/profil" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+            Für Partner
+          </Link>
           <Link component={RouterLink} to="/vorteile" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
             Vorteile
           </Link>
