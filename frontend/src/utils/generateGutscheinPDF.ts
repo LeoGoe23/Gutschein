@@ -50,6 +50,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
         <img
           src="${data.bildURL}"
           alt="Unternehmensbild"
+          crossorigin="anonymous"
           style="
             position: absolute;
             top: 50%;
@@ -210,7 +211,20 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
   
   // Element zum DOM hinzufügen
   document.body.appendChild(pdfContent);
-  
+
+  // Warte auf das Laden des Bildes, falls vorhanden
+  if (data.bildURL) {
+    const img: HTMLImageElement | null = pdfContent.querySelector('img');
+    if (img) {
+      img.crossOrigin = 'anonymous'; // CORS für html2canvas
+      await new Promise<void>((resolve, reject) => {
+        if (img.complete) return resolve();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+      });
+    }
+  }
+
   try {
     // Canvas erstellen mit höherer Auflösung für bessere Qualität
     const canvas = await html2canvas(pdfContent, {
