@@ -1,10 +1,10 @@
-import { Box, Typography, Button, Stack } from '@mui/material';
+import { Box, Typography, Button, Stack, Checkbox, FormControlLabel, Link } from '@mui/material';
 import { useGutschein } from '../../context/GutscheinContext';
 import { Email, Phone, Person, Business, DesignServices, Image as ImageIcon, Build } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
 export default function Zusammenfassung() {
-  const { data, clearData } = useGutschein();
+  const { data, setData, clearData } = useGutschein(); // setData ergänzt
   const navigate = useNavigate();
 
   const handlePreview = () => {
@@ -28,110 +28,47 @@ export default function Zusammenfassung() {
         </Typography>
         
         <Stack spacing={2}>
-          <Stack direction="row" spacing={4}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-              <Person sx={{ color: '#4CAF50', fontSize: '1.5rem' }} />
-              <Typography sx={{ fontWeight: 500 }}>Name: {data.nachname}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-              <Email sx={{ color: '#2196F3', fontSize: '1.5rem' }} />
-              <Typography sx={{ fontWeight: 500 }}>E-Mail: {data.email}</Typography>
-            </Box>
-          </Stack>
-          
-          <Stack direction="row" spacing={4}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-              <Phone sx={{ color: '#FF9800', fontSize: '1.5rem' }} />
-              <Typography sx={{ fontWeight: 500 }}>Telefon: {data.telefon}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-              <Business sx={{ color: '#9C27B0', fontSize: '1.5rem' }} />
-              <Typography sx={{ fontWeight: 500 }}>IBAN: {data.iban}</Typography>
-            </Box>
-          </Stack>
-        </Stack>
-      </Box>
-
-      {/* Gutschein-Design */}
-      <Box sx={{ border: '1px solid #ddd', borderRadius: '1rem', padding: '2rem', backgroundColor: '#FAFAFA' }}>
-        <Typography sx={{ fontWeight: 500, mb: '1.5rem', color: '#333' }}>
-          Gutschein-Design:
-        </Typography>
-        
-        <Stack spacing={2}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {data.gutscheinDesign?.modus === 'wir-designen' ? (
-              <DesignServices sx={{ color: '#FF5722', fontSize: '1.5rem' }} />
-            ) : data.gutscheinDesign?.modus === 'eigenes' ? (
-              <ImageIcon sx={{ color: '#2196F3', fontSize: '1.5rem' }} />
-            ) : (
-              <Build sx={{ color: '#4CAF50', fontSize: '1.5rem' }} />
-            )}
-            <Typography sx={{ fontWeight: 500 }}>
-              Modus: {
-                data.gutscheinDesign?.modus === 'wir-designen' 
-                  ? 'Wir designen den Gutschein' 
-                  : data.gutscheinDesign?.modus === 'eigenes'
-                  ? 'Eigenes Design hochgeladen'
-                  : 'Unser Standard-Design'
-              }
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Person sx={{ color: '#4CAF50', fontSize: '2rem' }} />
+            <Typography sx={{ fontWeight: 500, fontSize: '1.1rem' }}>
+              Name: {data.vorname} {data.nachname}
             </Typography>
           </Box>
-
-          {/* Hochgeladenes Design anzeigen */}
-          {data.gutscheinDesign?.modus === 'eigenes' && data.gutscheinDesign?.hintergrund && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-                Hochgeladenes Design:
-              </Typography>
-              <Box
-                sx={{
-                  width: 200,
-                  height: 150,
-                  border: '1px solid #e0e0e0',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#f5f5f5',
-                }}
-              >
-                {data.gutscheinDesign.hintergrundTyp === 'image' ? (
-                  <img
-                    src={data.gutscheinDesign.hintergrund}
-                    alt="Hochgeladenes Design"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                    }}
-                  />
-                ) : (
-                  <Box sx={{ textAlign: 'center' }}>
-                    <ImageIcon sx={{ fontSize: 40, color: '#666' }} />
-                    <Typography variant="body2" color="text.secondary">
-                      PDF-Datei ({data.gutscheinDesign.hintergrundTyp})
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Box>
-          )}
-
-          {data.gutscheinDesign?.modus === 'wir-designen' && (
-            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              Unser Team erstellt ein individuelles Design basierend auf Ihrer Website und Ihren Angaben.
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Email sx={{ color: '#2196F3', fontSize: '2rem' }} />
+            <Typography sx={{ fontWeight: 500, fontSize: '1.1rem' }}>
+              E-Mail: {data.email}
             </Typography>
-          )}
-
-          {data.gutscheinDesign?.modus === 'unser-design' && (
-            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              Sie verwenden unser professionelles Standard-Design.
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Phone sx={{ color: '#FF9800', fontSize: '2rem' }} />
+            <Typography sx={{ fontWeight: 500, fontSize: '1.1rem' }}>
+              Telefon: {data.telefon}
             </Typography>
-          )}
+          </Box>
         </Stack>
       </Box>
+
+      {/* AGB Checkbox */}
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={!!data.agbAccepted}
+            onChange={e => setData({ agbAccepted: e.target.checked })}
+            color="primary"
+          />
+        }
+        label={
+          <span>
+            Ich habe die{' '}
+            <Link href="/agb" target="_blank" rel="noopener">
+              AGB
+            </Link>{' '}
+            gelesen und akzeptiere sie.
+          </span>
+        }
+        sx={{ mt: 2 }}
+      />
 
       <Stack direction="row" spacing={2} sx={{ mt: '2rem' }}>
         <Button

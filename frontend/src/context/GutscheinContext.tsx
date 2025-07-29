@@ -35,7 +35,9 @@ const initialData = {
   gutscheinConfig: {
     prefix: 'GS',
     gueltigkeitTage: 365
-  }
+  },
+
+  agbAccepted: false, // <-- NEU
 };
 
 // Hilfsfunktion zum Laden aus localStorage

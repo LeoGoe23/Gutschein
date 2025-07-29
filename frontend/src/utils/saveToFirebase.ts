@@ -161,6 +161,8 @@ export const saveGutscheinData = async (contextData: any) => {
         Gutscheinarten: gutscheinarten,
         StripeAccountId: contextData.stripeAccountId || '', // StripeAccountId wieder speichern!
       },
+
+      agbAccepted: contextData.agbAccepted || false, // <-- NEU
     };
 
     console.log('📝 Update data prepared:', updateData);

@@ -36,23 +36,19 @@ export default function Sidebar({ activeStep }: SidebarProps) {
       case 1:
         return !!(data.vorname && data.nachname && data.email && data.unternehmensname && data.website && data.geschaeftsart && data.bild);
       case 2:
-        // Mindestens eine Option muss aktiviert sein
         const hasCustomValue = data.customValue;
         const hasServices = data.dienstleistungen && data.dienstleistungen.length > 0;
-        
-        // Mindestens eine der beiden Optionen muss aktiviert/ausgefüllt sein
         return hasCustomValue || hasServices;
       case 3:
-        // Wenn "eigenes" Design gewählt wurde, muss ein Hintergrund hochgeladen werden
         if (data.gutscheinDesign?.modus === 'eigenes') {
           return !!(data.gutscheinDesign.hintergrund);
         }
         return true;
       case 4:
-        // Stripe-Account-ID ist Pflicht für "abgeschlossen"
         return !!(data.stripeAccountId);
       case 5:
-        return true; // Zusammenfassung hat keine Pflichtfelder
+        // Step 5 ist nur gültig, wenn die AGB akzeptiert wurden
+        return !!data.agbAccepted;
       default:
         return false;
     }
@@ -87,9 +83,9 @@ export default function Sidebar({ activeStep }: SidebarProps) {
           const isActive = activeStep === stepNumber;
           const isValid = validateStep(stepNumber);
           
-          // Step 5 ist immer completed wenn einmal besucht
+          // Step 5 ist nur completed, wenn validiert UND besucht
           const isCompleted = stepNumber === 5 
-            ? currentMaxStep >= 5 
+            ? currentMaxStep >= 5 && isValid
             : currentMaxStep > stepNumber && isValid;
           
           // Zeige Fehler wenn Step bereits erreicht wurde (currentMaxStep > stepNumber) UND invalid ist
