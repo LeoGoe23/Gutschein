@@ -27,10 +27,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/checkoutc" element={<Checkout />} />
+        <Route path="/checkoutdemo" element={<Checkout />} />
         {/* Dynamische Route für Slug */}
-        <Route path="/checkoutc/:slug" element={<CheckoutC />} />
+        <Route path="/checkout/:slug" element={<CheckoutC />} />
         <Route path="/success" element={
           <GutscheinProvider>
             <Success />
