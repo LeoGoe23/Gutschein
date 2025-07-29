@@ -26,7 +26,7 @@ export default function GutscheinEditorPage() {
         const data = userSnap.data();
 
         if (data.slug) {
-          setCheckoutLink(`https://gutscheinery.de/checkoutc/${data.slug}`);
+          setCheckoutLink(`https://gutscheinery.de/checkout/${data.slug}`);
         }
       }
     };
