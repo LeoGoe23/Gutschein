@@ -43,6 +43,33 @@ export default function Zahlungsdaten() {
     }
   };
 
+  useEffect(() => {
+    // Prüfe nach Mount oder wenn stripeAccountId fehlt, ob Stripe-Konto aktiviert ist
+    const checkStripeAccount = async () => {
+      if (!firebaseUid || data.stripeAccountId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const apiUrl = process.env.REACT_APP_API_URL;
+        const res = await fetch(`${apiUrl}/api/stripeconnect/check-account`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firebaseUid }),
+        });
+        const result = await res.json();
+        if (res.ok && result.stripeAccountId) {
+          setData({ stripeAccountId: result.stripeAccountId });
+        }
+      } catch (err: any) {
+        // Fehler ignorieren, falls Konto noch nicht aktiviert
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkStripeAccount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebaseUid]);
+
   return (
     <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <Typography sx={{ fontSize: '2rem', fontWeight: 700 }}>
