@@ -14,18 +14,7 @@ interface GutscheinData {
   };
 }
 
-export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> => {
-  // Bild als DataURL laden, falls vorhanden
-  let bildDataURL = '';
-  if (data.bildURL) {
-    try {
-      bildDataURL = await toDataURL(data.bildURL);
-    } catch (e) {
-      console.warn('Bild konnte nicht als DataURL geladen werden:', e);
-      bildDataURL = '';
-    }
-  }
-
+export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> => { // <- Promise<Blob> statt Promise<void>
   // Container für PDF-Generierung erstellen
   const pdfContent = document.createElement('div');
   pdfContent.style.cssText = `
@@ -48,7 +37,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
       overflow: hidden;
       box-sizing: border-box;
     ">
-      ${bildDataURL ? `
+      ${data.bildURL ? `
       <!-- Unternehmensbild im oberen Bereich -->
       <div style="
         width: 100%;
@@ -59,7 +48,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
         position: relative;
       ">
         <img
-          src="${bildDataURL}"
+          src="${data.bildURL}"
           alt="Unternehmensbild"
           style="
             position: absolute;
@@ -258,14 +247,3 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     document.body.removeChild(pdfContent);
   }
 };
-
-function toDataURL(url: string): Promise<string> {
-  return fetch(url)
-    .then(response => response.blob())
-    .then(blob => new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    }));
-}
