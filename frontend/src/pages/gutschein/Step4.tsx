@@ -10,7 +10,7 @@ export default function Zahlungsdaten() {
   const auth = getAuth();
   const currentUser = auth.currentUser;
   const firebaseUid = data.firebaseUid || currentUser?.uid || '';
-  const email = data.email || currentUser?.email || '';
+  const email = currentUser?.email || '';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

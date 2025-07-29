@@ -79,11 +79,14 @@ function GutscheinContent() {
       missing.push('Step 3 - Gutschein-Design: Bild für eigenes Design hochladen');
     }
 
+    if (!data.agbAccepted) {
+      missing.push('AGB müssen akzeptiert werden');
+    }
     return missing;
   };
 
   const isAllValid = () => {
-    return validateStep(1) && validateStep(2) && validateStep(3) && validateStep(4);
+    return validateStep(1) && validateStep(2) && validateStep(3) && validateStep(4) && !!data.agbAccepted;
   };
 
   const nextStep = () => {
