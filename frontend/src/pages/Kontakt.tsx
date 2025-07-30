@@ -85,6 +85,7 @@ export default function Kontakt() {
             <Button type="submit" variant="contained" sx={{ mt: 2 }}>
               Senden
             </Button>
+            <Box sx={{ height: { xs: '4rem', md: 0 } }} />
           </Box>
         </Container>
       </Box>
