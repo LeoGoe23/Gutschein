@@ -50,7 +50,7 @@ export default function LinkGenerierung() {
   }, []);
 
   // Checkout-Link mit echtem Slug erstellen
-  const checkoutLink = slug ? `https://gutscheinery.de/checkoutc/${slug}` : '';
+  const checkoutLink = slug ? `https://gutscheinery.de/checkout/${slug}` : '';
 
   const handleCopyLink = async () => {
     try {

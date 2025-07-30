@@ -512,7 +512,7 @@ export default function GutscheinLandingPage() {
                         <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
                           Welche Dienstleistung möchten Sie verschenken?
                         </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           {checkoutData.dienstleistungen.map((dienstleistung, index) => (
                             <Button
                               key={index}
@@ -520,17 +520,28 @@ export default function GutscheinLandingPage() {
                               onClick={() => handleDienstleistungSelect(dienstleistung)}
                               sx={{
                                 borderRadius: 2,
-                                px: 2,
-                                py: 1.5,
+                                px: 3,
+                                py: 2,
                                 textTransform: 'none',
                                 textAlign: 'left',
                                 justifyContent: 'space-between',
                                 display: 'flex',
                                 fontWeight: 600,
+                                width: '100%',
+                                minWidth: '220px',
+                                boxShadow: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? 4 : 1,
+                                borderColor: '#bdbdbd',
+                                backgroundColor: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? '#e3f2fd' : '#fff',
+                                color: '#222',
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                  backgroundColor: '#f5f5f5',
+                                  boxShadow: 3,
+                                },
                               }}
                             >
                               <span>{dienstleistung.shortDesc}</span>
-                              <span>{dienstleistung.price}€</span>
+                              <span style={{ fontWeight: 700 }}>{dienstleistung.price}€</span>
                             </Button>
                           ))}
                         </Box>
@@ -546,12 +557,21 @@ export default function GutscheinLandingPage() {
 
                     {/* Weiter zur Bestellung Button */}
                     {!showPaymentForm && (
-                      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                      <Box sx={{ mt: 3, display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-start' } }}>
                         <Button
                           variant="contained"
                           color="primary"
                           size="large"
-                          sx={{ borderRadius: 2, px: 4, py: 1.5, fontWeight: 600 }}
+                          sx={{
+                            borderRadius: 2,
+                            px: 4,
+                            py: 1.5,
+                            fontWeight: 600,
+                            boxShadow: 2,
+                            textTransform: 'none',
+                            backgroundColor: '#1976d2',
+                            '&:hover': { backgroundColor: '#1565c0' },
+                          }}
                           onClick={handleWeiterZurBestellung}
                           disabled={
                             (gutscheinType === 'wert' && (!betrag || betrag <= 0)) ||
