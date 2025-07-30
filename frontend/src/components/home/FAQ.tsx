@@ -9,11 +9,11 @@ const faqData = [
   },
   {
     question: "Wie funktioniert die Auszahlung an meinen Shop?",
-    answer: "Die Einnahmen aus dem Gutscheinverkauf werden automatisch über Mollie an Sie ausgezahlt. Sie sehen jederzeit, wie viele Gutscheine verkauft wurden – transparent und nachvollziehbar."
+    answer: "Die Einnahmen aus dem Gutscheinverkauf werden automatisch über Stripe an Sie ausgezahlt. Sie sehen jederzeit, wie viele Gutscheine verkauft wurden – transparent und nachvollziehbar."
   },
   {
     question: "Was kostet mich die Teilnahme?",
-    answer: "Es gibt keine Einrichtungsgebühr, keine Fixkosten und kein Abo. Wir behalten lediglich eine geringe Provision von 6,5 % pro verkauftem Gutschein ein – der Rest gehört Ihnen."
+    answer: "Es gibt keine Einrichtungsgebühr, keine Fixkosten und kein Abo. Wir behalten lediglich eine geringe Provision pro verkauftem Gutschein ein – der Rest gehört Ihnen."
   },
   {
     question: "Muss ich meine Website umbauen?",
@@ -29,7 +29,7 @@ const faqData = [
   },
   {
     question: "Ist das rechtlich sicher und steuerlich sauber?",
-    answer: "Ja. Wir nutzen Mollie als zertifizierten Zahlungsanbieter und stellen dem Kunden eine rechtssichere Rechnung aus. Alle Verkäufe sind in Ihrem Dashboard dokumentiert."
+    answer: "Ja. Wir nutzen Stripe als zertifizierten Zahlungsanbieter und stellen dem Kunden eine rechtssichere Rechnung aus. Alle Verkäufe sind in Ihrem Dashboard dokumentiert."
   }
 ];
 

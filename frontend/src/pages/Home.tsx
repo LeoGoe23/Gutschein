@@ -1,4 +1,4 @@
-import { Box, Button, Typography, Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox } from '@mui/material';
+import { Box, Button, Typography, Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox, Switch } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import TopBar from '../components/home/TopBar';
@@ -19,6 +19,17 @@ export default function HomeLayout() {
   const [intendedRoute, setIntendedRoute] = useState<string | null>(null);
 
   const [showCookieDialog, setShowCookieDialog] = useState(false);
+  const [showCookieSettings, setShowCookieSettings] = useState(false);
+  const [cookiePrefs, setCookiePrefs] = useState({ statistics: true, marketing: true });
+
+  const handleSaveCookiePreferences = () => {
+    const consent = ['technical'];
+    if (cookiePrefs.statistics) consent.push('statistics');
+    if (cookiePrefs.marketing) consent.push('marketing');
+    document.cookie = `cookieConsent=${consent.join(',')}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    setShowCookieSettings(false);
+    setShowCookieDialog(true);
+  };
 
   useEffect(() => {
     const consent = document.cookie.split('; ').find(row => row.startsWith('cookieConsent='));
@@ -30,11 +41,13 @@ export default function HomeLayout() {
   const acceptAllCookies = () => {
     document.cookie = 'cookieConsent=all; path=/; max-age=' + 60 * 60 * 24 * 365;
     setShowCookieDialog(false);
+    setShowCookieSettings(false);
   };
 
   const acceptTechnicalCookies = () => {
     document.cookie = 'cookieConsent=technical; path=/; max-age=' + 60 * 60 * 24 * 365;
     setShowCookieDialog(false);
+    setShowCookieSettings(false);
   };
 
   // LoginModal öffnen wenn von ProtectedRoute weitergeleitet
@@ -110,19 +123,40 @@ export default function HomeLayout() {
         onClose={handleCloseLoginModal} 
       />
 
-      <Dialog open={showCookieDialog} disableEscapeKeyDown>
-        <DialogTitle>Cookie-Einstellungen</DialogTitle>
+      <Dialog open={showCookieDialog && !showCookieSettings} onClose={acceptTechnicalCookies}>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Wir verwenden essenzielle Cookies</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Wir verwenden Cookies, um Ihnen die bestmögliche Funktionalität unserer Website zu bieten. Sie können wählen, ob Sie alle Cookies akzeptieren oder nur die technisch notwendigen zulassen möchten.
+            Wir verwenden Cookies, um unsere Website nutzerfreundlich zu gestalten und fortlaufend zu verbessern. Mit Ihrer Zustimmung helfen Sie uns, unser Angebot zu optimieren. Sie können Ihre Einstellungen jederzeit ändern.
           </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Box>
+              <Button onClick={() => setShowCookieSettings(true)} sx={{ mr: 1 }} variant="outlined">Cookies verwalten</Button>
+              <Button onClick={acceptAllCookies} variant="contained">Akzeptieren</Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCookieSettings} onClose={() => setShowCookieSettings(false)}>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Cookie-Einstellungen</DialogTitle>
+        <DialogContent dividers>
+          <FormControlLabel
+            control={<Switch checked disabled />}
+            label="Technisch notwendig (immer aktiv)"
+          />
+          <FormControlLabel
+            control={<Switch checked={cookiePrefs.statistics} onChange={(e) => setCookiePrefs({ ...cookiePrefs, statistics: e.target.checked })} />}
+            label="Leistungs-Cookies"
+          />
+          <FormControlLabel
+            control={<Switch checked={cookiePrefs.marketing} onChange={(e) => setCookiePrefs({ ...cookiePrefs, marketing: e.target.checked })} />}
+            label="Personalisierungs-Cookies"
+          />
         </DialogContent>
         <DialogActions>
-          <Button variant="contained" color="primary" onClick={acceptAllCookies}>
-            Alle Cookies akzeptieren
-          </Button>
-          <Button variant="outlined" color="primary" onClick={acceptTechnicalCookies}>
-            Nur notwendige Cookies zulassen
+          <Button onClick={handleSaveCookiePreferences} variant="contained">
+            Einstellungen speichern
           </Button>
         </DialogActions>
       </Dialog>

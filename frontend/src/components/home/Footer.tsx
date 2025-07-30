@@ -1,7 +1,11 @@
 import { Box, Typography, Link } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
+import { useState } from 'react';
+import LoginModal from '../login/LoginModal';
 
 export default function Footer() {
+  const [open, setOpen] = useState(false);
+
   return (
     <Box sx={{ width: '100%', backgroundColor: '#222', color: '#fff', padding: '6rem 4%' }}>
       
@@ -22,7 +26,7 @@ export default function Footer() {
           <Typography sx={{ fontSize: '1.2rem', fontWeight: 600, color: '#4F46E5', mb: '1rem' }}>
             Unternehmen
           </Typography>
-          <Link component={RouterLink} to="/profil" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+          <Link onClick={() => setOpen(true)} underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb', cursor: 'pointer' }}>
             Für Partner
           </Link>
           <Link component={RouterLink} to="/vorteile" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
@@ -66,6 +70,7 @@ export default function Footer() {
       <Box sx={{ borderTop: '1px solid #444', mt: '4rem', pt: '2rem', textAlign: 'center', color: '#888', fontSize: '0.9rem' }}>
         © {new Date().getFullYear()} GutscheinFabrik. Alle Rechte vorbehalten.
       </Box>
+      <LoginModal open={open} onClose={() => setOpen(false)} />
     </Box>
   );
 }

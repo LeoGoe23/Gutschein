@@ -1,9 +1,15 @@
+import { useState } from 'react';
 import { Box, Typography, Button, Stack } from '@mui/material';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import LoginModal from '../../components/login/LoginModal';
+import { useNavigate } from 'react-router-dom';
 
 export default function ContentSection() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+
   return (
     <>
       <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', padding: { xs: '4rem 1rem', md: '6rem 2rem' }, overflow: 'hidden', backgroundColor: '#f4f4f4' }}>
@@ -91,9 +97,11 @@ export default function ContentSection() {
               '&:hover': { backgroundColor: '#4338ca' },
               marginTop: '2rem',
             }}
+            onClick={() => setOpen(true)}
           >
             Jetzt starten
           </Button>
+          <LoginModal open={open} onClose={() => setOpen(false)} />
         </Box>
       </Box>
     </>
