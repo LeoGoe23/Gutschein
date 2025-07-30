@@ -33,7 +33,7 @@ export default function HeroText() {
   }, [user]);
 
   const handleStartDemo = () => {
-    navigate('/checkout');
+    navigate('/checkoutdemo');
   };
 
   const handleAccountClick = () => {
