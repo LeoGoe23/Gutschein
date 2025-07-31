@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Typography, Paper, Divider, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Box, CircularProgress, Typography, Paper, Divider, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel, Button } from '@mui/material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
 import { useEffect, useState } from 'react';
@@ -10,6 +10,7 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import axios from 'axios'; // ganz oben ergänzen
 
 function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: any; color: string; }) {
   return (
@@ -44,6 +45,7 @@ export default function AdminPage() {
   const [selectedMonat, setSelectedMonat] = useState<string>('');
   const [tagStats, setTagStats] = useState<any[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('');
+  const [shops, setShops] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -103,6 +105,26 @@ export default function AdminPage() {
     };
     if (selectedMonat) fetchTagStats();
   }, [selectedMonat]);
+
+  // Lade alle User/Shop-Daten
+  useEffect(() => {
+    const fetchShops = async () => {
+      const usersCol = collection(db, 'users');
+      const usersSnap = await getDocs(usersCol);
+      const shopsArr: any[] = [];
+      usersSnap.forEach(docSnap => {
+        const data = docSnap.data();
+        shopsArr.push({
+          id: docSnap.id,
+          unternehmensname: data.Checkout?.Unternehmensname || data.Unternehmensdaten?.Unternehmensname || '',
+          stripeAccountId: data.Checkout?.StripeAccountId || '',
+          email: data.email || '',
+        });
+      });
+      setShops(shopsArr);
+    };
+    if (isAdmin) fetchShops();
+  }, [isAdmin]);
 
   if (isAdmin === null) {
     return (
@@ -305,6 +327,52 @@ export default function AdminPage() {
               <Typography color="text.secondary">Keine Gutscheine gefunden.</Typography>
             )}
           </Paper>
+
+          {/* Shops & Stripe-Konten */}
+          <Box sx={{ mt: 6 }}>
+            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+              Shops & Stripe-Konten
+            </Typography>
+            <Paper elevation={2} sx={{ p: 2, borderRadius: 3 }}>
+              <List>
+                {shops.map(shop => (
+                  <ListItem key={shop.id} divider>
+                    <ListItemText
+                      primary={shop.unternehmensname || shop.email || shop.id}
+                      secondary={
+                        shop.stripeAccountId
+                          ? `StripeAccountId: ${shop.stripeAccountId}`
+                          : 'Kein Stripe-Konto verknüpft'
+                      }
+                    />
+                    {shop.stripeAccountId && (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={async () => {
+                          if (!window.confirm('Stripe-Konto wirklich löschen?')) return;
+                          try {
+                            await axios.post('/api/stripeconnect/delete-stripe-account', {
+                              stripeAccountId: shop.stripeAccountId,
+                            });
+                            alert('Stripe-Konto gelöscht!');
+                            // Optional: Shop-Liste neu laden
+                            window.location.reload();
+                          } catch (err: any) {
+                            alert('Fehler beim Löschen: ' + (err.response?.data?.error || err.message));
+                          }
+                        }}
+                        sx={{ ml: 2 }}
+                      >
+                        Stripe-Konto löschen
+                      </Button>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          </Box>
         </Box>
       </Box>
     </Box>
