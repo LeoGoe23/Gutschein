@@ -26,7 +26,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
       return;
     }
 
-    // Immer Stripe verwenden
+    // Immer Stripe verwenden, nur Card erlauben
     try {
       const slug = window.location.pathname.split('/').pop();
 
@@ -38,7 +38,8 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           customerEmail,
           stripeAccountId,
           slug,
-          provision
+          provision,
+          paymentMethodTypes: ['card'] // <-- Nur Card erlauben
         }),
       });
       const data = await response.json();
@@ -163,7 +164,8 @@ function SuccessPage({
           betrag: purchasedBetrag,
           dienstleistung: selectedDienstleistung,
           pdfBuffer: pdfBase64,
-          stripeSessionId: sessionId, // <--- NEU!
+          stripeSessionId: sessionId,
+          slug: checkoutData.slug // <--- HIER HINZUFÜGEN!
         };
 
         const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
