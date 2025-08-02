@@ -10,7 +10,8 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import axios from 'axios'; // ganz oben ergänzen
+import axios from 'axios';
+const API_URL = process.env.REACT_APP_API_URL;
 
 function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: any; color: string; }) {
   return (
@@ -162,7 +163,6 @@ export default function AdminPage() {
           <Typography variant="body1" color="text.secondary" gutterBottom>
             Übersicht der wichtigsten Statistiken:
           </Typography>
-          {/* Stat-Karten nebeneinander */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 5, mt: 3 }}>
             <StatCard
               label="Gesamtumsatz"
@@ -227,7 +227,6 @@ export default function AdminPage() {
             )}
           </Box>
 
-          {/* Monatsstatistik */}
           {selectedMonat && (
             <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 3 }}>
               <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>Monat: {selectedMonat}</Typography>
@@ -297,7 +296,6 @@ export default function AdminPage() {
             </Paper>
           )}
 
-          {/* Letzte 3 Gutscheine */}
           <Paper
             elevation={4}
             sx={{
@@ -353,11 +351,10 @@ export default function AdminPage() {
                         onClick={async () => {
                           if (!window.confirm('Stripe-Konto wirklich löschen?')) return;
                           try {
-                            await axios.post('/api/stripeconnect/delete-stripe-account', {
+                            await axios.post(`${API_URL}/api/stripeconnect/delete-stripe-account`, { // <--- HIER geändert
                               stripeAccountId: shop.stripeAccountId,
                             });
                             alert('Stripe-Konto gelöscht!');
-                            // Optional: Shop-Liste neu laden
                             window.location.reload();
                           } catch (err: any) {
                             alert('Fehler beim Löschen: ' + (err.response?.data?.error || err.message));
