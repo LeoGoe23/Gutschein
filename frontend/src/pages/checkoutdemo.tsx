@@ -303,7 +303,7 @@ export default function GutscheinDemoPage() {
             🎉 Du hast es schon so weit geschafft!
           </Typography>
           <Typography variant="body1" sx={{ color: 'grey.700', mb: 3, lineHeight: 1.6 }}>
-            Registrier dich in unter 7min und fange an Geld im Schlaf zu verdienen
+            Registriere dich in unter 7 min und fange an, Geld im Schlaf zu verdienen!
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3, flexDirection: 'column', gap: 2 }}>
