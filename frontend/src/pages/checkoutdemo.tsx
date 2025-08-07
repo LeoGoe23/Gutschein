@@ -76,7 +76,7 @@ export default function GutscheinDemoPage() {
                   }}
                   onClick={() => window.open('https://calendly.com/gutscheinfabrik/15-minute-meeting', '_blank')}
                 >
-                  Sind 15min deiner Zeit 60€ wert?
+                  Sind 15min Ihrer Zeit 60€ wert?
                 </Button>
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 500, mb: 1, color: 'grey.600' }}>
