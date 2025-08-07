@@ -1,6 +1,7 @@
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField } from '@mui/material';
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField, Dialog, DialogContent, DialogActions } from '@mui/material';
 import { useState } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo'; // <--- Hinzugefügt
+import LoginModal from '../components/login/LoginModal';
 
 const DEMO_BILD_URL = '/Bild1.png';
 
@@ -18,6 +19,8 @@ export default function GutscheinDemoPage() {
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
   const [purchasedBetrag, setPurchasedBetrag] = useState<number>(0);
+  const [showPopup, setShowPopup] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const handleWeiter = () => {
     if (gutscheinType === 'wert' && (!betrag || betrag <= 0)) {
@@ -34,6 +37,11 @@ export default function GutscheinDemoPage() {
   const handleFakePayment = () => {
     setPurchasedBetrag(selectedDienstleistung ? Number(selectedDienstleistung.price) : betrag || 0);
     setShowSuccessPage(true);
+    
+    // Pop-up nach 1 Sekunde öffnen
+    setTimeout(() => {
+      setShowPopup(true);
+    }, 1000);
   };
 
   return (
@@ -53,6 +61,24 @@ export default function GutscheinDemoPage() {
         <Box sx={{ maxWidth: '450px', width: '100%', textAlign: { xs: 'center', md: 'left' }, mt: { xs: 8, md: 6 } }}>
           {!showSuccessPage ? (
             <>
+              <Box sx={{ mb: 3 }}>
+                <Button
+                  variant="contained"
+                  sx={{
+                    backgroundColor: '#4caf50',
+                    color: 'white',
+                    px: 3,
+                    py: 1.5,
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    '&:hover': { backgroundColor: '#45a049' }
+                  }}
+                  onClick={() => window.open('https://calendly.com/gutscheinfabrik/15-minute-meeting', '_blank')}
+                >
+                  Sind 15min deiner Zeit 60€ wert?
+                </Button>
+              </Box>
               <Typography variant="h5" sx={{ fontWeight: 500, mb: 1, color: 'grey.600' }}>
                 Gutschein für
               </Typography>
@@ -140,7 +166,7 @@ export default function GutscheinDemoPage() {
                     </Box>
                   )}
 
-                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                  <Box sx={{ mt: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'center', alignItems: 'center' }}>
                     <Button
                       variant="contained"
                       color="primary"
@@ -154,7 +180,36 @@ export default function GutscheinDemoPage() {
                     >
                       Jetzt zahlen
                     </Button>
+                    <Button
+                      variant="outlined"
+                      size="large"
+                      sx={{ 
+                        borderRadius: 2, 
+                        px: 4, 
+                        py: 1.5, 
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        borderColor: '#666',
+                        color: '#666',
+                        '&:hover': { borderColor: '#333', color: '#333' }
+                      }}
+                      onClick={() => setLoginModalOpen(true)}
+                    >
+                      Jetzt registrieren
+                    </Button>
                   </Box>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      display: 'block',
+                      textAlign: 'center',
+                      mt: 2,
+                      color: 'grey.600',
+                      fontStyle: 'italic'
+                    }}
+                  >
+                    Schneller registrieren als dein Kaffee fertig ist.
+                  </Typography>
                 </Box>
               )}
 
@@ -229,6 +284,81 @@ export default function GutscheinDemoPage() {
           p: 2,
         }}
       />
+
+      {/* Pop-up Dialog */}
+      <Dialog
+        open={showPopup}
+        onClose={() => setShowPopup(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 3,
+            p: 2
+          }
+        }}
+      >
+        <DialogContent sx={{ textAlign: 'center', py: 4 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#333' }}>
+            🎉 Du hast es schon so weit geschafft!
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'grey.700', mb: 3, lineHeight: 1.6 }}>
+            Registrier dich in unter 7min und fange an Geld im Schlaf zu verdienen
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3, flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button
+              variant="outlined"
+              sx={{
+                borderColor: '#2196f3',
+                color: '#2196f3',
+                px: 4,
+                py: 1.5,
+                borderRadius: 2,
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { borderColor: '#1976d2', color: '#1976d2' }
+              }}
+              onClick={() => {
+                setLoginModalOpen(true);
+                setShowPopup(false);
+              }}
+            >
+              Jetzt registrieren
+            </Button>
+            <Button
+              variant="contained"
+              sx={{
+                backgroundColor: '#4caf50',
+                color: 'white',
+                px: 4,
+                py: 1.5,
+                borderRadius: 2,
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { backgroundColor: '#45a049' }
+              }}
+              onClick={() => {
+                window.open('https://calendly.com/gutscheinfabrik/15-minute-meeting', '_blank');
+                setShowPopup(false);
+              }}
+            >
+              Kurzgespräch vereinbaren
+            </Button>
+          </Box>
+          <Button
+            variant="text"
+            sx={{ color: 'grey.600' }}
+            onClick={() => setShowPopup(false)}
+          >
+            Später
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Login Modal für Registrierung */}
+      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </Box>
   );
 }
