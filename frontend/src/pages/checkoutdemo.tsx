@@ -300,10 +300,10 @@ export default function GutscheinDemoPage() {
       >
         <DialogContent sx={{ textAlign: 'center', py: 4 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#333' }}>
-            🎉 Du hast es schon so weit geschafft!
+            🎉 Sie haben es schon so weit geschafft!
           </Typography>
           <Typography variant="body1" sx={{ color: 'grey.700', mb: 3, lineHeight: 1.6 }}>
-            Registriere dich in unter 7 min und fange an, Geld im Schlaf zu verdienen!
+            Registrieren Sie sich in unter 7 min und fangen Sie an, Geld im Schlaf zu verdienen!
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3, flexDirection: 'column', gap: 2 }}>
