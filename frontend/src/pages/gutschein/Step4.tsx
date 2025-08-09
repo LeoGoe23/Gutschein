@@ -1,62 +1,13 @@
-import { Box, Typography, Button, CircularProgress, TextField } from '@mui/material';
-import { useState, useEffect } from 'react';
+import { Box, Typography, TextField } from '@mui/material';
+import { useState } from 'react';
 import { useGutschein } from '../../context/GutscheinContext';
-import { getAuth } from 'firebase/auth';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useSearchParams } from 'react-router-dom';
 
 export default function Zahlungsdaten() {
   const { data, setData } = useGutschein();
-  const auth = getAuth();
-  const currentUser = auth.currentUser;
-  const firebaseUid = data.firebaseUid || currentUser?.uid || '';
-  const email = currentUser?.email || '';
+  const [touched, setTouched] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
-  const urlStripeAccountId = searchParams.get('stripeAccountId');
-  const [stripeAccountId, setStripeAccountId] = useState<string>(urlStripeAccountId || data.stripeAccountId || '');
-  const [saved, setSaved] = useState(false);
-
-  // Stripe-Account-ID aus URL holen (bei Änderung)
-  useEffect(() => {
-    if (urlStripeAccountId && urlStripeAccountId !== stripeAccountId) {
-      setStripeAccountId(urlStripeAccountId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlStripeAccountId]);
-
-  // Stripe-Account-ID im Context speichern
-  useEffect(() => {
-    if (stripeAccountId) setData({ stripeAccountId });
-  }, [stripeAccountId, setData]);
-
-  // Account-ID im Backend speichern
-  useEffect(() => {
-    const saveStripeAccountId = async () => {
-      if (!firebaseUid || !stripeAccountId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const apiUrl = process.env.REACT_APP_API_URL;
-        const res = await fetch(`${apiUrl}/api/stripeconnect/save-stripe-account-id`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ firebaseUid, stripeAccountId }),
-        });
-        const result = await res.json();
-        if (res.ok && result.success) setSaved(true);
-        else setError(result.error || 'Fehler beim Speichern');
-      } catch (err: any) {
-        setError(err.message || 'Unbekannter Fehler');
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (stripeAccountId) saveStripeAccountId();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stripeAccountId, firebaseUid]);
+  const isValid = data.stripeAccountId?.trim().length > 0;
 
   return (
     <Box sx={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -85,18 +36,20 @@ export default function Zahlungsdaten() {
         variant="outlined"
         required
         fullWidth
-        value={stripeAccountId}
-        onChange={e => setStripeAccountId(e.target.value)}
+        value={data.stripeAccountId || ''}
+        onChange={e => {
+          setData({ ...data, stripeAccountId: e.target.value });
+          setTouched(true);
+        }}
         sx={{ mb: 2 }}
         helperText="Deine Stripe-Account-ID beginnt mit acct_..."
+        error={touched && !isValid}
       />
 
-      {loading && <CircularProgress size={24} sx={{ mb: 2 }} />}
-      {error && <Typography color="error">{error}</Typography>}
-      {saved && stripeAccountId && (
+      {isValid && (
         <Box sx={{ display: 'flex', alignItems: 'center', color: 'green', mb: 2 }}>
           <CheckCircleIcon sx={{ mr: 1 }} />
-          <Typography>Stripe-Konto verbunden: {stripeAccountId}</Typography>
+          <Typography>Stripe-Konto verbunden: {data.stripeAccountId}</Typography>
         </Box>
       )}
     </Box>
