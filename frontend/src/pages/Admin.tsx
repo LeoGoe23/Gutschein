@@ -11,6 +11,7 @@ import LocalActivityIcon from '@mui/icons-material/LocalActivity';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import axios from 'axios';
+import GutscheinDesignAdminEdit from './GutscheinDesignAdminEdit'; // Import hinzufügen
 const API_URL = process.env.REACT_APP_API_URL;
 
 function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: any; color: string; }) {
@@ -47,6 +48,7 @@ export default function AdminPage() {
   const [tagStats, setTagStats] = useState<any[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [shops, setShops] = useState<any[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -343,6 +345,14 @@ export default function AdminPage() {
                           : 'Kein Stripe-Konto verknüpft'
                       }
                     />
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      sx={{ ml: 2 }}
+                      onClick={() => navigate(`/admin/shop/${shop.id}/design`)}
+                    >
+                      Design bearbeiten
+                    </Button>
                     {shop.stripeAccountId && (
                       <Button
                         variant="outlined"

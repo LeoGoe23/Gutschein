@@ -15,47 +15,11 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
   const [customerEmail, setCustomerEmail] = useState<string>('');
 
   const handlePayment = async () => {
-    console.log('DEBUG Payment:', {
-      betrag,
-      customerEmail,
-      stripeAccountId
-    });
-
     if (!betrag || !customerEmail) {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
-
-    // Immer Stripe verwenden, nur Card erlauben
-    try {
-      const slug = window.location.pathname.split('/').pop();
-
-      const response = await fetch(`${API_URL}/api/zahlung/create-stripe-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: betrag * 100,
-          customerEmail,
-          stripeAccountId,
-          slug,
-          provision,
-          paymentMethodTypes: ['card'] // <-- Nur Card erlauben
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        alert('Zahlung fehlgeschlagen: ' + (data?.error || 'Unbekannter Fehler'));
-        return;
-      }
-      const stripe = (window as any).Stripe?.(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
-      if (stripe && data.paymentUrl) {
-        stripe.redirectToCheckout({ sessionId: data.sessionId });
-      } else {
-        window.open(data.paymentUrl, '_blank');
-      }
-    } catch (err: any) {
-      alert('Stripe-Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
-    }
+    onPaymentSuccess(betrag, customerEmail);
   };
 
   return (
@@ -105,26 +69,43 @@ function SuccessPage({
 }) {
   const [isSending, setIsSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const hasSentRef = useRef(false);
-
-  // NEU: Session-ID aus URL holen
-  const sessionId = new URLSearchParams(window.location.search).get('session_id');
-  const sentKey = `gutschein_sent_${sessionId}`;
 
   const generateGutscheinCode = () => {
     return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
   };
 
   useEffect(() => {
+    // Warten bis customerEmail gesetzt ist
+    if (!customerEmail) return;
+    
+    // Session-ID erst hier generieren, wenn customerEmail verfügbar ist
+    const urlSessionId = new URLSearchParams(window.location.search).get('session_id');
+    const sessionId = urlSessionId || `adminfake_${checkoutData.slug}_${customerEmail}_${Date.now()}`; // <-- Timestamp hinzufügen für Eindeutigkeit
+    const sentKey = `gutschein_sent_${sessionId}`;
+    
     // Prüfe, ob für diese Session schon ein Gutschein verschickt wurde
-    if (!sessionId || localStorage.getItem(sentKey)) return; // <--- Hier wird abgebrochen, wenn schon verschickt
-    if (hasSentRef.current) return;
-    hasSentRef.current = true;
+    if (localStorage.getItem(sentKey)) return;
 
     const sendGutscheinEmail = async () => {
       setIsSending(true);
       try {
         const gutscheinCode = generateGutscheinCode();
+        
+        // DEBUG: Was wird an generateGutscheinPDF übergeben?
+        console.log('🐛 Data being passed to generateGutscheinPDF:', {
+          unternehmen: checkoutData.unternehmensname,
+          betrag: selectedDienstleistung ? '' : purchasedBetrag.toString(),
+          gutscheinCode,
+          ausstelltAm: new Date().toLocaleDateString(),
+          website: checkoutData.website,
+          bildURL: checkoutData.bildURL,
+          // KORRIGIERT: gutscheinURL → gutscheinDesignURL
+          gutscheinDesignURL: checkoutData.gutscheinURL,
+          designConfig: checkoutData.designConfig,
+          hasGutscheinURL: !!checkoutData.gutscheinURL,
+          gutscheinURLLength: checkoutData.gutscheinURL?.length || 0
+        });
+        
         // PDF generieren MIT Design-Daten
         const pdfBlob = await generateGutscheinPDF({
           unternehmen: checkoutData.unternehmensname,
@@ -139,9 +120,9 @@ function SuccessPage({
                 longDesc: selectedDienstleistung.longDesc,
               }
             : undefined,
-          // NEU: Design-Daten hinzufügen
-          gutscheinDesignURL: checkoutData.gutscheinURL, // ✅ Richtig: gutscheinURL
-          designConfig: checkoutData.designConfig // <-- Das müssen wir noch zu CheckoutData hinzufügen
+          // KORRIGIERT: Design-Daten hinzufügen
+          gutscheinDesignURL: checkoutData.gutscheinURL, // ✅ Das ist richtig - checkoutData.gutscheinURL enthält die GutscheinDesignURL
+          designConfig: checkoutData.designConfig
         });
 
         // PDF als Base64
@@ -168,7 +149,7 @@ function SuccessPage({
           dienstleistung: selectedDienstleistung,
           pdfBuffer: pdfBase64,
           stripeSessionId: sessionId,
-          slug: checkoutData.slug // <--- HIER HINZUFÜGEN!
+          slug: checkoutData.slug
         };
 
         const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
@@ -217,6 +198,7 @@ function SuccessPage({
           alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
         }
       } catch (error: any) {
+        console.error('❌ Detailed error in sendGutscheinEmail:', error);
         alert(`Fehler beim E-Mail-Versand: ${error?.message || 'Unbekannter Fehler'}`);
       } finally {
         setIsSending(false);
@@ -224,7 +206,7 @@ function SuccessPage({
     };
 
     sendGutscheinEmail();
-  }, [sessionId]);
+  }, [customerEmail, checkoutData.slug, purchasedBetrag, selectedDienstleistung]); // customerEmail als Dependency
 
   return (
     <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -294,6 +276,11 @@ export default function GutscheinLandingPage() {
       try {
         const data = await loadCheckoutDataBySlug(slug);
         if (data) {
+          // DEBUG: Prüfen was wirklich geladen wird
+          console.log('🐛 Loaded CheckoutData:', data);
+          console.log('🐛 gutscheinURL (contains GutscheinDesignURL):', data.gutscheinURL);
+          console.log('🐛 designConfig:', data.designConfig);
+        
           setCheckoutData(data);
           // Nur Hit zählen, wenn KEIN Stripe-Redirect (success) vorliegt und noch nicht getrackt
           const params = new URLSearchParams(window.location.search);
@@ -311,7 +298,6 @@ export default function GutscheinLandingPage() {
         setLoading(false);
       }
     };
-
     loadData();
   }, [slug]);
 
@@ -406,7 +392,7 @@ export default function GutscheinLandingPage() {
     } else {
       localStorage.removeItem('selectedDienstleistung');
     }
-    setShowPaymentForm(true);
+    setShowPaymentForm(true); // <--- PaymentForm anzeigen!
   };
 
   const handleDienstleistungSelect = (dienstleistung: { shortDesc: string; longDesc: string; price: string }) => {

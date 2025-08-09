@@ -45,7 +45,7 @@ export default function Sidebar({ activeStep }: SidebarProps) {
         }
         return true;
       case 4:
-        return !!(data.stripeAccountId);
+        return true; // Stripe-Account-ID ist optional
       case 5:
         // Step 5 ist nur gültig, wenn die AGB akzeptiert wurden
         return !!data.agbAccepted;

@@ -1,8 +1,8 @@
 [
   {
-    "origin": ["https://gutscheinery.de"],
-    "method": ["GET"],
+    "origin": ["*"],
+    "method": ["GET", "HEAD"],
     "maxAgeSeconds": 3600,
-    "responseHeader": ["Content-Type"]
+    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"]
   }
 ]

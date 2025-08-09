@@ -12,9 +12,89 @@ interface GutscheinData {
     shortDesc: string;
     longDesc: string;
   };
+  // NEU: Design-Unterstützung
+  gutscheinDesignURL?: string;
+  designConfig?: {
+    betrag: { x: number; y: number; size: number };
+    code: { x: number; y: number; size: number };
+  };
 }
 
-export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> => { // <- Promise<Blob> statt Promise<void>
+// 🔥 Hilfsfunktion: Bild zu Base64 konvertieren über Backend
+const imageToBase64 = async (imageUrl: string): Promise<string> => {
+  try {
+    console.log('🔄 Converting image to Base64 via backend:', imageUrl);
+    
+    // Backend-Route verwenden
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${API_URL}/api/gutscheine/image-to-base64`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ imageUrl })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Backend conversion failed: ${errorData.error || response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('✅ Image converted via backend proxy');
+    console.log('🎯 Original size:', data.size, 'bytes');
+    console.log('🎯 MIME type:', data.mimeType);
+    
+    return data.base64;
+    
+  } catch (backendError) {
+    console.warn('⚠️ Backend conversion failed, trying direct fetch:', backendError);
+    
+    // Fallback: Versuche direkten Fetch (wird wahrscheinlich CORS-Fehler geben)
+    try {
+      const response = await fetch(imageUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'image/*,*/*;q=0.8'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          console.log('✅ Direct fetch conversion successful');
+          resolve(reader.result as string);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      
+    } catch (directError) {
+      console.error('❌ All conversion methods failed');
+      console.error('Backend error:', (backendError instanceof Error ? backendError.message : String(backendError)));
+      console.error('Direct fetch error:', directError instanceof Error ? directError.message : String(directError));
+      
+      // Als letzter Ausweg: Original URL zurückgeben
+      console.warn('🔄 Using original URL as fallback (may cause CORS issues)');
+      return imageUrl;
+    }
+  }
+};
+
+// A4 Größe in Pixel bei 72 DPI (Standard für jsPDF)
+const A4_WIDTH_PX = 595;
+const A4_HEIGHT_PX = 842;
+
+export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> => {
+  console.log('🎨 Generating PDF with design:', data.gutscheinDesignURL);
+  
   // Container für PDF-Generierung erstellen
   const pdfContent = document.createElement('div');
   pdfContent.style.cssText = `
@@ -25,216 +105,347 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     left: -9999px;
     background: white;
     font-family: Arial, sans-serif;
+    box-sizing: border-box;
   `;
   
-  // HTML-Inhalt generieren - EXAKT wie in Step3.tsx
-  pdfContent.innerHTML = `
-    <div style="
-      width: 595px;
-      height: 842px;
-      position: relative;
-      background-color: #ffffff;
-      overflow: hidden;
-      box-sizing: border-box;
-    ">
-      ${data.bildURL ? `
-      <!-- Unternehmensbild im oberen Bereich -->
-      <div style="
-        width: 100%;
-        height: 210px;
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        margin-bottom: 24px;
-        overflow: hidden;
+  if (data.gutscheinDesignURL && data.designConfig) {
+    console.log('✅ Using custom PNG design');
+    
+    let safeImageUrl = data.gutscheinDesignURL;
+    try {
+      safeImageUrl = await imageToBase64(data.gutscheinDesignURL);
+      console.log('✅ Image successfully converted to Base64');
+    } catch (error) {
+      console.error('❌ Image conversion failed, using original URL:', error);
+    }
+    
+    // 🚨 PROBLEM GEFUNDEN: Editor hat BORDER + PADDING!
+    // Der Editor-Container hat: border: 4px + eventuell padding
+    // Das PDF-Container hat: KEIN border, KEIN padding
+    
+    // KORREKTUR: 4px Border vom Editor abziehen!
+    const EDITOR_BORDER_WIDTH = 4; // Border vom Editor
+    
+    // 🔥 ECHTES PROBLEM: Koordinaten sind relativ zum BROWSER-VIEWPORT, nicht zum Container!
+    // Wir müssen die Container-Position berücksichtigen!
+    
+    // KORREKTUR: Prozentsätze zu Pixeln umrechnen
+    const betragConfig = {
+      x: data.designConfig.betrag.x, // Bereits Pixel
+      y: data.designConfig.betrag.y, // Bereits Pixel
+      size: data.designConfig.betrag.size,
+    };
+    
+    const codeConfig = {
+      x: data.designConfig.code.x, // Bereits Pixel
+      y: data.designConfig.code.y, // Bereits Pixel
+      size: data.designConfig.code.size,
+    };
+    
+    console.log('🎯 Direkte Pixel-Werte:');
+    console.log('🎯 Betrag - Pixel:', betragConfig);
+    console.log('🎯 Code - Pixel:', codeConfig);
+    
+    const displayBetrag = data.dienstleistung 
+      ? `${data.dienstleistung.shortDesc}\n${data.dienstleistung.longDesc}`
+      : `€ ${data.betrag}`;
+    
+    // 🎯 EXAKT gleiche Struktur wie im Editor mit Border!
+    pdfContent.innerHTML = `
+      <div id="design-preview" style="
+        width: 595px;
+        height: 842px;
         position: relative;
+        background-color: #ffffff;
+        overflow: hidden;
+        box-sizing: border-box;
+        border: none; /* KEIN Border im PDF! */
+        box-shadow: none; /* KEIN Schatten im PDF! */
+        border-radius: 0;
       ">
+        <!-- Custom PNG-Hintergrund -->
         <img
-          src="${data.bildURL}"
-          alt="Unternehmensbild"
-          crossorigin="anonymous"
+          src="${safeImageUrl}"
+          alt="Gutschein Design"
           style="
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            min-width: 100%;
-            min-height: 100%;
-            width: auto;
-            height: auto;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
+            z-index: 1;
           "
         />
-      </div>` : ''}
-
-      <!-- Gutschein-Inhalt -->
-      <div style="
-        padding: 32px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 24px;
-        height: ${data.bildURL ? 'calc(842px - 210px - 24px)' : '842px'};
-        justify-content: center;
-        box-sizing: border-box;
-      ">
-        <!-- Überschrift -->
-        <div style="
-          font-weight: bold;
-          text-align: center;
-          color: #1976d2;
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-          font-size: 48px;
-          margin: 0;
-          font-family: Arial, sans-serif;
-          line-height: 1.2;
-        ">
-          GUTSCHEIN
-        </div>
-
-        <!-- Unternehmen -->
-        <div style="
-          font-weight: 600;
-          text-align: center;
-          color: #333;
-          margin: 0;
-          font-size: 28px;
-          font-family: Arial, sans-serif;
-          line-height: 1.2;
-          max-width: 500px;
-          word-wrap: break-word;
-        ">
-          ${data.unternehmen}
-        </div>
-
-        ${data.dienstleistung ? `
-        <!-- Dienstleistung -->
-        <div style="
-          text-align: center;
-          color: #666;
-          font-size: 16px;
-          margin: 8px 0;
-          font-family: Arial, sans-serif;
-          max-width: 400px;
-          word-wrap: break-word;
-          line-height: 1.4;
-        ">
-          <div style="font-size:32px;font-weight:bold;color:#1976d2;">${data.dienstleistung.shortDesc}</div>
-          <div style="font-size:16px;color:#666;">${data.dienstleistung.longDesc}</div>
-        </div>` : `
-        <!-- Betrag -->
-        <div style="
-          background: linear-gradient(45deg, #1976d2 30%, #42a5f5 90%);
-          border-radius: 15px;
-          padding: 20px 40px;
-          box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
-          margin: 16px 0;
-        ">
+        
+        <!-- Text-Overlays - EXAKT wie im Editor -->
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;">
+          <!-- Betrag - ZENTRIERT wie im Editor -->
           <div style="
+            position: absolute;
+            left: 50%;
+            top: ${betragConfig.y}px;
+            transform: translateX(-50%);
+            font-size: ${betragConfig.size}px;
+            color: #fff;
             font-weight: bold;
-            text-align: center;
-            color: #ffffff;
-            font-size: 48px;
-            margin: 0;
+            background: linear-gradient(90deg,#1976d2 80%,#fff 100%);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 3px solid #1976d2;
+            box-shadow: 0 2px 12px rgba(25,118,210,0.25);
+            text-shadow: 0 2px 6px rgba(0,0,0,0.25);
             font-family: Arial, sans-serif;
-            line-height: 1;
+            text-align: center;
+            line-height: 1.2;
           ">
             € ${data.betrag}
           </div>
-        </div>`}
-
-        <!-- Gutscheincode -->
-        <div style="
-          border: 2px dashed #1976d2;
-          padding: 15px 25px;
-          border-radius: 8px;
-          background-color: #f8f9fa;
-          margin: 16px 0;
-        ">
+          
+          <!-- Gutscheincode - ZENTRIERT wie im Editor -->
           <div style="
+            position: absolute;
+            left: 50%;
+            top: ${codeConfig.y}px;
+            transform: translateX(-50%);
+            font-size: ${codeConfig.size}px;
+            color: #fff;
             font-weight: bold;
-            text-align: center;
+            background: linear-gradient(90deg,#d32f2f 80%,#fff 100%);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 3px solid #d32f2f;
+            box-shadow: 0 2px 12px rgba(211,47,47,0.25);
+            text-shadow: 0 2px 6px rgba(0,0,0,0.25);
             font-family: 'Courier New', monospace;
-            color: #1976d2;
-            letter-spacing: 2px;
-            font-size: 20px;
-            margin: 0;
-            line-height: 1;
+            text-align: center;
           ">
             ${data.gutscheinCode}
           </div>
         </div>
-
-        <!-- Gültigkeit -->
+      </div>
+    `;
+  } else {
+    console.log('✅ Using standard layout');
+    
+    // Standard-Layout - auch mit Base64-Konvertierung für bildURL
+    let safeBildURL = data.bildURL;
+    if (data.bildURL) {
+      try {
+        safeBildURL = await imageToBase64(data.bildURL);
+        console.log('✅ Company image converted to Base64');
+      } catch (error) {
+        console.warn('⚠️ Company image conversion failed, using original URL');
+      }
+    }
+    
+    // Standard-Layout (dein bewährter Code)
+    pdfContent.innerHTML = `
+      <div style="
+        width: 595px;
+        height: 842px;
+        position: relative;
+        background-color: #ffffff;
+        overflow: hidden;
+        box-sizing: border-box;
+      ">
+        ${safeBildURL ? `
+        <!-- Unternehmensbild im oberen Bereich -->
         <div style="
-          text-align: center;
-          color: #666;
-          font-weight: 500;
-          font-size: 14px;
-          font-family: Arial, sans-serif;
-          margin: 8px 0;
+          width: 100%;
+          height: 210px;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          margin-bottom: 24px;
+          overflow: hidden;
+          position: relative;
         ">
-          Ausgestellt am: ${data.ausstelltAm}
-        </div>
-
-        ${data.website ? `
-        <!-- Website -->
-        <div style="
-          text-align: center;
-          color: #1976d2;
-          font-weight: 500;
-          font-size: 14px;
-          font-family: Arial, sans-serif;
-          margin: 4px 0;
-        ">
-          ${data.website}
+          <img
+            src="${safeBildURL}"
+            alt="Unternehmensbild"
+            style="
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              min-width: 100%;
+              min-height: 100%;
+              width: auto;
+              height: auto;
+              object-fit: cover;
+            "
+          />
         </div>` : ''}
 
-        <!-- Abschlusstext -->
+        <!-- Gutschein-Inhalt -->
         <div style="
-          margin-top: 16px;
-          padding: 10px 20px;
-          border-top: 1px solid #e0e0e0;
-          width: calc(100% - 40px);
+          padding: 32px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 24px;
+          height: ${safeBildURL ? 'calc(842px - 210px - 24px)' : '842px'};
+          justify-content: center;
+          box-sizing: border-box;
         ">
+          <!-- Überschrift -->
+          <div style="
+            font-weight: bold;
+            text-align: center;
+            color: #1976d2;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            font-size: 48px;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            line-height: 1.2;
+          ">
+            GUTSCHEIN
+          </div>
+
+          <!-- Unternehmen -->
+          <div style="
+            font-weight: 600;
+            text-align: center;
+            color: #333;
+            margin: 0;
+            font-size: 28px;
+            font-family: Arial, sans-serif;
+            line-height: 1.2;
+            max-width: 500px;
+            word-wrap: break-word;
+          ">
+            ${data.unternehmen}
+          </div>
+
+          ${data.dienstleistung ? `
+          <!-- Dienstleistung -->
           <div style="
             text-align: center;
             color: #666;
-            font-style: italic;
-            font-size: 12px;
+            font-size: 16px;
+            margin: 8px 0;
             font-family: Arial, sans-serif;
+            max-width: 400px;
+            word-wrap: break-word;
+            line-height: 1.4;
           ">
-            Wir freuen uns auf Sie!
+            <div style="font-size:32px;font-weight:bold;color:#1976d2;">${data.dienstleistung.shortDesc}</div>
+            <div style="font-size:16px;color:#666;">${data.dienstleistung.longDesc}</div>
+          </div>` : `
+          <!-- Betrag -->
+          <div style="
+            background: linear-gradient(45deg, #1976d2 30%, #42a5f5 90%);
+            border-radius: 15px;
+            padding: 20px 40px;
+            box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
+            margin: 16px 0;
+          ">
+            <div style="
+              font-weight: bold;
+              text-align: center;
+              color: #ffffff;
+              font-size: 48px;
+              margin: 0;
+              font-family: Arial, sans-serif;
+              line-height: 1;
+            ">
+              € ${data.betrag}
+            </div>
+          </div>`}
+
+          <!-- Gutscheincode -->
+          <div style="
+            border: 2px dashed #1976d2;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            margin: 16px 0;
+          ">
+            <div style="
+              font-weight: bold;
+              text-align: center;
+              font-family: 'Courier New', monospace;
+              color: #1976d2;
+              letter-spacing: 2px;
+              font-size: 20px;
+              margin: 0;
+              line-height: 1;
+            ">
+              ${data.gutscheinCode}
+            </div>
+          </div>
+
+          <!-- Gültigkeit -->
+          <div style="
+            text-align: center;
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            margin: 8px 0;
+          ">
+            Ausgestellt am: ${data.ausstelltAm}
+          </div>
+
+          ${data.website ? `
+          <!-- Website -->
+          <div style="
+            text-align: center;
+            color: #1976d2;
+            font-weight: 500;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            margin: 4px 0;
+          ">
+            ${data.website}
+          </div>` : ''}
+
+          <!-- Abschlusstext -->
+          <div style="
+            margin-top: 16px;
+            padding: 10px 20px;
+            border-top: 1px solid #e0e0e0;
+            width: calc(100% - 40px);
+          ">
+            <div style="
+              text-align: center;
+              color: #666;
+              font-style: italic;
+              font-size: 12px;
+              font-family: Arial, sans-serif;
+            ">
+              Wir freuen uns auf Sie!
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  `;
+    `;
+  }
   
   // Element zum DOM hinzufügen
   document.body.appendChild(pdfContent);
 
-  // Warte auf das Laden des Bildes, falls vorhanden
-  if (data.bildURL) {
-    const img: HTMLImageElement | null = pdfContent.querySelector('img');
-    if (img) {
-      img.crossOrigin = 'anonymous'; // CORS für html2canvas
-      await new Promise<void>((resolve, reject) => {
-        if (img.complete) return resolve();
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
-      });
-    }
-  }
+  // Kurz warten damit Base64-Bilder geladen werden
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
-    // Canvas erstellen mit höherer Auflösung für bessere Qualität
-    const canvas = await html2canvas(pdfContent, {
+    // 🎯 EXAKT gleiche Download-Logik wie im Editor!
+    const previewElement = pdfContent.querySelector('#design-preview') as HTMLElement;
+    
+    // Temporär Rand/Schatten entfernen (wie im Editor)
+    previewElement.style.border = 'none';
+    previewElement.style.boxShadow = 'none';
+
+    // Canvas erstellen mit EXAKT gleichen Einstellungen wie Editor
+    const canvas = await html2canvas(previewElement, {
       width: 595,
       height: 842,
-      scale: 3, // Höhere Auflösung für bessere Qualität
+      scale: 4,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       removeContainer: false,
+      imageTimeout: 15000,
+      logging: false
     });
     
     // PDF erstellen im A4 Format
@@ -248,13 +459,13 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     const imgData = canvas.toDataURL('image/png', 1.0);
     pdf.addImage(imgData, 'PNG', 0, 0, 595, 842, '', 'FAST');
     
-    // PDF als Blob zurückgeben statt direkt zu speichern
+    // PDF als Blob zurückgeben
     const pdfBlob = pdf.output('blob');
-
-    return pdfBlob; // <- Blob zurückgeben für E-Mail-Versand
+    console.log('✅ PDF successfully generated with custom design');
+    return pdfBlob;
     
   } catch (error) {
-    console.error('Fehler beim Generieren des PDFs:', error);
+    console.error('❌ Fehler beim Generieren des PDFs:', error);
     throw new Error('PDF konnte nicht generiert werden');
   } finally {
     // Element wieder entfernen

@@ -65,7 +65,7 @@ export default function GutscheinEditorPage() {
     }
 
     try {
-      const newImagePath = `seiten/${slug}/screen`;
+      const newImagePath = `seiten/${slug}/company-image`;
       const newImageURL = await uploadImageToStorage(file, newImagePath);
       showSnackbar('Bild erfolgreich aktualisiert!');
       console.log('Neue Bild-URL:', newImageURL);

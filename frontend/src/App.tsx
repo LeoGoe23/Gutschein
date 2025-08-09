@@ -21,6 +21,8 @@ import Impressum from './components/home/legal/Impressum';
 import AdminPage from './pages/Admin';
 import Kontakt from './pages/Kontakt';
 import Vorteile from './pages/Vorteile';
+import GutscheinDesignAdminEdit from './pages/GutscheinDesignAdminEdit'; // Import ergänzen
+import CheckoutAdmin from './pages/checkoutadmin';
 
 export default function App() {
   return (
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/kontakt" element={<Kontakt />} />
         <Route path="/vorteile" element={<Vorteile />} />
+        <Route path="/admin/shop/:shopId/design" element={<GutscheinDesignAdminEdit />} />
+        <Route path="/checkoutadmin/:slug" element={<CheckoutAdmin />} />
       </Routes>
     </BrowserRouter>
   );

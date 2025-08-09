@@ -12,8 +12,13 @@ export interface CheckoutData {
   StripeAccountId: string;
   website: string;
   telefon: string;
-  userId: string; // <--- NEU
+  userId: string;
   Provision: number;
+  // KORRIGIERT: Positionen sind jetzt DIREKTE PIXEL-WERTE
+  designConfig?: {
+    betrag: { x: number; y: number; size: number }; // x,y = Pixel (absolut)
+    code: { x: number; y: number; size: number };   // x,y = Pixel (absolut)
+  };
 }
 
 export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData | null> => {
@@ -43,8 +48,10 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
       StripeAccountId: userData.Checkout?.StripeAccountId || '',
       website: userData.Unternehmensdaten?.Website || '',
       telefon: userData.Unternehmensdaten?.Telefon || '',
-      userId: userDoc.id, // <--- NEU
-      Provision: userData.Provision || 0
+      userId: userDoc.id,
+      Provision: userData.Provision || 0,
+      // NEU:
+      designConfig: userData.Checkout?.DesignConfig || undefined
     };
 
     console.log('📦 Processed checkout data:', checkoutData);
