@@ -239,7 +239,6 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
       }
     }
     
-    // Standard-Layout (dein bewährter Code)
     pdfContent.innerHTML = `
       <div style="
         width: 595px;

@@ -13,20 +13,18 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string, provision: number }) {
   const [customerEmail, setCustomerEmail] = useState<string>('');
+  const [isTestMode, setIsTestMode] = useState<boolean>(false);
 
   const handlePayment = async () => {
-    console.log('DEBUG Payment:', {
-      betrag,
-      customerEmail,
-      stripeAccountId
-    });
-
     if (!betrag || !customerEmail) {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
 
-    // Immer Stripe verwenden, nur Card erlauben
+    // ✅ FIX: Daten VORHER in localStorage speichern
+    localStorage.setItem('purchasedBetrag', betrag.toString());
+    localStorage.setItem('customerEmail', customerEmail);
+
     try {
       const slug = window.location.pathname.split('/').pop();
 
@@ -38,17 +36,30 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           customerEmail,
           stripeAccountId,
           slug,
-          provision,
-          paymentMethodTypes: ['card'] // <-- Nur Card erlauben
+          provision
         }),
       });
+      
       const data = await response.json();
       if (!response.ok) {
         alert('Zahlung fehlgeschlagen: ' + (data?.error || 'Unbekannter Fehler'));
         return;
       }
-      const stripe = (window as any).Stripe?.(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
+
+      console.log('💳 Payment Mode:', data.testMode ? 'TEST' : 'LIVE');
+      
+      // ✅ FIX: Test-Mode SOFORT setzen, bevor Stripe Key gewählt wird
+      const testMode = data.testMode;
+      setIsTestMode(testMode);
+
+      // Richtigen Stripe Key wählen
+      const stripeKey = testMode 
+        ? process.env.REACT_APP_STRIPE_TEST_KEY 
+        : process.env.REACT_APP_STRIPE_PUBLIC_KEY;
+
+      const stripe = (window as any).Stripe?.(stripeKey);
       if (stripe && data.paymentUrl) {
+        console.log('🚀 Redirecting to Stripe Checkout...');
         stripe.redirectToCheckout({ sessionId: data.sessionId });
       } else {
         window.open(data.paymentUrl, '_blank');
@@ -58,8 +69,30 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     }
   };
 
+  // ✅ NEU: Test-Mode beim ersten Laden anzeigen
+  useEffect(() => {
+    // Backend Test-Mode Status laden
+    const checkTestMode = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/zahlung/test-mode-status`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsTestMode(data.testMode);
+        }
+      } catch (err) {
+        console.log('Test-Mode Status nicht verfügbar');
+      }
+    };
+    checkTestMode();
+  }, []);
+
   return (
     <Box sx={{ mt: 4 }}>
+      {isTestMode && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          🧪 TEST-MODUS: Verwenden Sie Testkarte 4242 4242 4242 4242
+        </Alert>
+      )}
       <TextField
         label="E-Mail-Adresse"
         type="email"
@@ -76,17 +109,17 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           borderRadius: 2,
           px: 4,
           py: 1.5,
-          backgroundColor: '#e0e0e0',
-          color: '#000',
+          backgroundColor: isTestMode ? '#ff9800' : '#1976d2',
+          color: '#fff',
           fontWeight: 600,
           textTransform: 'none',
           boxShadow: 3,
-          '&:hover': { backgroundColor: '#bdbdbd' },
+          '&:hover': { backgroundColor: isTestMode ? '#f57c00' : '#1565c0' },
           mt: 2,
         }}
         onClick={handlePayment}
       >
-        Zahlung abschließen
+        {isTestMode ? '🧪 Test-Zahlung' : 'Zahlung abschließen'}
       </Button>
     </Box>
   );
@@ -111,14 +144,14 @@ function SuccessPage({
   const sessionId = new URLSearchParams(window.location.search).get('session_id');
   const sentKey = `gutschein_sent_${sessionId}`;
 
-  const generateGutscheinCode = () => {
-    return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-  };
-
+  // ✅ FIX: useEffect IMMER am Anfang, vor allen Returns
   useEffect(() => {
     // Prüfe, ob für diese Session schon ein Gutschein verschickt wurde
-    if (!sessionId || localStorage.getItem(sentKey)) return; // <--- Hier wird abgebrochen, wenn schon verschickt
+    if (!sessionId || localStorage.getItem(sentKey)) return;
     if (hasSentRef.current) return;
+    // ✅ FIX: Auch prüfen ob Daten vollständig sind
+    if (!purchasedBetrag || !customerEmail) return;
+    
     hasSentRef.current = true;
 
     const sendGutscheinEmail = async () => {
@@ -224,7 +257,26 @@ function SuccessPage({
     };
 
     sendGutscheinEmail();
-  }, [sessionId]);
+  }, [sessionId, purchasedBetrag, customerEmail]); // ✅ FIX: Dependencies hinzufügen
+
+  const generateGutscheinCode = () => {
+    return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+  };
+
+  // ✅ FIX: Conditional Return NACH useEffect
+  if (!purchasedBetrag || !customerEmail) {
+    return (
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: '#4caf50' }}>
+          Zahlung erfolgreich!
+        </Typography>
+        <Typography variant="body1" sx={{ mb: 4, color: 'grey.600' }}>
+          Ihr Gutschein wird verarbeitet...
+        </Typography>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -329,14 +381,33 @@ export default function GutscheinLandingPage() {
         localStorage.removeItem('selectedDienstleistung');
       }
 
-      // Lade die Stripe-Session-Daten vom Backend
+      // ✅ FIX: Lade die Stripe-Session-Daten VOR dem Success-Page Rendering
       if (sessionId && checkoutData) {
+        console.log('🔍 Loading session data for:', sessionId);
+        
         fetch(`${API_URL}/api/zahlung/stripe-session-info?session_id=${sessionId}&stripeAccountId=${checkoutData.StripeAccountId}`)
-          .then(res => res.json())
+          .then(res => {
+            console.log('📡 Session API Response:', res.status);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          })
           .then(data => {
+            console.log('💰 Session Data:', data);
             if (data && data.amount && data.customerEmail) {
               setPurchasedBetrag(data.amount / 100);
               setCustomerEmail(data.customerEmail);
+            } else {
+              console.error('❌ Invalid session data:', data);
+            }
+          })
+          .catch(error => {
+            console.error('❌ Session API Error:', error);
+            // ✅ FALLBACK: Daten aus localStorage falls API fehlschlägt
+            const fallbackBetrag = localStorage.getItem('purchasedBetrag');
+            const fallbackEmail = localStorage.getItem('customerEmail');
+            if (fallbackBetrag && fallbackEmail) {
+              setPurchasedBetrag(Number(fallbackBetrag));
+              setCustomerEmail(fallbackEmail);
             }
           });
       }
@@ -600,19 +671,13 @@ export default function GutscheinLandingPage() {
                 )}
               </>
             ) : (
-              purchasedBetrag > 0 && customerEmail ? (
-                <SuccessPage 
-                  purchasedBetrag={purchasedBetrag} 
-                  selectedDienstleistung={selectedDienstleistung}
-                  checkoutData={checkoutData}
-                  customerEmail={customerEmail}
-                />
-              ) : (
-                <Box sx={{ textAlign: 'center', mt: 4 }}>
-                  <CircularProgress />
-                  <Typography sx={{ mt: 2 }}>Zahlungsdaten werden geladen...</Typography>
-                </Box>
-              )
+              // ✅ FIX: Success Page auch ohne vollständige Daten anzeigen
+              <SuccessPage 
+                purchasedBetrag={purchasedBetrag} 
+                selectedDienstleistung={selectedDienstleistung}
+                checkoutData={checkoutData}
+                customerEmail={customerEmail}
+              />
             )}
           </Box>
         </Box>
