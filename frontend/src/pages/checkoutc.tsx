@@ -8,6 +8,7 @@ import { saveSoldGutscheinToShop, updateUserEinnahmenStats } from '../utils/save
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { saveAdminStats, saveAdminHit } from '../utils/saveAdminStats';
+import { uploadPDFToStorage, saveGutscheinLink } from '../utils/firebaseStorage';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -138,27 +139,28 @@ function SuccessPage({
 }) {
   const [isSending, setIsSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [downloadLink, setDownloadLink] = useState<string>('');
+  const [pdfGenerated, setPdfGenerated] = useState(false); // NEU: PDF-Status separat tracken
   const hasSentRef = useRef(false);
 
-  // NEU: Session-ID aus URL holen
   const sessionId = new URLSearchParams(window.location.search).get('session_id');
   const sentKey = `gutschein_sent_${sessionId}`;
 
-  // ✅ FIX: useEffect IMMER am Anfang, vor allen Returns
   useEffect(() => {
-    // Prüfe, ob für diese Session schon ein Gutschein verschickt wurde
     if (!sessionId || localStorage.getItem(sentKey)) return;
     if (hasSentRef.current) return;
-    // ✅ FIX: Auch prüfen ob Daten vollständig sind
     if (!purchasedBetrag || !customerEmail) return;
     
     hasSentRef.current = true;
 
     const sendGutscheinEmail = async () => {
       setIsSending(true);
+      
       try {
         const gutscheinCode = generateGutscheinCode();
-        // PDF generieren MIT Design-Daten
+        
+        // 1️⃣ PDF SOFORT generieren und hochladen (passiert schnell)
+        console.log('🎨 Generiere PDF...');
         const pdfBlob = await generateGutscheinPDF({
           unternehmen: checkoutData.unternehmensname,
           betrag: selectedDienstleistung ? '' : purchasedBetrag.toString(),
@@ -172,15 +174,38 @@ function SuccessPage({
                 longDesc: selectedDienstleistung.longDesc,
               }
             : undefined,
-          // NEU: Design-Daten hinzufügen
-          gutscheinDesignURL: checkoutData.gutscheinURL, // ✅ Richtig: gutscheinURL
-          designConfig: checkoutData.designConfig // <-- Das müssen wir noch zu CheckoutData hinzufügen
+          gutscheinDesignURL: checkoutData.gutscheinURL,
+          designConfig: checkoutData.designConfig
         });
 
-        // PDF als Base64
-        const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+        console.log('📤 Lade PDF zu Firebase hoch...');
+        const fileName = `${checkoutData.slug}_${gutscheinCode}_${Date.now()}.pdf`;
+        const downloadURL = await uploadPDFToStorage(pdfBlob, fileName);
         
-        // PDF als Base64 (sicher, ohne Stack Overflow)
+        console.log('💾 Speichere Download-Link...');
+        const linkId = await saveGutscheinLink({
+          gutscheinCode,
+          downloadURL,
+          betrag: purchasedBetrag,
+          empfaengerEmail: customerEmail,
+          unternehmensname: checkoutData.unternehmensname,
+          slug: checkoutData.slug,
+          createdAt: new Date().toISOString(),
+          dienstleistung: selectedDienstleistung?.shortDesc || undefined,
+          stripeSessionId: sessionId || undefined
+        });
+
+        // 2️⃣ DOWNLOAD-LINK SOFORT BEREITSTELLEN (User kann schon downloaden!)
+        const publicDownloadLink = `${API_URL}/api/gutscheine/download/${linkId}`;
+        setDownloadLink(publicDownloadLink);
+        setPdfGenerated(true);
+        console.log('✅ PDF und Download-Link bereit!');
+
+        // 3️⃣ E-Mail ASYNCHRON im Hintergrund versenden (dauert länger)
+        console.log('📧 Verschicke E-Mail im Hintergrund...');
+        
+        // PDF als Base64 für E-Mail konvertieren (dauert am längsten)
+        const pdfArrayBuffer = await pdfBlob.arrayBuffer();
         function arrayBufferToBase64(buffer: ArrayBuffer) {
           let binary = '';
           const bytes = new Uint8Array(buffer);
@@ -193,6 +218,7 @@ function SuccessPage({
         }
         const pdfBase64 = arrayBufferToBase64(pdfArrayBuffer);
 
+        // E-Mail-Versand (läuft parallel, User wartet nicht darauf)
         const emailData = {
           empfaengerEmail: customerEmail,
           unternehmensname: checkoutData.unternehmensname,
@@ -201,66 +227,96 @@ function SuccessPage({
           dienstleistung: selectedDienstleistung,
           pdfBuffer: pdfBase64,
           stripeSessionId: sessionId,
-          slug: checkoutData.slug // <--- HIER HINZUFÜGEN!
+          slug: checkoutData.slug,
+          downloadLink: publicDownloadLink
         };
 
-        const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
+        // E-Mail senden - aber User Interface nicht blockieren
+        fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(emailData),
-        });
-
-        if (response.ok) {
-          setEmailSent(true);
-          localStorage.setItem(sentKey, 'true');
-          // Gutschein in Firebase speichern
-          await saveSoldGutscheinToShop({
-            gutscheinCode,
-            betrag: purchasedBetrag,
-            kaufdatum: new Date().toISOString(),
-            empfaengerEmail: customerEmail,
-            slug: checkoutData.slug,
-            provision: checkoutData.Provision // <--- NEU: Provision wirklich mitschicken!
-          });
-
-          // Statistiken beim User updaten
-          if (checkoutData.userId) {
-            await updateUserEinnahmenStats({
-              userId: checkoutData.userId,
-              betrag: purchasedBetrag,
-              dienstleistung: selectedDienstleistung?.shortDesc,
-              isFreierBetrag: !selectedDienstleistung,
-              provision: checkoutData.Provision // <-- Hinzugefügt
-            });
-          }
-
-          // Nach Gutscheinverkauf:
-          await saveAdminStats({
-            adminId: 'globalAdmin',
-            gutschein: {
+        })
+        .then(async (response) => {
+          if (response.ok) {
+            console.log('✅ E-Mail erfolgreich versendet');
+            setEmailSent(true);
+            localStorage.setItem(sentKey, 'true');
+            
+            // Firebase-Speicherungen im Hintergrund
+            await saveSoldGutscheinToShop({
               gutscheinCode,
               betrag: purchasedBetrag,
               kaufdatum: new Date().toISOString(),
               empfaengerEmail: customerEmail,
-              dienstleistung: selectedDienstleistung?.shortDesc,
+              slug: checkoutData.slug,
+              provision: checkoutData.Provision
+            });
+
+            if (checkoutData.userId) {
+              await updateUserEinnahmenStats({
+                userId: checkoutData.userId,
+                betrag: purchasedBetrag,
+                dienstleistung: selectedDienstleistung?.shortDesc,
+                isFreierBetrag: !selectedDienstleistung,
+                provision: checkoutData.Provision
+              });
             }
-          });
-        } else {
-          const errorData = await response.json();
-          alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}`);
-        }
+
+            await saveAdminStats({
+              adminId: 'globalAdmin',
+              gutschein: {
+                gutscheinCode,
+                betrag: purchasedBetrag,
+                kaufdatum: new Date().toISOString(),
+                empfaengerEmail: customerEmail,
+                dienstleistung: selectedDienstleistung?.shortDesc,
+              }
+            });
+          } else {
+            const errorData = await response.json();
+            console.error('❌ E-Mail-Versand fehlgeschlagen:', errorData.error);
+            // Fehler anzeigen, aber Download-Link bleibt verfügbar
+            alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}\nIhr Gutschein ist trotzdem verfügbar und kann heruntergeladen werden.`);
+          }
+        })
+        .catch((error) => {
+          console.error('❌ E-Mail-Versand-Fehler:', error);
+          alert(`E-Mail-Versand fehlgeschlagen: ${error?.message}\nIhr Gutschein ist trotzdem verfügbar und kann heruntergeladen werden.`);
+        });
+
       } catch (error: any) {
-        alert(`Fehler beim E-Mail-Versand: ${error?.message || 'Unbekannter Fehler'}`);
+        console.error('❌ Fehler bei PDF-Erstellung:', error);
+        alert(`Fehler bei der Gutschein-Erstellung: ${error?.message || 'Unbekannter Fehler'}`);
       } finally {
         setIsSending(false);
       }
     };
 
     sendGutscheinEmail();
-  }, [sessionId, purchasedBetrag, customerEmail]); // ✅ FIX: Dependencies hinzufügen
+  }, [sessionId, purchasedBetrag, customerEmail]);
 
   const generateGutscheinCode = () => {
     return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+  };
+
+  // Download-Handler
+  const handleDownload = async () => {
+    if (!downloadLink) return;
+    
+    try {
+      const response = await fetch(downloadLink);
+      const data = await response.json();
+      
+      if (data.success && data.downloadURL) {
+        window.open(data.downloadURL, '_blank');
+      } else {
+        alert('Download-Link nicht verfügbar');
+      }
+    } catch (error) {
+      console.error('Download-Fehler:', error);
+      alert('Fehler beim Download');
+    }
   };
 
   // ✅ FIX: Conditional Return NACH useEffect
@@ -291,15 +347,69 @@ function SuccessPage({
       <Typography variant="body1" sx={{ mb: 4, color: 'grey.600' }}>
         Wir freuen uns auf Ihren Besuch!
       </Typography>
-      {isSending && (
+      
+      {/* NEU: Verschiedene Status-Anzeigen */}
+      {isSending && !pdfGenerated && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Gutschein wird verschickt...
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={20} />
+            <span>Gutschein wird erstellt...</span>
+          </Box>
         </Alert>
       )}
+
+      {/* NEU: PDF fertig, aber E-Mail wird noch versendet */}
+      {isSending && pdfGenerated && !emailSent && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span>✅ Gutschein erstellt! E-Mail wird versendet...</span>
+            <CircularProgress size={16} />
+          </Box>
+        </Alert>
+      )}
+      
       {emailSent && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          Gutschein wurde erfolgreich an {customerEmail} gesendet!
+          ✅ Gutschein wurde erfolgreich an {customerEmail} gesendet!
         </Alert>
+      )}
+      
+      {/* NEU: Download-Button erscheint SOFORT nach PDF-Erstellung */}
+      {pdfGenerated && downloadLink && (
+        <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            {emailSent 
+              ? "Sie können Ihren Gutschein auch direkt herunterladen:" 
+              : "Ihr Gutschein ist bereit zum Download (E-Mail folgt):"}
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            size="large"
+            onClick={handleDownload}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              backgroundColor: '#1976d2',
+              boxShadow: 3,
+              '&:hover': { 
+                backgroundColor: '#1565c0',
+                boxShadow: 4
+              },
+            }}
+          >
+            📄 Gutschein jetzt herunterladen
+          </Button>
+          
+          {!emailSent && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              Der Download ist sofort verfügbar, auch wenn die E-Mail noch versendet wird.
+            </Typography>
+          )}
+        </Box>
       )}
     </Box>
   );
