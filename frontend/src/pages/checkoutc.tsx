@@ -796,16 +796,19 @@ export default function GutscheinLandingPage() {
         <Box
           sx={{
             width: { xs: '100%', md: '50%' },
-            position: 'relative',
+            position: { xs: 'relative', md: 'fixed' }, // Fixed on desktop, relative on mobile
+            right: { md: 0 }, // Stick to right side on desktop
+            top: { md: 0 }, // Start from top on desktop
+            height: { xs: '300px', md: '100vh' }, // Full viewport height on desktop
             backgroundImage: checkoutData.bildURL ? `url(${checkoutData.bildURL})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundColor: '#222',
-            minHeight: checkoutData.bildURL ? { xs: '300px', md: 'auto' } : { xs: '0', md: 'auto' },
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
             p: 2,
+            zIndex: 1, // Keep
           }}
         >
         </Box>
