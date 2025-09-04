@@ -19,7 +19,9 @@ export const saveSoldGutscheinToShop = async (data: SoldGutscheinData) => {
         betrag: data.betrag,
         kaufdatum: data.kaufdatum,
         empfaengerEmail: data.empfaengerEmail,
-        provision: data.provision, // <--- Wirkliche Provision speichern!
+        provision: data.provision,
+        eingeloest: false, // Neu: Standard ist nicht eingelöst
+        eingeloesetAm: null, // Neu: Datum der Einlösung
       }
     );
     console.log('✅ Gutscheinverkauf im Shop gespeichert:', docRef.id);
