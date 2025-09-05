@@ -25,6 +25,8 @@ import Vorteile from './pages/Vorteile';
 import GutscheinDesignAdminEdit from './pages/GutscheinDesignAdminEdit';
 import CheckoutAdmin from './pages/checkoutadmin';
 import AdminGutscheinVerwaltung from './pages/AdminGutscheinVerwaltung';
+import AdminDemosPage from './pages/AdminDemos';
+import DemoCheckoutPage from './pages/DemoCheckout';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -109,6 +111,8 @@ function AppContent() {
       <Route path="/admin/shop/:shopId/design" element={<GutscheinDesignAdminEdit />} />
       <Route path="/checkoutadmin/:slug" element={<CheckoutAdmin />} />
       <Route path="/admin/gutscheine" element={<AdminGutscheinVerwaltung />} />
+      <Route path="/admin/demos" element={<AdminDemosPage />} />
+      <Route path="/demo/:slug" element={<DemoCheckoutPage />} />
     </Routes>
   );
 }
