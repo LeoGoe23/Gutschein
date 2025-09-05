@@ -73,10 +73,14 @@ const extractDienstleistungen = (gutscheinarten: any): any[] => {
       dienstleistungen.push({
         shortDesc: item.name,
         longDesc: item.beschreibung || item.name,
-        price: item.preis.toString()
+        price: item.preis.toString(),
+        reihenfolge: item.reihenfolge || 0 // NEU: Reihenfolge hinzufügen
       });
     }
   });
+  
+  // NEU: Nach Reihenfolge sortieren
+  dienstleistungen.sort((a, b) => a.reihenfolge - b.reihenfolge);
   
   return dienstleistungen;
 };

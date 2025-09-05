@@ -330,9 +330,18 @@ export default function AdminPage() {
 
           {/* Shops & Stripe-Konten */}
           <Box sx={{ mt: 6 }}>
-            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-              Shops & Stripe-Konten
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                Shops & Stripe-Konten
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/admin/gutscheine')}
+                sx={{ ml: 2 }}
+              >
+                Gutscheine verwalten
+              </Button>
+            </Box>
             <Paper elevation={2} sx={{ p: 2, borderRadius: 3 }}>
               <List>
                 {shops.map(shop => (
