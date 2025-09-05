@@ -815,3 +815,17 @@ export default function GutscheinLandingPage() {
       </Box>
   );
 }
+
+// Falls Sie eine Funktion haben, die alle Gutscheinarten lädt:
+const loadAllGutscheinarten = (gutscheinarten: any) => {
+  const items = Object.keys(gutscheinarten).map(key => ({
+    id: key,
+    ...gutscheinarten[key],
+    reihenfolge: gutscheinarten[key].reihenfolge || 0
+  }));
+  
+  // Nach Reihenfolge sortieren
+  items.sort((a, b) => a.reihenfolge - b.reihenfolge);
+  
+  return items;
+};
