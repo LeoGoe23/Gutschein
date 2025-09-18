@@ -108,18 +108,18 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         // ✅ Elements mit E-Mail vorausfüllen
         const elementsInstance = stripe.elements({
           clientSecret: data.clientSecret,
-          // ✅ WICHTIG: appearance und andere Optionen
           appearance: {
             theme: 'stripe',
             variables: {
               colorPrimary: '#1976d2',
             }
           },
-          // ✅ WICHTIG: stripeAccount NUR wenn Live-Mode UND AccountId vorhanden
+          // ✅ WICHTIG: API Version spezifizieren
+          mode: 'payment',
+          // ✅ NEU: Explizite Konfiguration
           ...((!isTestMode && stripeAccountId) ? { 
             stripeAccount: stripeAccountId 
           } : {}),
-          // ✅ Loader für bessere UX
           loader: 'auto'
         });
 
