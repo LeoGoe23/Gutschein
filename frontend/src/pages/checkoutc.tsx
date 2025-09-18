@@ -108,13 +108,19 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         // ✅ Elements mit E-Mail vorausfüllen
         const elementsInstance = stripe.elements({
           clientSecret: data.clientSecret,
-          // ✅ KRITISCH: stripeAccount für Live-Modus setzen
-          ...(isTestMode ? {} : { stripeAccount: stripeAccountId }),
-          defaultValues: {
-            billingDetails: {
-              email: customerEmail
+          // ✅ WICHTIG: appearance und andere Optionen
+          appearance: {
+            theme: 'stripe',
+            variables: {
+              colorPrimary: '#1976d2',
             }
-          }
+          },
+          // ✅ WICHTIG: stripeAccount NUR wenn Live-Mode UND AccountId vorhanden
+          ...((!isTestMode && stripeAccountId) ? { 
+            stripeAccount: stripeAccountId 
+          } : {}),
+          // ✅ Loader für bessere UX
+          loader: 'auto'
         });
 
         setElements(elementsInstance);
@@ -135,21 +141,45 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     const container = document.getElementById('payment-element');
     if (!container) return;
     
-    console.log('🎯 Erstelle Payment Element...');
+    console.log('🎯 Erstelle Payment Element für Payment Intent...');
     
+    // ✅ WICHTIG: Einfache Payment Element Config
     const paymentElementInstance = elements.create('payment', {
-      layout: { type: 'tabs', defaultCollapsed: false },
+      layout: { 
+        type: 'tabs',
+        defaultCollapsed: false,
+        radios: false,
+        spacedAccordionItems: true
+      },
+      // ✅ WICHTIG: Explizite Payment Method Types
       paymentMethodOrder: ['sepa_debit', 'card', 'sofort', 'giropay'],
-      fields: { billingDetails: 'auto' },
-      terms: { sepaDebit: 'always' }
+      fields: {
+        billingDetails: {
+          name: 'auto',
+          email: 'auto',
+          address: 'never'
+        }
+      },
+      terms: {
+        sepaDebit: 'always'
+      },
+      wallets: {
+        applePay: 'never',
+        googlePay: 'never'
+      }
     });
     
     paymentElementInstance.mount('#payment-element');
     setPaymentElement(paymentElementInstance);
     
+    console.log('✅ Payment Element gemountet (Payment Intent Mode)');
+    
     return () => {
-      // Cleanup beim Unmount
-      paymentElementInstance.unmount();
+      try {
+        paymentElementInstance.unmount();
+      } catch (e) {
+        // Element bereits unmounted
+      }
     };
   }, [elements, clientSecret]);
 
