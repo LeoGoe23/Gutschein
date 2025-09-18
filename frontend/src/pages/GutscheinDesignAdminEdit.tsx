@@ -387,15 +387,8 @@ export default function GutscheinDesignAdminEdit() {
                       <Typography
                         sx={{
                           fontSize: `${betragConfig.size}px`,
-                          color: '#fff',
+                          color: '#000', // Schwarzer Text
                           fontWeight: 'bold',
-                          background: 'linear-gradient(90deg,#1976d2 80%,#fff 100%)',
-                          px: 2,
-                          py: 1,
-                          borderRadius: 2,
-                          border: '3px solid #1976d2',
-                          boxShadow: '0 2px 12px rgba(25,118,210,0.25)',
-                          textShadow: '0 2px 6px rgba(0,0,0,0.25)',
                           userSelect: 'none'
                         }}
                       >
@@ -419,15 +412,8 @@ export default function GutscheinDesignAdminEdit() {
                       <Typography
                         sx={{
                           fontSize: `${codeConfig.size}px`,
-                          color: '#fff',
+                          color: '#000', // Schwarzer Text
                           fontWeight: 'bold',
-                          background: 'linear-gradient(90deg,#d32f2f 80%,#fff 100%)',
-                          px: 2,
-                          py: 1,
-                          borderRadius: 2,
-                          border: '3px solid #d32f2f',
-                          boxShadow: '0 2px 12px rgba(211,47,47,0.25)',
-                          textShadow: '0 2px 6px rgba(0,0,0,0.25)',
                           userSelect: 'none'
                         }}
                       >
@@ -467,23 +453,25 @@ export default function GutscheinDesignAdminEdit() {
                 <Box>
                   <Typography variant="body2" sx={{ mb: 1 }}>Betrag Größe</Typography>
                   <TextField
-                    label="Größe"
+                    label="Größe (px)"
                     type="number"
                     value={betragConfig.size}
                     onChange={e => setBetragConfig({ ...betragConfig, size: Number(e.target.value) })}
                     size="small"
-                    sx={{ width: 80 }}
+                    sx={{ width: 100 }}
+                    inputProps={{ min: 8, max: 72 }} // Mindest- und Maximalwerte
                   />
                 </Box>
                 <Box>
                   <Typography variant="body2" sx={{ mb: 1 }}>Code Größe</Typography>
                   <TextField
-                    label="Größe"
+                    label="Größe (px)"
                     type="number"
                     value={codeConfig.size}
                     onChange={e => setCodeConfig({ ...codeConfig, size: Number(e.target.value) })}
                     size="small"
-                    sx={{ width: 80 }}
+                    sx={{ width: 100 }}
+                    inputProps={{ min: 8, max: 72 }} // Mindest- und Maximalwerte
                   />
                 </Box>
               </Box>
