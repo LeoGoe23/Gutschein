@@ -16,18 +16,39 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [isTestMode, setIsTestMode] = useState<boolean>(false);
 
+  // ✅ FIX: Test-Mode Status SOFORT beim Laden abrufen
+  useEffect(() => {
+    const checkTestMode = async () => {
+      try {
+        console.log('🔍 Prüfe Test-Mode Status...');
+        const response = await fetch(`${API_URL}/api/zahlung/test-mode-status`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📋 Test-Mode Status:', data);
+          setIsTestMode(data.testMode);
+        }
+      } catch (err) {
+        console.log('❌ Test-Mode Status nicht verfügbar:', err);
+        // Fallback: Frontend .env prüfen
+        setIsTestMode(process.env.REACT_APP_STRIPE_TEST_MODE === 'true');
+      }
+    };
+    checkTestMode();
+  }, []);
+
   const handlePayment = async () => {
     if (!betrag || !customerEmail) {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
 
-    // ✅ FIX: Daten VORHER in localStorage speichern
     localStorage.setItem('purchasedBetrag', betrag.toString());
     localStorage.setItem('customerEmail', customerEmail);
 
     try {
       const slug = window.location.pathname.split('/').pop();
+
+      console.log('💳 Sende Payment Request...', { testMode: isTestMode });
 
       const response = await fetch(`${API_URL}/api/zahlung/create-stripe-session`, {
         method: 'POST',
@@ -47,16 +68,18 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         return;
       }
 
-      console.log('💳 Payment Mode:', data.testMode ? 'TEST' : 'LIVE');
+      console.log('💳 Payment Response:', data);
       
-      // ✅ FIX: Test-Mode SOFORT setzen, bevor Stripe Key gewählt wird
-      const testMode = data.testMode;
-      setIsTestMode(testMode);
+      // Test-Mode aus Response aktualisieren
+      if (typeof data.testMode === 'boolean') {
+        setIsTestMode(data.testMode);
+      }
 
-      // Richtigen Stripe Key wählen
-      const stripeKey = testMode 
+      const stripeKey = data.testMode 
         ? process.env.REACT_APP_STRIPE_TEST_KEY 
         : process.env.REACT_APP_STRIPE_PUBLIC_KEY;
+
+      console.log('🔑 Verwendeter Stripe Key:', data.testMode ? 'TEST' : 'LIVE');
 
       const stripe = (window as any).Stripe?.(stripeKey);
       if (stripe && data.paymentUrl) {
@@ -70,30 +93,23 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     }
   };
 
-  // ✅ NEU: Test-Mode beim ersten Laden anzeigen
-  useEffect(() => {
-    // Backend Test-Mode Status laden
-    const checkTestMode = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/zahlung/test-mode-status`);
-        if (response.ok) {
-          const data = await response.json();
-          setIsTestMode(data.testMode);
-        }
-      } catch (err) {
-        console.log('Test-Mode Status nicht verfügbar');
-      }
-    };
-    checkTestMode();
-  }, []);
-
   return (
     <Box sx={{ mt: 4 }}>
+      {/* ✅ FIX: Test-Mode Warnung deutlicher anzeigen */}
       {isTestMode && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          🧪 TEST-MODUS: Verwenden Sie Testkarte 4242 4242 4242 4242
+        <Alert 
+          severity="warning" 
+          sx={{ 
+            mb: 2,
+            backgroundColor: '#fff3e0',
+            borderColor: '#ff9800',
+            '& .MuiAlert-icon': { color: '#ff9800' }
+          }}
+        >
+          🧪 <strong>TEST-MODUS</strong>: Verwenden Sie Testkarte <code>4242 4242 4242 4242</code>
         </Alert>
       )}
+      
       <TextField
         label="E-Mail-Adresse"
         type="email"
@@ -103,6 +119,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         fullWidth
         sx={{ mb: 2 }}
       />
+      
       <Button
         variant="contained"
         size="large"
@@ -110,18 +127,44 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           borderRadius: 2,
           px: 4,
           py: 1.5,
+          // ✅ FIX: Deutliche Farbunterscheidung für Test-Mode
           backgroundColor: isTestMode ? '#ff9800' : '#1976d2',
           color: '#fff',
           fontWeight: 600,
           textTransform: 'none',
           boxShadow: 3,
-          '&:hover': { backgroundColor: isTestMode ? '#f57c00' : '#1565c0' },
+          '&:hover': { 
+            backgroundColor: isTestMode ? '#f57c00' : '#1565c0',
+            boxShadow: 4
+          },
           mt: 2,
+          // ✅ Zusätzlicher visueller Hinweis für Test-Mode
+          ...(isTestMode && {
+            border: '2px solid #ff6f00',
+            animation: 'pulse 2s infinite'
+          })
         }}
         onClick={handlePayment}
       >
-        {isTestMode ? '🧪 Test-Zahlung' : 'Zahlung abschließen'}
+        {/* ✅ FIX: Deutlicher Text-Unterschied */}
+        {isTestMode ? '🧪 Test-Zahlung durchführen' : '💳 Zahlung abschließen'}
       </Button>
+      
+      {/* ✅ Zusätzlicher Hinweis für Test-Mode */}
+      {isTestMode && (
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            display: 'block', 
+            mt: 1, 
+            color: '#ff9800',
+            fontWeight: 600,
+            textAlign: 'center'
+          }}
+        >
+          Dies ist eine Test-Transaktion - kein echtes Geld wird abgebucht
+        </Typography>
+      )}
     </Box>
   );
 }
