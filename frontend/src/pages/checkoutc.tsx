@@ -108,6 +108,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         // ✅ Elements mit E-Mail vorausfüllen
         const elementsInstance = stripe.elements({
           clientSecret: data.clientSecret,
+          // ✅ KRITISCH: stripeAccount für Live-Modus setzen
           ...(isTestMode ? {} : { stripeAccount: stripeAccountId }),
           defaultValues: {
             billingDetails: {
@@ -116,40 +117,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           }
         });
 
-        // ✅ Payment Element erstellen mit SEPA zuerst
-        const paymentElementInstance = elementsInstance.create('payment', {
-          layout: {
-            type: 'tabs',
-            defaultCollapsed: false
-          },
-          paymentMethodOrder: [
-            'sepa_debit',     // 🏦 SEPA-Lastschrift ZUERST
-            'card',           // 💳 Kreditkarten
-            'sofort',         // ⚡ Sofort
-            'giropay'         // 💶 Giropay
-          ],
-          // ✅ VEREINFACHT: Lass Stripe die Felder automatisch verwalten
-          fields: {
-            billingDetails: 'auto'  // Stripe entscheidet automatisch
-          },
-          terms: {
-            sepaDebit: 'always'
-          }
-        });
-        
         setElements(elementsInstance);
-        setPaymentElement(paymentElementInstance);
-
-        // Payment Element mounten
-        setTimeout(() => {
-          const container = document.getElementById('payment-element');
-          if (container && paymentElementInstance) {
-            console.log('🎯 Payment Element wird gemountet...');
-            paymentElementInstance.mount('#payment-element');
-          } else {
-            console.error('❌ Payment Element Container nicht gefunden!');
-          }
-        }, 100);
 
       } catch (err) {
         console.error('❌ Fehler beim Erstellen des Payment Intent:', err);
@@ -159,6 +127,31 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
 
     createPaymentIntent();
   }, [stripe, betrag, customerEmail, stripeAccountId, isTestMode]);
+
+  // ✅ BESSER: Separater useEffect für Payment Element
+  useEffect(() => {
+    if (!elements || !clientSecret) return;
+    
+    const container = document.getElementById('payment-element');
+    if (!container) return;
+    
+    console.log('🎯 Erstelle Payment Element...');
+    
+    const paymentElementInstance = elements.create('payment', {
+      layout: { type: 'tabs', defaultCollapsed: false },
+      paymentMethodOrder: ['sepa_debit', 'card', 'sofort', 'giropay'],
+      fields: { billingDetails: 'auto' },
+      terms: { sepaDebit: 'always' }
+    });
+    
+    paymentElementInstance.mount('#payment-element');
+    setPaymentElement(paymentElementInstance);
+    
+    return () => {
+      // Cleanup beim Unmount
+      paymentElementInstance.unmount();
+    };
+  }, [elements, clientSecret]);
 
   const handlePayment = async () => {
     if (!stripe || !elements || !clientSecret) {
