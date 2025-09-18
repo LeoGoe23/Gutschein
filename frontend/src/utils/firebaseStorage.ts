@@ -27,7 +27,7 @@ export const uploadPDFToStorage = async (pdfBlob: Blob, fileName: string): Promi
 };
 
 // Gutschein-Link in Firestore speichern
-export const saveGutscheinLink = async (gutscheinData: {
+export const saveGutscheinLink = async (data: {
   gutscheinCode: string;
   downloadURL: string;
   betrag: number;
@@ -36,25 +36,27 @@ export const saveGutscheinLink = async (gutscheinData: {
   slug: string;
   createdAt: string;
   dienstleistung?: string;
-  stripeSessionId?: string;
-}): Promise<string> => {
+  paymentIntentId?: string; // ✅ ÄNDERUNG: paymentIntentId statt stripeSessionId
+  stripeSessionId?: string; // ✅ OPTIONAL: Für Rückwärtskompatibilität
+}) => {
   try {
     console.log('💾 Saving gutschein link to Firestore');
     
     // NEU: Undefined-Werte filtern
     const cleanData = {
-      gutscheinCode: gutscheinData.gutscheinCode,
-      downloadURL: gutscheinData.downloadURL,
-      betrag: gutscheinData.betrag,
-      empfaengerEmail: gutscheinData.empfaengerEmail,
-      unternehmensname: gutscheinData.unternehmensname,
-      slug: gutscheinData.slug,
-      createdAt: gutscheinData.createdAt,
+      gutscheinCode: data.gutscheinCode,
+      downloadURL: data.downloadURL,
+      betrag: data.betrag,
+      empfaengerEmail: data.empfaengerEmail,
+      unternehmensname: data.unternehmensname,
+      slug: data.slug,
+      createdAt: data.createdAt,
       clicks: 0, // Download-Counter
       lastAccessed: null,
       // Nur hinzufügen wenn nicht undefined
-      ...(gutscheinData.dienstleistung && { dienstleistung: gutscheinData.dienstleistung }),
-      ...(gutscheinData.stripeSessionId && { stripeSessionId: gutscheinData.stripeSessionId })
+      ...(data.dienstleistung && { dienstleistung: data.dienstleistung }),
+      ...(data.paymentIntentId && { paymentIntentId: data.paymentIntentId }),
+      ...(data.stripeSessionId && { stripeSessionId: data.stripeSessionId })
     };
     
     console.log('📋 Clean data to save:', cleanData);

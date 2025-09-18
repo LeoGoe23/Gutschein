@@ -15,87 +15,203 @@ const API_URL = process.env.REACT_APP_API_URL;
 function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: { betrag: number | null; onPaymentSuccess: (betrag: number, email: string) => void, stripeAccountId: string, provision: number }) {
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [isTestMode, setIsTestMode] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [stripe, setStripe] = useState<any>(null);
+  const [elements, setElements] = useState<any>(null);
+  const [clientSecret, setClientSecret] = useState<string>('');
+  const [paymentElement, setPaymentElement] = useState<any>(null);
+  const [error, setError] = useState<string>(''); // ✅ NEU: Error State
 
-  // ✅ FIX: Test-Mode Status SOFORT beim Laden abrufen
+  // ✅ DEBUG: Stripe initialisieren
   useEffect(() => {
-    const checkTestMode = async () => {
+    const initializeStripe = async () => {
       try {
-        console.log('🔍 Prüfe Test-Mode Status...');
+        console.log('🔄 Initialisiere Stripe...');
+        
+        // Test-Mode Status abrufen
         const response = await fetch(`${API_URL}/api/zahlung/test-mode-status`);
         if (response.ok) {
           const data = await response.json();
-          console.log('📋 Test-Mode Status:', data);
+          console.log('📊 Test-Mode Response:', data);
           setIsTestMode(data.testMode);
+          
+          // Richtigen Stripe Key wählen
+          const stripeKey = data.testMode 
+            ? process.env.REACT_APP_STRIPE_TEST_KEY 
+            : process.env.REACT_APP_STRIPE_PUBLIC_KEY;
+
+          console.log('🔑 Verwende Stripe Key:', stripeKey ? 'Key vorhanden' : 'Key fehlt!');
+
+          // Stripe laden
+          const stripeInstance = (window as any).Stripe?.(stripeKey);
+          console.log('🎯 Stripe Instance:', stripeInstance ? 'Geladen' : 'Fehler!');
+          setStripe(stripeInstance);
+        } else {
+          console.error('❌ Test-Mode Status konnte nicht abgerufen werden');
+          // Fallback
+          setIsTestMode(process.env.REACT_APP_STRIPE_TEST_MODE === 'true');
         }
       } catch (err) {
-        console.log('❌ Test-Mode Status nicht verfügbar:', err);
-        // Fallback: Frontend .env prüfen
+        console.error('❌ Fehler beim Initialisieren von Stripe:', err);
+        setError('Stripe konnte nicht geladen werden');
         setIsTestMode(process.env.REACT_APP_STRIPE_TEST_MODE === 'true');
       }
     };
-    checkTestMode();
+
+    initializeStripe();
   }, []);
 
-  const handlePayment = async () => {
-    if (!betrag || !customerEmail) {
-      alert('Bitte füllen Sie alle Felder aus.');
+  // ✅ DEBUG: Payment Intent erstellen
+  useEffect(() => {
+    if (!stripe || !betrag || !customerEmail) {
+      console.log('⏳ Warte auf:', { 
+        stripe: !!stripe, 
+        betrag: !!betrag, 
+        customerEmail: !!customerEmail 
+      });
       return;
     }
 
-    localStorage.setItem('purchasedBetrag', betrag.toString());
-    localStorage.setItem('customerEmail', customerEmail);
+    const createPaymentIntent = async () => {
+      try {
+        console.log('💳 Erstelle Payment Intent...');
+        const slug = window.location.pathname.split('/').pop();
 
-    try {
-      const slug = window.location.pathname.split('/').pop();
-
-      console.log('💳 Sende Payment Request...', { testMode: isTestMode });
-
-      const response = await fetch(`${API_URL}/api/zahlung/create-stripe-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        const requestData = {
           amount: betrag * 100,
           customerEmail,
-          stripeAccountId,
+          stripeAccountId: isTestMode ? null : stripeAccountId,
           slug,
           provision
-        }),
+        };
+
+        console.log('📤 Request Data:', requestData);
+
+        const response = await fetch(`${API_URL}/api/zahlung/create-payment-intent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData),
+        });
+
+        const data = await response.json();
+        console.log('📥 Response:', data);
+
+        if (!response.ok) {
+          console.error('❌ Payment Intent Fehler:', data.error);
+          setError(`Payment Intent Fehler: ${data.error}`);
+          return;
+        }
+
+        setClientSecret(data.clientSecret);
+        console.log('✅ Client Secret erhalten');
+
+        // ✅ Elements mit E-Mail vorausfüllen
+        const elementsInstance = stripe.elements({
+          clientSecret: data.clientSecret,
+          ...(isTestMode ? {} : { stripeAccount: stripeAccountId }),
+          defaultValues: {
+            billingDetails: {
+              email: customerEmail
+            }
+          }
+        });
+
+        // ✅ Payment Element erstellen mit SEPA zuerst
+        const paymentElementInstance = elementsInstance.create('payment', {
+          layout: {
+            type: 'tabs',
+            defaultCollapsed: false
+          },
+          paymentMethodOrder: [
+            'sepa_debit',     // 🏦 SEPA-Lastschrift ZUERST
+            'card',           // 💳 Kreditkarten
+            'sofort',         // ⚡ Sofort
+            'giropay'         // 💶 Giropay
+          ],
+          // ✅ VEREINFACHT: Lass Stripe die Felder automatisch verwalten
+          fields: {
+            billingDetails: 'auto'  // Stripe entscheidet automatisch
+          },
+          terms: {
+            sepaDebit: 'always'
+          }
+        });
+        
+        setElements(elementsInstance);
+        setPaymentElement(paymentElementInstance);
+
+        // Payment Element mounten
+        setTimeout(() => {
+          const container = document.getElementById('payment-element');
+          if (container && paymentElementInstance) {
+            console.log('🎯 Payment Element wird gemountet...');
+            paymentElementInstance.mount('#payment-element');
+          } else {
+            console.error('❌ Payment Element Container nicht gefunden!');
+          }
+        }, 100);
+
+      } catch (err) {
+        console.error('❌ Fehler beim Erstellen des Payment Intent:', err);
+        setError(`Fehler: ${err}`);
+      }
+    };
+
+    createPaymentIntent();
+  }, [stripe, betrag, customerEmail, stripeAccountId, isTestMode]);
+
+  const handlePayment = async () => {
+    if (!stripe || !elements || !clientSecret) {
+      alert('Stripe ist noch nicht bereit. Bitte warten Sie einen Moment.');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href
+        },
+        redirect: 'if_required'
       });
       
-      const data = await response.json();
-      if (!response.ok) {
-        alert('Zahlung fehlgeschlagen: ' + (data?.error || 'Unbekannter Fehler'));
-        return;
-      }
-
-      console.log('💳 Payment Response:', data);
-      
-      // Test-Mode aus Response aktualisieren
-      if (typeof data.testMode === 'boolean') {
-        setIsTestMode(data.testMode);
-      }
-
-      const stripeKey = data.testMode 
-        ? process.env.REACT_APP_STRIPE_TEST_KEY 
-        : process.env.REACT_APP_STRIPE_PUBLIC_KEY;
-
-      console.log('🔑 Verwendeter Stripe Key:', data.testMode ? 'TEST' : 'LIVE');
-
-      const stripe = (window as any).Stripe?.(stripeKey);
-      if (stripe && data.paymentUrl) {
-        console.log('🚀 Redirecting to Stripe Checkout...');
-        stripe.redirectToCheckout({ sessionId: data.sessionId });
-      } else {
-        window.open(data.paymentUrl, '_blank');
+      if (error) {
+        console.error('Payment Error:', error);
+        alert(`Zahlung fehlgeschlagen: ${error.message}`);
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        console.log('✅ Payment successful:', paymentIntent.id);
+        // Success direkt aufrufen - keine Weiterleitung!
+        onPaymentSuccess(betrag!, customerEmail);
       }
     } catch (err: any) {
-      alert('Stripe-Zahlung fehlgeschlagen: ' + (err?.message || 'Netzwerkfehler'));
+      console.error('Payment Exception:', err);
+      alert('Zahlung fehlgeschlagen: ' + (err?.message || 'Unbekannter Fehler'));
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
     <Box sx={{ mt: 4 }}>
-      {/* ✅ FIX: Test-Mode Warnung deutlicher anzeigen */}
+      {/* ✅ DEBUG: Error-Anzeige */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* ✅ DEBUG: Loading-Anzeige */}
+      {!stripe && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={20} />
+            <span>Lade Stripe...</span>
+          </Box>
+        </Alert>
+      )}
+
       {isTestMode && (
         <Alert 
           severity="warning" 
@@ -117,8 +233,27 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         onChange={(e) => setCustomerEmail(e.target.value)}
         required
         fullWidth
-        sx={{ mb: 2 }}
+        sx={{ mb: 3 }}
       />
+
+      {/* Stripe Payment Element Container */}
+      {clientSecret && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Zahlungsmethode wählen
+          </Typography>
+          <Box 
+            id="payment-element"
+            sx={{
+              padding: 2,
+              border: '1px solid #e0e0e0',
+              borderRadius: 2,
+              backgroundColor: '#fafafa',
+              minHeight: '200px' // ✅ NEU: Mindesthöhe für bessere Sichtbarkeit
+            }}
+          />
+        </Box>
+      )}
       
       <Button
         variant="contained"
@@ -127,7 +262,6 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           borderRadius: 2,
           px: 4,
           py: 1.5,
-          // ✅ FIX: Deutliche Farbunterscheidung für Test-Mode
           backgroundColor: isTestMode ? '#ff9800' : '#1976d2',
           color: '#fff',
           fontWeight: 600,
@@ -137,20 +271,29 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
             backgroundColor: isTestMode ? '#f57c00' : '#1565c0',
             boxShadow: 4
           },
+          '&:disabled': {
+            backgroundColor: '#ccc',
+            color: '#666'
+          },
           mt: 2,
-          // ✅ Zusätzlicher visueller Hinweis für Test-Mode
-          ...(isTestMode && {
-            border: '2px solid #ff6f00',
-            animation: 'pulse 2s infinite'
-          })
+          width: '100%'
         }}
         onClick={handlePayment}
+        disabled={isProcessing || !clientSecret || !customerEmail || !!error}
       >
-        {/* ✅ FIX: Deutlicher Text-Unterschied */}
-        {isTestMode ? '🧪 Test-Zahlung durchführen' : '💳 Zahlung abschließen'}
+        {isProcessing ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={20} color="inherit" />
+            Zahlung wird verarbeitet...
+          </Box>
+        ) : (
+          <>
+            {isTestMode ? '🧪 Test-Zahlung durchführen' : '💳 Zahlung abschließen'}
+            {betrag && ` (${betrag}€)`}
+          </>
+        )}
       </Button>
       
-      {/* ✅ Zusätzlicher Hinweis für Test-Mode */}
       {isTestMode && (
         <Typography 
           variant="caption" 
@@ -183,14 +326,16 @@ function SuccessPage({
   const [isSending, setIsSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [downloadLink, setDownloadLink] = useState<string>('');
-  const [pdfGenerated, setPdfGenerated] = useState(false); // NEU: PDF-Status separat tracken
+  const [pdfGenerated, setPdfGenerated] = useState(false);
   const hasSentRef = useRef(false);
 
-  const sessionId = new URLSearchParams(window.location.search).get('session_id');
-  const sentKey = `gutschein_sent_${sessionId}`;
+  // ✅ ÄNDERUNG: Keine sessionId mehr - verwende paymentIntentId oder Timestamp
+  const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const sentKey = `gutschein_sent_${paymentId}`;
 
   useEffect(() => {
-    if (!sessionId || localStorage.getItem(sentKey)) return;
+    // ✅ ÄNDERUNG: Keine sessionId-Checks mehr
+    if (localStorage.getItem(sentKey)) return;
     if (hasSentRef.current) return;
     if (!purchasedBetrag || !customerEmail) return;
     
@@ -202,7 +347,6 @@ function SuccessPage({
       try {
         const gutscheinCode = generateGutscheinCode();
         
-        // 1️⃣ PDF SOFORT generieren und hochladen (passiert schnell)
         console.log('🎨 Generiere PDF...');
         const pdfBlob = await generateGutscheinPDF({
           unternehmen: checkoutData.unternehmensname,
@@ -235,25 +379,19 @@ function SuccessPage({
           slug: checkoutData.slug,
           createdAt: new Date().toISOString(),
           dienstleistung: selectedDienstleistung?.shortDesc || undefined,
-          stripeSessionId: sessionId || undefined
+          paymentIntentId: paymentId // ✅ ÄNDERUNG: paymentIntentId statt sessionId
         });
 
-        // 2️⃣ DOWNLOAD-LINK SOFORT BEREITSTELLEN (User kann schon downloaden!)
         const publicDownloadLink = `${API_URL}/api/gutscheine/download/${linkId}`;
         setDownloadLink(publicDownloadLink);
         setPdfGenerated(true);
-        console.log('✅ PDF und Download-Link bereit!');
 
-        // 3️⃣ E-Mail ASYNCHRON im Hintergrund versenden (dauert länger)
-        console.log('📧 Verschicke E-Mail im Hintergrund...');
-        
-        // PDF als Base64 für E-Mail konvertieren (dauert am längsten)
+        // E-Mail-Versand mit deiner Provision (bleibt gleich!)
         const pdfArrayBuffer = await pdfBlob.arrayBuffer();
         function arrayBufferToBase64(buffer: ArrayBuffer) {
           let binary = '';
           const bytes = new Uint8Array(buffer);
           const len = bytes.byteLength;
-          
           for (let i = 0; i < len; i++) {
             binary += String.fromCharCode(bytes[i]);
           }
@@ -261,7 +399,6 @@ function SuccessPage({
         }
         const pdfBase64 = arrayBufferToBase64(pdfArrayBuffer);
 
-        // E-Mail-Versand (läuft parallel, User wartet nicht darauf)
         const emailData = {
           empfaengerEmail: customerEmail,
           unternehmensname: checkoutData.unternehmensname,
@@ -269,12 +406,12 @@ function SuccessPage({
           betrag: purchasedBetrag,
           dienstleistung: selectedDienstleistung,
           pdfBuffer: pdfBase64,
-          stripeSessionId: sessionId,
+          paymentIntentId: paymentId, // ✅ ÄNDERUNG: paymentIntentId statt stripeSessionId
           slug: checkoutData.slug,
           downloadLink: publicDownloadLink
         };
 
-        // E-Mail senden - aber User Interface nicht blockieren
+        // E-Mail senden (gleich wie vorher)
         fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -282,18 +419,17 @@ function SuccessPage({
         })
         .then(async (response) => {
           if (response.ok) {
-            console.log('✅ E-Mail erfolgreich versendet');
             setEmailSent(true);
             localStorage.setItem(sentKey, 'true');
             
-            // Firebase-Speicherungen im Hintergrund
+            // ✅ PROVISION: Deine bestehende Logik bleibt gleich!
             await saveSoldGutscheinToShop({
               gutscheinCode,
               betrag: purchasedBetrag,
               kaufdatum: new Date().toISOString(),
               empfaengerEmail: customerEmail,
               slug: checkoutData.slug,
-              provision: checkoutData.Provision
+              provision: checkoutData.Provision // ✅ Provision bleibt gleich
             });
 
             if (checkoutData.userId) {
@@ -302,7 +438,7 @@ function SuccessPage({
                 betrag: purchasedBetrag,
                 dienstleistung: selectedDienstleistung?.shortDesc,
                 isFreierBetrag: !selectedDienstleistung,
-                provision: checkoutData.Provision
+                provision: checkoutData.Provision // ✅ Provision bleibt gleich
               });
             }
 
@@ -316,28 +452,18 @@ function SuccessPage({
                 dienstleistung: selectedDienstleistung?.shortDesc,
               }
             });
-          } else {
-            const errorData = await response.json();
-            console.error('❌ E-Mail-Versand fehlgeschlagen:', errorData.error);
-            // Fehler anzeigen, aber Download-Link bleibt verfügbar
-            alert(`E-Mail-Versand fehlgeschlagen: ${errorData.error}\nIhr Gutschein ist trotzdem verfügbar und kann heruntergeladen werden.`);
           }
-        })
-        .catch((error) => {
-          console.error('❌ E-Mail-Versand-Fehler:', error);
-          alert(`E-Mail-Versand fehlgeschlagen: ${error?.message}\nIhr Gutschein ist trotzdem verfügbar und kann heruntergeladen werden.`);
         });
 
       } catch (error: any) {
         console.error('❌ Fehler bei PDF-Erstellung:', error);
-        alert(`Fehler bei der Gutschein-Erstellung: ${error?.message || 'Unbekannter Fehler'}`);
       } finally {
         setIsSending(false);
       }
     };
 
     sendGutscheinEmail();
-  }, [sessionId, purchasedBetrag, customerEmail]);
+  }, [purchasedBetrag, customerEmail]); // ✅ ÄNDERUNG: sessionId dependency entfernt
 
   const generateGutscheinCode = () => {
     return 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -484,8 +610,8 @@ export default function GutscheinLandingPage() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
-  const [customerEmail, setCustomerEmail] = useState<string>(''); // <- Neue State
-  const hitTrackedRef = useRef(false); // <--- NEU
+  const [customerEmail, setCustomerEmail] = useState<string>('');
+  const hitTrackedRef = useRef(false);
 
   // Lade Daten basierend auf Slug
   useEffect(() => {
@@ -520,52 +646,23 @@ export default function GutscheinLandingPage() {
     loadData();
   }, [slug]);
 
-  // Prüfe Stripe-Redirect
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('success') === 'true') {
-      const sessionId = params.get('session_id');
-      setShowSuccessPage(true);
+  // ✅ LÖSCHEN: Diesen kompletten useEffect entfernen!
+  // useEffect(() => {
+  //   const params = new URLSearchParams(location.search);
+  //   if (params.get('success') === 'true') {
+  //     const sessionId = params.get('session_id');
+  //     setShowSuccessPage(true);
+  //     // ... ganze Logic weg
+  //   }
+  // }, [location, checkoutData]);
 
-      // Dienstleistung aus LocalStorage wiederherstellen
-      const dienstleistungStr = localStorage.getItem('selectedDienstleistung');
-      if (dienstleistungStr) {
-        setSelectedDienstleistung(JSON.parse(dienstleistungStr));
-        localStorage.removeItem('selectedDienstleistung');
-      }
-
-      // ✅ FIX: Lade die Stripe-Session-Daten VOR dem Success-Page Rendering
-      if (sessionId && checkoutData) {
-        console.log('🔍 Loading session data for:', sessionId);
-        
-        fetch(`${API_URL}/api/zahlung/stripe-session-info?session_id=${sessionId}&stripeAccountId=${checkoutData.StripeAccountId}`)
-          .then(res => {
-            console.log('📡 Session API Response:', res.status);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-          })
-          .then(data => {
-            console.log('💰 Session Data:', data);
-            if (data && data.amount && data.customerEmail) {
-              setPurchasedBetrag(data.amount / 100);
-              setCustomerEmail(data.customerEmail);
-            } else {
-              console.error('❌ Invalid session data:', data);
-            }
-          })
-          .catch(error => {
-            console.error('❌ Session API Error:', error);
-            // ✅ FALLBACK: Daten aus localStorage falls API fehlschlägt
-            const fallbackBetrag = localStorage.getItem('purchasedBetrag');
-            const fallbackEmail = localStorage.getItem('customerEmail');
-            if (fallbackBetrag && fallbackEmail) {
-              setPurchasedBetrag(Number(fallbackBetrag));
-              setCustomerEmail(fallbackEmail);
-            }
-          });
-      }
-    }
-  }, [location, checkoutData]);
+  // ✅ NEU: Einfacher Payment Success Handler
+  const handlePaymentSuccess = (betrag: number, email: string) => {
+    setPurchasedBetrag(betrag);
+    setCustomerEmail(email);
+    setShowSuccessPage(true);
+    // Keine URL-Parameter oder Session-Handling mehr nötig!
+  };
 
   // Loading State
   if (loading) {
@@ -644,12 +741,6 @@ export default function GutscheinLandingPage() {
       setBetrag(null);
       setSelectedDienstleistung(null);
     }
-  };
-
-  const handlePaymentSuccess = (betrag: number, email: string) => { // <- E-Mail-Parameter hinzufügen
-    setPurchasedBetrag(betrag);
-    setCustomerEmail(email); // <- E-Mail speichern
-    setShowSuccessPage(true);
   };
 
   return (
