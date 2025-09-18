@@ -22,14 +22,30 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
   const [paymentElement, setPaymentElement] = useState<any>(null);
   const [error, setError] = useState<string>(''); // ✅ NEU: Error State
 
-  // ✅ DEBUG: Stripe initialisieren
+  // ✅ VERBESSERTE Stripe-Initialisierung
   useEffect(() => {
     const initializeStripe = async () => {
       try {
         console.log('🔄 Initialisiere Stripe...');
+        console.log('🌍 Window.Stripe verfügbar:', !!(window as any).Stripe);
         
+        // ✅ WARTEN bis Stripe geladen ist
+        let attempts = 0;
+        while (!(window as any).Stripe && attempts < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        if (!(window as any).Stripe) {
+          setError('Stripe JS konnte nicht geladen werden. Bitte Seite neu laden.');
+          return;
+        }
+
         // Test-Mode Status abrufen
         const response = await fetch(`${API_URL}/api/zahlung/test-mode-status`);
+        console.log('📡 Test-Mode Request zu:', `${API_URL}/api/zahlung/test-mode-status`);
+        console.log('📡 Response Status:', response.status);
+        
         if (response.ok) {
           const data = await response.json();
           console.log('📊 Test-Mode Response:', data);
@@ -40,21 +56,29 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
             ? process.env.REACT_APP_STRIPE_TEST_KEY 
             : process.env.REACT_APP_STRIPE_PUBLIC_KEY;
 
-          console.log('🔑 Verwende Stripe Key:', stripeKey ? 'Key vorhanden' : 'Key fehlt!');
+          console.log('🔑 Stripe Key Status:', {
+            testMode: data.testMode,
+            keyExists: !!stripeKey,
+            keyPrefix: stripeKey?.substring(0, 7)
+          });
+
+          if (!stripeKey) {
+            setError(`Stripe Key fehlt für ${data.testMode ? 'Test' : 'Live'} Modus`);
+            return;
+          }
 
           // Stripe laden
-          const stripeInstance = (window as any).Stripe?.(stripeKey);
+          const stripeInstance = (window as any).Stripe(stripeKey);
           console.log('🎯 Stripe Instance:', stripeInstance ? 'Geladen' : 'Fehler!');
           setStripe(stripeInstance);
         } else {
-          console.error('❌ Test-Mode Status konnte nicht abgerufen werden');
-          // Fallback
-          setIsTestMode(process.env.REACT_APP_STRIPE_TEST_MODE === 'true');
+          const errorText = await response.text();
+          console.error('❌ Test-Mode Status Fehler:', response.status, errorText);
+          setError(`Backend nicht erreichbar: ${response.status}`);
         }
       } catch (err) {
         console.error('❌ Fehler beim Initialisieren von Stripe:', err);
-        setError('Stripe konnte nicht geladen werden');
-        setIsTestMode(process.env.REACT_APP_STRIPE_TEST_MODE === 'true');
+        setError(`Netzwerkfehler: ${err}`);
       }
     };
 
@@ -77,15 +101,28 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         console.log('💳 Erstelle Payment Intent...');
         const slug = window.location.pathname.split('/').pop();
 
+        // ✅ FIX: Amount Validation im Frontend
+        if (!betrag || betrag <= 0) {
+          console.error('❌ Ungültiger Betrag:', betrag);
+          setError('Ungültiger Betrag');
+          return;
+        }
+
+        const amountInCents = Math.round(betrag * 100);
+        
         const requestData = {
-          amount: betrag * 100,
+          amount: amountInCents,
           customerEmail,
           stripeAccountId: isTestMode ? null : stripeAccountId,
           slug,
           provision
         };
 
-        console.log('📤 Request Data:', requestData);
+        console.log('📤 Request Data:', {
+          ...requestData,
+          amountOriginal: betrag,
+          amountInCents: amountInCents
+        });
 
         const response = await fetch(`${API_URL}/api/zahlung/create-payment-intent`, {
           method: 'POST',
@@ -93,8 +130,10 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           body: JSON.stringify(requestData),
         });
 
+        console.log('📥 Response Status:', response.status);
+
         const data = await response.json();
-        console.log('📥 Response:', data);
+        console.log('📥 Response Data:', data);
 
         if (!response.ok) {
           console.error('❌ Payment Intent Fehler:', data.error);
@@ -102,27 +141,37 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           return;
         }
 
-        setClientSecret(data.clientSecret);
-        console.log('✅ Client Secret erhalten');
+        if (!data.clientSecret) {
+          console.error('❌ Kein Client Secret erhalten');
+          setError('Kein Client Secret erhalten');
+          return;
+        }
 
-        // ✅ Elements mit E-Mail vorausfüllen
-        const elementsInstance = stripe.elements({
+        setClientSecret(data.clientSecret);
+        console.log('✅ Client Secret erhalten:', data.clientSecret.substring(0, 20) + '...');
+
+        // ✅ FIX: Einfache Elements Konfiguration OHNE stripeAccount
+        const elementsConfig = {
           clientSecret: data.clientSecret,
           appearance: {
-            theme: 'stripe',
-            variables: {
+            theme: 'stripe' as const,
+            variables: { 
               colorPrimary: '#1976d2',
+              fontFamily: 'system-ui, sans-serif',
+              borderRadius: '8px'
             }
           },
-          // ✅ WICHTIG: API Version spezifizieren
-          mode: 'payment',
-          // ✅ NEU: Explizite Konfiguration
-          ...((!isTestMode && stripeAccountId) ? { 
-            stripeAccount: stripeAccountId 
-          } : {}),
-          loader: 'auto'
+          loader: 'auto' as const
+        };
+
+        // ✅ WICHTIG: KEINE stripeAccount Config in Elements!
+        // Das Client Secret ist bereits für den Connect Account erstellt
+        console.log('🎯 Elements Config (ohne stripeAccount):', {
+          hasClientSecret: !!elementsConfig.clientSecret,
+          testMode: isTestMode
         });
 
+        const elementsInstance = stripe.elements(elementsConfig);
         setElements(elementsInstance);
 
       } catch (err) {
@@ -141,9 +190,9 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     const container = document.getElementById('payment-element');
     if (!container) return;
     
-    console.log('🎯 Erstelle Payment Element für Payment Intent...');
+    console.log('🎯 Erstelle Payment Element...');
     
-    // ✅ WICHTIG: Einfache Payment Element Config
+    // ✅ EINFACHERE Payment Element Config
     const paymentElementInstance = elements.create('payment', {
       layout: { 
         type: 'tabs',
@@ -151,8 +200,6 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         radios: false,
         spacedAccordionItems: true
       },
-      // ✅ WICHTIG: Explizite Payment Method Types
-      paymentMethodOrder: ['sepa_debit', 'card', 'sofort', 'giropay'],
       fields: {
         billingDetails: {
           name: 'auto',
@@ -172,7 +219,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     paymentElementInstance.mount('#payment-element');
     setPaymentElement(paymentElementInstance);
     
-    console.log('✅ Payment Element gemountet (Payment Intent Mode)');
+    console.log('✅ Payment Element gemountet');
     
     return () => {
       try {
@@ -192,25 +239,42 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     setIsProcessing(true);
 
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
+      console.log('💳 Starte Payment Confirmation...');
+      
+      // ✅ FIX: Confirm Payment für Connect Account
+      const confirmConfig = {
         elements,
         confirmParams: {
-          return_url: window.location.href
+          return_url: window.location.href,
+          receipt_email: customerEmail
         },
-        redirect: 'if_required'
+        redirect: 'if_required' as const
+      };
+
+      console.log('🔗 Payment Config:', {
+        hasElements: !!confirmConfig.elements,
+        returnUrl: confirmConfig.confirmParams.return_url,
+        email: confirmConfig.confirmParams.receipt_email
       });
       
+      const { error, paymentIntent } = await stripe.confirmPayment(confirmConfig);
+      
       if (error) {
-        console.error('Payment Error:', error);
-        alert(`Zahlung fehlgeschlagen: ${error.message}`);
+        console.error('❌ Payment Error:', error);
+        setError(`Zahlung fehlgeschlagen: ${error.message}`);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
         console.log('✅ Payment successful:', paymentIntent.id);
-        // Success direkt aufrufen - keine Weiterleitung!
         onPaymentSuccess(betrag!, customerEmail);
+      } else {
+        console.log('⏳ Payment Status:', paymentIntent?.status);
+        if (paymentIntent?.status === 'processing') {
+          // Payment wird noch verarbeitet
+          onPaymentSuccess(betrag!, customerEmail);
+        }
       }
     } catch (err: any) {
-      console.error('Payment Exception:', err);
-      alert('Zahlung fehlgeschlagen: ' + (err?.message || 'Unbekannter Fehler'));
+      console.error('❌ Payment Exception:', err);
+      setError('Zahlung fehlgeschlagen: ' + (err?.message || 'Unbekannter Fehler'));
     } finally {
       setIsProcessing(false);
     }
