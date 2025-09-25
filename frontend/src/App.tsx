@@ -27,6 +27,7 @@ import CheckoutAdmin from './pages/checkoutadmin';
 import AdminGutscheinVerwaltung from './pages/AdminGutscheinVerwaltung';
 import AdminDemosPage from './pages/AdminDemos';
 import DemoCheckoutPage from './pages/DemoCheckout';
+import DemoFinal from './pages/DemoFinal';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -113,6 +114,8 @@ function AppContent() {
       <Route path="/admin/gutscheine" element={<AdminGutscheinVerwaltung />} />
       <Route path="/admin/demos" element={<AdminDemosPage />} />
       <Route path="/demo/:slug" element={<DemoCheckoutPage />} />
+            {/* ✅ DIESE ROUTE HINZUFÜGEN/PRÜFEN: */}
+      <Route path="/demofinal/:slug" element={<DemoFinal />} />
     </Routes>
   );
 }

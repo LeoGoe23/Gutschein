@@ -370,6 +370,39 @@ export default function AdminPage() {
                     >
                       Design bearbeiten
                     </Button>
+                    
+                    {/* NEU: Demo erstellen Button */}
+                    <Button
+                      variant="outlined"
+                      color="success"
+                      size="small"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${API_URL}/api/gutscheine/demo/create`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ shopId: shop.id })
+                          });
+                          
+                          if (response.ok) {
+                            const data = await response.json();
+                            const demoUrl = `${window.location.origin}/demofinal/${data.demoSlug}`;
+                            alert(`Demo erstellt!\n\nURL: ${demoUrl}\n\nDie Demo öffnet sich in einem neuen Tab.`);
+                            window.open(demoUrl, '_blank');
+                          } else {
+                            const errorData = await response.json();
+                            alert(`Fehler beim Erstellen der Demo: ${errorData.error}`);
+                          }
+                        } catch (err) {
+                          console.error('Demo-Erstellung Fehler:', err);
+                          alert('Fehler beim Erstellen der Demo');
+                        }
+                      }}
+                      sx={{ ml: 1 }}
+                    >
+                      🎭 Demo erstellen
+                    </Button>
+                    
                     {shop.stripeAccountId && (
                       <Button
                         variant="outlined"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Typography, Button, CircularProgress, Paper, TextField } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Paper, TextField, Switch, FormControlLabel, Chip } from '@mui/material';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../auth/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -9,6 +9,7 @@ import TopBar from '../components/home/TopBar';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import DownloadIcon from '@mui/icons-material/Download';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 // A4 Größe in Pixel bei 72 DPI (Standard für jsPDF)
 const A4_WIDTH_PX = 595;
@@ -33,7 +34,7 @@ export default function GutscheinDesignAdminEdit() {
   const [slug, setSlug] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
+  
   useEffect(() => {
     const fetchShop = async () => {
       try {
@@ -150,7 +151,7 @@ export default function GutscheinDesignAdminEdit() {
     setLoading(false);
   };
 
-  // Neue Drag-Funktionen mit horizontaler Zentrierung
+  // Überarbeitete Drag-Funktionen mit optionaler horizontaler Bewegung
   const handleMouseDown = (e: React.MouseEvent, type: 'betrag' | 'code') => {
     e.preventDefault();
     setIsDragging(type);
@@ -169,21 +170,17 @@ export default function GutscheinDesignAdminEdit() {
     if (!previewElement) return;
     
     const rect = previewElement.getBoundingClientRect();
-    // NUR Y-Position ändern, X bleibt zentriert
+    
+    // Y-Position (vertikal) - wie bisher
     const y = Math.max(0, Math.min(e.clientY - rect.top - dragOffset.y, rect.height - 50));
     
+    // X-Position (horizontal) - IMMER berechnen, nicht zentrieren
+    const x = Math.max(0, Math.min(e.clientX - rect.left - dragOffset.x, rect.width - 150));
+    
     if (isDragging === 'betrag') {
-      setBetragConfig(cfg => ({ 
-        ...cfg, 
-        x: rect.width / 2 - 75, // Zentriert (75px = halbe Elementbreite ca.)
-        y 
-      }));
+      setBetragConfig(cfg => ({ ...cfg, x, y }));
     } else if (isDragging === 'code') {
-      setCodeConfig(cfg => ({ 
-        ...cfg, 
-        x: rect.width / 2 - 75, // Zentriert (75px = halbe Elementbreite ca.)
-        y 
-      }));
+      setCodeConfig(cfg => ({ ...cfg, x, y }));
     }
   };
 
@@ -304,7 +301,7 @@ export default function GutscheinDesignAdminEdit() {
             </Box>
           </Box>
 
-          {/* Vorschau mit eigener Drag-Implementierung */}
+          {/* Vorschau mit Drag-Implementierung */}
           <Box sx={{ mb: 3 }}>
             <Box sx={{ position: 'relative', mb: 3 }}>
               {(previewImage || designFile) && (
@@ -326,17 +323,122 @@ export default function GutscheinDesignAdminEdit() {
                   <DownloadIcon sx={{ color: '#1976d2' }} />
                 </Button>
               )}
+              
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Design-Vorschau & Positionierung</Typography>
+              
+              {/* Info-Text erweitert */}
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  💡 Ziehe die Elemente per Drag & Drop zur gewünschten Position
+                </Typography>
+                {/* {enableHorizontalMove && (
+                  <Chip 
+                    label="Horizontal aktiv" 
+                    color="primary" 
+                    size="small" 
+                    icon={<SwapHorizIcon />}
+                  />
+                )} */}
+              </Box>
+
+              {/* Positions-Anzeige erweitert */}
+              <Box sx={{ display: 'flex', gap: 4, mb: 2, p: 1, background: '#f9f9f9', borderRadius: 1 }}>
+                <Typography variant="body2">
+                  <strong>Betrag:</strong> Y: {Math.round(betragConfig.y)}px, Größe: {betragConfig.size}px
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Code:</strong> Y: {Math.round(codeConfig.y)}px, Größe: {codeConfig.size}px
+                </Typography>
+              </Box>
+
+              {/* Reset-Button für Zentrierung */}
+              <Box sx={{ mb: 2 }}>
                 <Button
                   variant="outlined"
-                  color="secondary"
+                  size="small"
                   onClick={() => {
-                    setBetragConfig(cfg => ({ ...cfg, x: 0, y: 0 }));
-                    setCodeConfig(cfg => ({ ...cfg, x: 0, y: 30 }));
+                    const centerX = (previewDimensions.width / 2) - 75; // Zentriert
+                    setBetragConfig(cfg => ({ ...cfg, x: centerX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: centerX }));
+                  }}
+                  sx={{ mr: 1 }}
+                >
+                  🎯 Horizontal zentrieren
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const rightSideX = (previewDimensions.width * 0.75) - 75; // Rechte Hälfte
+                    setBetragConfig(cfg => ({ ...cfg, x: rightSideX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: rightSideX }));
                   }}
                 >
-                  Elemente zurücksetzen (links oben)
+                  ➡️ Rechte Hälfte
+                </Button>
+              </Box>
+              
+              {/* Erweiterte Positionierungs-Buttons */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const centerX = (previewDimensions.width / 2) - 75;
+                    setBetragConfig(cfg => ({ ...cfg, x: centerX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: centerX }));
+                  }}
+                >
+                  🎯 Zentriert
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const leftX = 50;
+                    setBetragConfig(cfg => ({ ...cfg, x: leftX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: leftX }));
+                  }}
+                >
+                  ⬅️ Links
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const rightX = previewDimensions.width - 200;
+                    setBetragConfig(cfg => ({ ...cfg, x: rightX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: rightX }));
+                  }}
+                >
+                  ➡️ Rechts
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const quarterX = (previewDimensions.width * 0.25) - 75;
+                    setBetragConfig(cfg => ({ ...cfg, x: quarterX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: quarterX }));
+                  }}
+                >
+                  📍 1/4
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const threeQuarterX = (previewDimensions.width * 0.75) - 75;
+                    setBetragConfig(cfg => ({ ...cfg, x: threeQuarterX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: threeQuarterX }));
+                  }}
+                >
+                  📍 3/4
                 </Button>
               </Box>
               
@@ -371,13 +473,12 @@ export default function GutscheinDesignAdminEdit() {
                       }}
                     />
                     
-                    {/* Betrag Element - mit Transform für echte Zentrierung */}
+                    {/* Betrag Element - € HINTER dem Betrag */}
                     <Box
                       sx={{
                         position: 'absolute',
-                        left: '50%', // Horizontal zentriert
+                        left: `${betragConfig.x}px`,
                         top: `${betragConfig.y}px`,
-                        transform: 'translateX(-50%)', // Echte Zentrierung
                         zIndex: 10,
                         cursor: 'grab',
                         '&:active': { cursor: 'grabbing' }
@@ -387,22 +488,22 @@ export default function GutscheinDesignAdminEdit() {
                       <Typography
                         sx={{
                           fontSize: `${betragConfig.size}px`,
-                          color: '#000', // Schwarzer Text
+                          color: '#000000',
                           fontWeight: 'bold',
-                          userSelect: 'none'
+                          userSelect: 'none',
+                          textShadow: '1px 1px 2px rgba(255,255,255,0.8)'
                         }}
                       >
                         50,00 €
                       </Typography>
                     </Box>
 
-                    {/* Code Element - mit Transform für echte Zentrierung */}
+                    {/* Code Element - IMMER absolute Positionierung verwenden */}
                     <Box
                       sx={{
                         position: 'absolute',
-                        left: '50%', // Horizontal zentriert
+                        left: `${codeConfig.x}px`,
                         top: `${codeConfig.y}px`,
-                        transform: 'translateX(-50%)', // Echte Zentrierung
                         zIndex: 20,
                         cursor: 'grab',
                         '&:active': { cursor: 'grabbing' }
@@ -412,9 +513,11 @@ export default function GutscheinDesignAdminEdit() {
                       <Typography
                         sx={{
                           fontSize: `${codeConfig.size}px`,
-                          color: '#000', // Schwarzer Text
+                          color: '#000000',
                           fontWeight: 'bold',
-                          userSelect: 'none'
+                          userSelect: 'none',
+                          textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
+                          fontFamily: '"Courier New", monospace'
                         }}
                       >
                         GS-XXXX-XXXX
