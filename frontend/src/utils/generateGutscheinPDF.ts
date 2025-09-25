@@ -1,23 +1,23 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-interface GutscheinData {
+export interface GutscheinData {
   unternehmen: string;
   betrag: string;
   gutscheinCode: string;
   ausstelltAm: string;
-  website?: string;
+  website: string;
   bildURL?: string;
   dienstleistung?: {
     shortDesc: string;
     longDesc: string;
   };
-  // NEU: Design-Unterstützung
   gutscheinDesignURL?: string;
   designConfig?: {
     betrag: { x: number; y: number; size: number };
     code: { x: number; y: number; size: number };
   };
+  isDemoMode?: boolean; // ✅ NEU: Demo-Flag hinzufügen
 }
 
 // 🔥 Hilfsfunktion: Bild zu Base64 konvertieren über Backend
@@ -151,6 +151,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
       : `€ ${data.betrag}`;
     
     // 🎯 EXAKT gleiche Struktur wie im Editor mit Border!
+    // Custom PNG-Design Bereich - € HINTER den Betrag:
     pdfContent.innerHTML = `
       <div id="design-preview" style="
         width: 595px;
@@ -159,8 +160,8 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
         background-color: #ffffff;
         overflow: hidden;
         box-sizing: border-box;
-        border: none; /* KEIN Border im PDF! */
-        box-shadow: none; /* KEIN Schatten im PDF! */
+        border: none;
+        box-shadow: none;
         border-radius: 0;
       ">
         <!-- Custom PNG-Hintergrund -->
@@ -178,47 +179,35 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
           "
         />
         
-        <!-- Text-Overlays - EXAKT wie im Editor -->
+        <!-- Text-Overlays - € HINTER dem Betrag -->
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;">
-          <!-- Betrag - ZENTRIERT wie im Editor -->
+          <!-- Betrag - € HINTER dem Betrag -->
           <div style="
             position: absolute;
-            left: 50%;
+            left: ${betragConfig.x}px;
             top: ${betragConfig.y}px;
-            transform: translateX(-50%);
             font-size: ${betragConfig.size}px;
-            color: #fff;
+            color: #000000;
             font-weight: bold;
-            background: linear-gradient(90deg,#1976d2 80%,#fff 100%);
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: 3px solid #1976d2;
-            box-shadow: 0 2px 12px rgba(25,118,210,0.25);
-            text-shadow: 0 2px 6px rgba(0,0,0,0.25);
             font-family: Arial, sans-serif;
-            text-align: center;
+            text-align: left;
             line-height: 1.2;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
           ">
-            € ${data.betrag}
+            ${data.betrag} €
           </div>
           
-          <!-- Gutscheincode - ZENTRIERT wie im Editor -->
+          <!-- Gutscheincode -->
           <div style="
             position: absolute;
-            left: 50%;
+            left: ${codeConfig.x}px;
             top: ${codeConfig.y}px;
-            transform: translateX(-50%);
             font-size: ${codeConfig.size}px;
-            color: #fff;
+            color: #000000;
             font-weight: bold;
-            background: linear-gradient(90deg,#d32f2f 80%,#fff 100%);
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: 3px solid #d32f2f;
-            box-shadow: 0 2px 12px rgba(211,47,47,0.25);
-            text-shadow: 0 2px 6px rgba(0,0,0,0.25);
             font-family: 'Courier New', monospace;
-            text-align: center;
+            text-align: left;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
           ">
             ${data.gutscheinCode}
           </div>
@@ -347,7 +336,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
               font-family: Arial, sans-serif;
               line-height: 1;
             ">
-              € ${data.betrag}
+              ${data.betrag} €
             </div>
           </div>`}
 
@@ -457,6 +446,17 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     // Bild zum PDF hinzufügen
     const imgData = canvas.toDataURL('image/png', 1.0);
     pdf.addImage(imgData, 'PNG', 0, 0, 595, 842, '', 'FAST');
+    
+    // Demo-Wasserzeichen hinzufügen wenn isDemoMode = true
+    if (data.isDemoMode) {
+      pdf.setFontSize(60);
+      pdf.setTextColor(255, 0, 0, 0.3); // Rot, transparent
+      pdf.text('DEMO', A4_WIDTH_PX / 2, A4_HEIGHT_PX / 2, { 
+        align: 'center',
+        angle: 45 
+      });
+      pdf.setTextColor(0, 0, 0); // Zurück zu schwarz
+    }
     
     // PDF als Blob zurückgeben
     const pdfBlob = pdf.output('blob');
