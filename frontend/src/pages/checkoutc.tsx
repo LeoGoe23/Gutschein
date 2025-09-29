@@ -192,7 +192,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     
     console.log('🎯 Erstelle Payment Element...');
     
-    // ✅ EINFACHERE Payment Element Config
+    // ✅ FIX: Entweder address sammeln ODER beim confirmPayment übergeben
     const paymentElementInstance = elements.create('payment', {
       layout: { 
         type: 'tabs',
@@ -204,7 +204,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         billingDetails: {
           name: 'auto',
           email: 'auto',
-          address: 'never'
+          address: 'auto' // ✅ ÄNDERN: 'auto' statt 'never'
         }
       },
       terms: {
@@ -230,6 +230,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     };
   }, [elements, clientSecret]);
 
+  // ✅ ALTERNATIVE: Billing Details manuell übergeben
   const handlePayment = async () => {
     if (!stripe || !elements || !clientSecret) {
       alert('Stripe ist noch nicht bereit. Bitte warten Sie einen Moment.');
@@ -241,12 +242,22 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     try {
       console.log('💳 Starte Payment Confirmation...');
       
-      // ✅ FIX: Confirm Payment für Connect Account
+      // ✅ FIX: Billing Details explizit übergeben wenn address: 'never'
       const confirmConfig = {
         elements,
         confirmParams: {
           return_url: window.location.href,
-          receipt_email: customerEmail
+          receipt_email: customerEmail,
+          // ✅ HINZUFÜGEN: Billing Details wenn address: 'never'
+          payment_method_data: {
+            billing_details: {
+              email: customerEmail,
+              // Minimale Adresse für Stripe-Compliance
+              address: {
+                country: 'DE' // Deutschland als Standard
+              }
+            }
+          }
         },
         redirect: 'if_required' as const
       };
@@ -268,7 +279,6 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
       } else {
         console.log('⏳ Payment Status:', paymentIntent?.status);
         if (paymentIntent?.status === 'processing') {
-          // Payment wird noch verarbeitet
           onPaymentSuccess(betrag!, customerEmail);
         }
       }
