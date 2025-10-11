@@ -136,10 +136,13 @@ function DemoSuccessPage({
 }) {
   const [isSending, setIsSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const hasSentRef = useRef(false); // ✅ NEU: Ref für Demo-Schutz
   
   useEffect(() => {
     const sendDemoEmail = async () => {
-      if (isSending || emailSent) {
+      // ✅ VERSTÄRKTER SCHUTZ: Ref + State
+      if (hasSentRef.current || isSending || emailSent) {
+        console.log('🛡️ Demo-E-Mail bereits gesendet oder in Bearbeitung');
         return;
       }
 
@@ -147,30 +150,32 @@ function DemoSuccessPage({
         return;
       }
       
+      // ✅ SOFORT markieren um doppelte Ausführung zu verhindern
+      hasSentRef.current = true;
       setIsSending(true);
       
       try {
         const gutscheinCode = 'GS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
         
+        console.log('🎨 Generiere PDF...'); // Debug
         const pdfBlob = await generateGutscheinPDF({
           unternehmen: checkoutData.unternehmensname,
           betrag: selectedDienstleistung ? '' : purchasedBetrag.toString(),
           gutscheinCode,
           ausstelltAm: new Date().toLocaleDateString(),
           website: checkoutData.website,
-          bildURL: checkoutData.bildURL, // ✅ Verwende das Bild aus Demo-Daten
+          bildURL: checkoutData.bildURL,
           dienstleistung: selectedDienstleistung
             ? { shortDesc: selectedDienstleistung.shortDesc, longDesc: selectedDienstleistung.longDesc }
             : undefined,
           gutscheinDesignURL: checkoutData.gutscheinURL,
           designConfig: checkoutData.designConfig,
-          isDemoMode: true // ✅ DEMO-Wasserzeichen aktivieren
+          isDemoMode: true
         });
 
         // 🔥 FIX: Korrekte ArrayBuffer zu Base64 Konvertierung
         const pdfArrayBuffer = await pdfBlob.arrayBuffer();
         
-        // Korrekte Methode für ArrayBuffer zu Base64
         function arrayBufferToBase64(buffer: ArrayBuffer): string {
           let binary = '';
           const bytes = new Uint8Array(buffer);
@@ -199,8 +204,8 @@ function DemoSuccessPage({
           }),
         });
 
-        const responseData = await response.json(); // 🔥 Response lesen
-        console.log('📧 Backend Response:', responseData); // Debug
+        const responseData = await response.json();
+        console.log('📧 Backend Response:', responseData);
 
         if (response.ok) {
           console.log('✅ E-Mail erfolgreich versendet');
@@ -212,17 +217,16 @@ function DemoSuccessPage({
         
       } catch (error) {
         console.error('❌ Demo-E-Mail Fehler:', error);
-        // 🔥 Bei Fehler NICHT als "sent" markieren, damit User es sieht
+        // ✅ Bei Fehler Ref zurücksetzen für Retry
+        hasSentRef.current = false;
         alert('Fehler beim Senden der E-Mail. Bitte versuchen Sie es erneut.');
       } finally {
         setIsSending(false);
       }
     };
 
-    if (purchasedBetrag && customerEmail && checkoutData?.unternehmensname) {
-      sendDemoEmail();
-    }
-  }, [purchasedBetrag, customerEmail, checkoutData?.unternehmensname, isSending, emailSent]);
+    sendDemoEmail();
+  }, [purchasedBetrag, customerEmail, checkoutData?.unternehmensname]); // ✅ isSending/emailSent aus Dependencies entfernt
 
   return (
     <Box sx={{ mt: 4, textAlign: 'center' }}>
