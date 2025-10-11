@@ -158,13 +158,13 @@ function DemoSuccessPage({
           gutscheinCode,
           ausstelltAm: new Date().toLocaleDateString(),
           website: checkoutData.website,
-          bildURL: '',
+          bildURL: checkoutData.bildURL, // ✅ Verwende das Bild aus Demo-Daten
           dienstleistung: selectedDienstleistung
             ? { shortDesc: selectedDienstleistung.shortDesc, longDesc: selectedDienstleistung.longDesc }
             : undefined,
           gutscheinDesignURL: checkoutData.gutscheinURL,
           designConfig: checkoutData.designConfig,
-          isDemoMode: false
+          isDemoMode: true // ✅ DEMO-Wasserzeichen aktivieren
         });
 
         // 🔥 FIX: Korrekte ArrayBuffer zu Base64 Konvertierung

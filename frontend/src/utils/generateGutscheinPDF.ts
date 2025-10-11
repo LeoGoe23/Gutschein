@@ -14,8 +14,8 @@ export interface GutscheinData {
   };
   gutscheinDesignURL?: string;
   designConfig?: {
-    betrag: { x: number; y: number; size: number };
-    code: { x: number; y: number; size: number };
+    betrag: { x: number; y: number; size: number; width?: number };
+    code: { x: number; y: number; size: number; width?: number };
   };
   isDemoMode?: boolean; // ✅ NEU: Demo-Flag hinzufügen
 }
@@ -146,12 +146,19 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     console.log('🎯 Betrag - Pixel:', betragConfig);
     console.log('🎯 Code - Pixel:', codeConfig);
     
+    // ✅ NEU: Gleiche intelligente Textaufteilung für PDF
+    // ✅ KORREKTUR: Für Custom-Design nur shortDesc verwenden
     const displayBetrag = data.dienstleistung 
-      ? `${data.dienstleistung.shortDesc}\n${data.dienstleistung.longDesc}`
+      ? data.dienstleistung.shortDesc // ✅ Nur shortDesc für Custom-Design
       : `€ ${data.betrag}`;
+
+    // ✅ DEBUG: Welcher Text wird verwendet?
+    console.log('🎯 Display Betrag:', displayBetrag);
+    console.log('🎯 Dienstleistung Data:', data.dienstleistung);
+    console.log('🎯 Betrag Data:', data.betrag);
     
     // 🎯 EXAKT gleiche Struktur wie im Editor mit Border!
-    // Custom PNG-Design Bereich - € HINTER den Betrag:
+    // Custom PNG-Design Bereich - Dienstleistung oder Betrag anzeigen:
     pdfContent.innerHTML = `
       <div id="design-preview" style="
         width: 595px;
@@ -179,35 +186,42 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
           "
         />
         
-        <!-- Text-Overlays - € HINTER dem Betrag -->
+        <!-- Text-Overlays -->
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;">
-          <!-- Betrag - € HINTER dem Betrag -->
+          <!-- Betrag/Dienstleistung -->
           <div style="
             position: absolute;
-            left: ${betragConfig.x}px;
+            left: 50%;
             top: ${betragConfig.y}px;
+            transform: translateX(-50%);
             font-size: ${betragConfig.size}px;
             color: #000000;
             font-weight: bold;
             font-family: Arial, sans-serif;
-            text-align: left;
-            line-height: 1.2;
+            text-align: center;
+            line-height: 1.1;
             text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+            white-space: pre-line;
+            max-width: ${data.designConfig?.betrag?.width || 80}%;
+            padding: 4px 8px;
           ">
-            ${data.betrag} €
+            ${displayBetrag}
           </div>
           
           <!-- Gutscheincode -->
           <div style="
             position: absolute;
-            left: ${codeConfig.x}px;
+            left: 50%;
             top: ${codeConfig.y}px;
+            transform: translateX(-50%);
             font-size: ${codeConfig.size}px;
             color: #000000;
             font-weight: bold;
             font-family: 'Courier New', monospace;
-            text-align: left;
+            text-align: center;
             text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+            white-space: nowrap;
+            min-width: 150px;
           ">
             ${data.gutscheinCode}
           </div>
@@ -229,7 +243,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     }
     
     pdfContent.innerHTML = `
-      <div style="
+      <div id="standard-preview" style="
         width: 595px;
         height: 842px;
         position: relative;
@@ -417,7 +431,7 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
 
   try {
     // 🎯 EXAKT gleiche Download-Logik wie im Editor!
-    const previewElement = pdfContent.querySelector('#design-preview') as HTMLElement;
+    const previewElement = pdfContent.querySelector('#design-preview, #standard-preview, [style*="width: 595px"]') as HTMLElement;
     
     // Temporär Rand/Schatten entfernen (wie im Editor)
     previewElement.style.border = 'none';

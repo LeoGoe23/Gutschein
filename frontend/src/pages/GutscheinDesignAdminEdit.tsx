@@ -20,6 +20,71 @@ const calculatePreviewDimensions = () => ({
   height: A4_HEIGHT_PX
 });
 
+// ✅ NEU: Intelligente Textaufteilung-Funktion
+const formatTextForDisplay = (text: string, maxLength: number = 25) => {
+  if (text.length <= maxLength) {
+    return text; // Kurzer Text: keine Änderung
+  }
+  
+  // ✅ STRATEGIE 1: Bei Sonderzeichen wie ® umbrechen
+  if (text.includes('®')) {
+    const parts = text.split('®');
+    if (parts.length === 2) {
+      return (
+        <>
+          {parts[0]}®
+          <br />
+          {parts[1].trim()}
+        </>
+      );
+    }
+  }
+  
+  // ✅ STRATEGIE 2: Bei "Massage" umbrechen
+  if (text.includes('Massage')) {
+    const beforeMassage = text.substring(0, text.indexOf('Massage') + 7); // "Massage" mit einschließen
+    const afterMassage = text.substring(text.indexOf('Massage') + 7).trim();
+    
+    if (afterMassage) {
+      return (
+        <>
+          {beforeMassage}
+          <br />
+          {afterMassage}
+        </>
+      );
+    }
+  }
+  
+  // ✅ STRATEGIE 3: Nach der Hälfte der Wörter umbrechen
+  const words = text.split(' ');
+  if (words.length >= 3) {
+    const midPoint = Math.ceil(words.length / 2);
+    const firstLine = words.slice(0, midPoint).join(' ');
+    const secondLine = words.slice(midPoint).join(' ');
+    
+    return (
+      <>
+        {firstLine}
+        <br />
+        {secondLine}
+      </>
+    );
+  }
+  
+  // ✅ FALLBACK: Einfach in der Mitte trennen
+  const midPoint = Math.floor(text.length / 2);
+  const splitPoint = text.lastIndexOf(' ', midPoint) || midPoint;
+  
+  return (
+    <>
+      {text.substring(0, splitPoint)}
+      <br />
+      {text.substring(splitPoint).trim()}
+    </>
+  );
+};
+
 export default function GutscheinDesignAdminEdit() {
   const { shopId } = useParams<{ shopId: string }>();
   const [loading, setLoading] = useState(true);
@@ -28,8 +93,8 @@ export default function GutscheinDesignAdminEdit() {
   const [designURL, setDesignURL] = useState<string | null>(null);
   const [designFile, setDesignFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [betragConfig, setBetragConfig] = useState({ x: 0, y: 0, size: 32 });
-  const [codeConfig, setCodeConfig] = useState({ x: 0, y: 30, size: 24 });
+  const [betragConfig, setBetragConfig] = useState({ y: 200, size: 32, width: 80 }); // ✅ width hinzugefügt
+  const [codeConfig, setCodeConfig] = useState({ y: 250, size: 24, width: 70 });     // ✅ width hinzugefügt
   const [previewDimensions, setPreviewDimensions] = useState<{width: number, height: number}>(calculatePreviewDimensions());
   const [slug, setSlug] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<string | null>(null);
@@ -50,8 +115,17 @@ export default function GutscheinDesignAdminEdit() {
           setCheckout(data.Checkout);
           setDesignURL(data.Checkout?.GutscheinDesignURL || null);
           setSlug(data.slug || shopId);
-          setBetragConfig(data.Checkout?.DesignConfig?.betrag || { x: 0, y: 0, size: 32 });
-          setCodeConfig(data.Checkout?.DesignConfig?.code || { x: 0, y: 30, size: 24 });
+          // ✅ Auch width laden
+          setBetragConfig({ 
+            y: data.Checkout?.DesignConfig?.betrag?.y || 200, 
+            size: data.Checkout?.DesignConfig?.betrag?.size || 32,
+            width: data.Checkout?.DesignConfig?.betrag?.width || 80 // ✅ NEU
+          });
+          setCodeConfig({ 
+            y: data.Checkout?.DesignConfig?.code?.y || 250, 
+            size: data.Checkout?.DesignConfig?.code?.size || 24,
+            width: data.Checkout?.DesignConfig?.code?.width || 70 // ✅ NEU
+          });
         } else {
           setError('Shop nicht gefunden');
         }
@@ -136,11 +210,22 @@ export default function GutscheinDesignAdminEdit() {
         setLoading(false);
         return;
       }
+      // ✅ KORRIGIERT: Auch width speichern
       await updateDoc(doc(db, 'users', shopId), {
         'Checkout.GutscheinDesignURL': url || null,
         'Checkout.DesignConfig': {
-          betrag: betragConfig,
-          code: codeConfig
+          betrag: {
+            x: A4_WIDTH_PX / 2, // IMMER zentriert
+            y: betragConfig.y,
+            size: betragConfig.size,
+            width: betragConfig.width // ✅ NEU
+          },
+          code: {
+            x: A4_WIDTH_PX / 2, // IMMER zentriert
+            y: codeConfig.y,
+            size: codeConfig.size,
+            width: codeConfig.width // ✅ NEU
+          }
         }
       });
       setDesignURL(url);
@@ -158,7 +243,7 @@ export default function GutscheinDesignAdminEdit() {
     
     const rect = e.currentTarget.getBoundingClientRect();
     setDragOffset({
-      x: e.clientX - rect.left,
+      x: 0, // ❌ Nicht mehr verwendet
       y: e.clientY - rect.top
     });
   };
@@ -171,16 +256,13 @@ export default function GutscheinDesignAdminEdit() {
     
     const rect = previewElement.getBoundingClientRect();
     
-    // Y-Position (vertikal) - wie bisher
+    // ✅ NUR Y-Position ändern
     const y = Math.max(0, Math.min(e.clientY - rect.top - dragOffset.y, rect.height - 50));
     
-    // X-Position (horizontal) - IMMER berechnen, nicht zentrieren
-    const x = Math.max(0, Math.min(e.clientX - rect.left - dragOffset.x, rect.width - 150));
-    
     if (isDragging === 'betrag') {
-      setBetragConfig(cfg => ({ ...cfg, x, y }));
+      setBetragConfig(cfg => ({ ...cfg, y }));
     } else if (isDragging === 'code') {
-      setCodeConfig(cfg => ({ ...cfg, x, y }));
+      setCodeConfig(cfg => ({ ...cfg, y }));
     }
   };
 
@@ -357,25 +439,32 @@ export default function GutscheinDesignAdminEdit() {
                   variant="outlined"
                   size="small"
                   onClick={() => {
-                    const centerX = (previewDimensions.width / 2) - 75; // Zentriert
-                    setBetragConfig(cfg => ({ ...cfg, x: centerX }));
-                    setCodeConfig(cfg => ({ ...cfg, x: centerX }));
+                    // BESSER: Text-zentriert statt Position-zentriert
+                    setBetragConfig(cfg => ({ 
+                      ...cfg, 
+                      x: (previewDimensions.width / 2) - 100 // Mehr Platz für breiteren Text
+                    }));
+                    setCodeConfig(cfg => ({ 
+                      ...cfg, 
+                      x: (previewDimensions.width / 2) - 80 // Weniger Platz für schmaleren Code
+                    }));
                   }}
                   sx={{ mr: 1 }}
                 >
-                  🎯 Horizontal zentrieren
+                  🎯 Optisch zentrieren
                 </Button>
                 
                 <Button
                   variant="outlined"
                   size="small"
                   onClick={() => {
-                    const rightSideX = (previewDimensions.width * 0.75) - 75; // Rechte Hälfte
-                    setBetragConfig(cfg => ({ ...cfg, x: rightSideX }));
-                    setCodeConfig(cfg => ({ ...cfg, x: rightSideX }));
+                    // Mathematisch exakt zentriert (gleiche X-Position)
+                    const centerX = (previewDimensions.width / 2) - 75;
+                    setBetragConfig(cfg => ({ ...cfg, x: centerX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: centerX }));
                   }}
                 >
-                  ➡️ Rechte Hälfte
+                  📐 Exakt zentrieren
                 </Button>
               </Box>
               
@@ -385,9 +474,10 @@ export default function GutscheinDesignAdminEdit() {
                   variant="outlined"
                   size="small"
                   onClick={() => {
-                    const centerX = (previewDimensions.width / 2) - 75;
+                    // VERBESSERT: Echte optische Zentrierung mit text-align
+                    const centerX = (previewDimensions.width / 2) - 100;
                     setBetragConfig(cfg => ({ ...cfg, x: centerX }));
-                    setCodeConfig(cfg => ({ ...cfg, x: centerX }));
+                    setCodeConfig(cfg => ({ ...cfg, x: centerX + 20 })); // Leicht versetzt für Code
                   }}
                 >
                   🎯 Zentriert
@@ -473,40 +563,72 @@ export default function GutscheinDesignAdminEdit() {
                       }}
                     />
                     
-                    {/* Betrag Element - € HINTER dem Betrag */}
+                    {/* ✅ PERFEKT ZENTRIERT: Betrag Element */}
                     <Box
                       sx={{
                         position: 'absolute',
-                        left: `${betragConfig.x}px`,
+                        left: '50%', 
                         top: `${betragConfig.y}px`,
+                        transform: 'translateX(-50%)', 
                         zIndex: 10,
                         cursor: 'grab',
-                        '&:active': { cursor: 'grabbing' }
+                        '&:active': { cursor: 'grabbing' },
+                        border: '1px dashed red',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        maxWidth: `${betragConfig.width}%`,
+                        textAlign: 'center'
                       }}
                       onMouseDown={(e) => handleMouseDown(e, 'betrag')}
                     >
                       <Typography
+                        component="div"
                         sx={{
                           fontSize: `${betragConfig.size}px`,
                           color: '#000000',
                           fontWeight: 'bold',
                           userSelect: 'none',
-                          textShadow: '1px 1px 2px rgba(255,255,255,0.8)'
+                          textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
+                          textAlign: 'center',
+                          lineHeight: 1.1,
+                          padding: '4px 8px',
+                          width: '100%',
+                          overflowWrap: 'break-word',
+                          wordBreak: 'break-word',
+                          hyphens: 'auto'
                         }}
                       >
-                        50,00 €
+                        {/* ✅ VEREINFACHT: Zeige verschiedene Demo-Texte */}
+                        {(() => {
+                          // Verschiedene Demo-Beispiele für bessere Vorschau
+                          const demoTexts = [
+                            "Klassische TouchLife® Massage 60 min.",
+                            "Gesichtspflege Deluxe Treatment",
+                            "Wellness-Paket für 2 Personen",
+                            "€ 50,00" // Für Wertgutscheine
+                          ];
+                          
+                          // Zufällig wechseln oder ersten nehmen
+                          const selectedText = demoTexts[0]; // Oder rotieren
+                          
+                          return formatTextForDisplay(selectedText);
+                        })()}
                       </Typography>
                     </Box>
 
-                    {/* Code Element - IMMER absolute Positionierung verwenden */}
+                    {/* ✅ KORRIGIERT: Code Element - mit variabler Breite */}
                     <Box
                       sx={{
                         position: 'absolute',
-                        left: `${codeConfig.x}px`,
+                        left: '50%', 
                         top: `${codeConfig.y}px`,
+                        transform: 'translateX(-50%)', 
                         zIndex: 20,
                         cursor: 'grab',
-                        '&:active': { cursor: 'grabbing' }
+                        '&:active': { cursor: 'grabbing' },
+                        border: '1px dashed blue',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        maxWidth: `${codeConfig.width}%`, // ✅ VARIABLE BREITE
+                        textAlign: 'center'
                       }}
                       onMouseDown={(e) => handleMouseDown(e, 'code')}
                     >
@@ -517,7 +639,11 @@ export default function GutscheinDesignAdminEdit() {
                           fontWeight: 'bold',
                           userSelect: 'none',
                           textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
-                          fontFamily: '"Courier New", monospace'
+                          fontFamily: '"Courier New", monospace',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          padding: '4px 8px',
+                          width: '100%'
                         }}
                       >
                         GS-XXXX-XXXX
@@ -531,7 +657,7 @@ export default function GutscheinDesignAdminEdit() {
                 )}
               </Box>
               
-              {/* Live Position Display */}
+              {/* ✅ VEREINFACHT: Nur noch Y-Position anzeigen */}
               <Box sx={{ mt: 2, display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <Box sx={{ 
                   background: '#f8f9fa', 
@@ -541,14 +667,14 @@ export default function GutscheinDesignAdminEdit() {
                   minWidth: 200 
                 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#333' }}>
-                    Live Position (Pixel)
+                    Vertikale Position (immer zentriert)
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#1976d2', fontFamily: 'monospace' }}>
-                      <strong>Betrag:</strong> X: {Math.round(betragConfig.x)}px, Y: {Math.round(betragConfig.y)}px
+                      <strong>Betrag:</strong> Y: {Math.round(betragConfig.y)}px
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#d32f2f', fontFamily: 'monospace' }}>
-                      <strong>Code:</strong> X: {Math.round(codeConfig.x)}px, Y: {Math.round(codeConfig.y)}px
+                      <strong>Code:</strong> Y: {Math.round(codeConfig.y)}px
                     </Typography>
                   </Box>
                 </Box>
@@ -562,7 +688,7 @@ export default function GutscheinDesignAdminEdit() {
                     onChange={e => setBetragConfig({ ...betragConfig, size: Number(e.target.value) })}
                     size="small"
                     sx={{ width: 100 }}
-                    inputProps={{ min: 8, max: 72 }} // Mindest- und Maximalwerte
+                    inputProps={{ min: 8, max: 72 }}
                   />
                 </Box>
                 <Box>
@@ -574,14 +700,15 @@ export default function GutscheinDesignAdminEdit() {
                     onChange={e => setCodeConfig({ ...codeConfig, size: Number(e.target.value) })}
                     size="small"
                     sx={{ width: 100 }}
-                    inputProps={{ min: 8, max: 72 }} // Mindest- und Maximalwerte
+                    inputProps={{ min: 8, max: 72 }}
                   />
                 </Box>
               </Box>
-            </Box>
-          </Box>
 
-          <Button variant="contained" color="primary" onClick={handleSave}>Speichern</Button>
+            </Box>
+
+            <Button variant="contained" color="primary" onClick={handleSave}>Speichern</Button>
+          </Box>
         </Paper>
       </Box>
     </Box>
