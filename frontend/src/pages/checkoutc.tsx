@@ -87,15 +87,16 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
 
   // ✅ DEBUG: Payment Intent erstellen
   useEffect(() => {
-    if (!stripe || !betrag || !customerEmail) {
+    if (!stripe || !betrag) {
       console.log('⏳ Warte auf:', { 
         stripe: !!stripe, 
-        betrag: !!betrag, 
-        customerEmail: !!customerEmail 
+        betrag: !!betrag
+        // customerEmail entfernt!
       });
       return;
     }
 
+    // ✅ Nur noch wenn User tatsächlich auf "Zahlen" klickt wird Email validiert
     const createPaymentIntent = async () => {
       try {
         console.log('💳 Erstelle Payment Intent...');
@@ -112,7 +113,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         
         const requestData = {
           amount: amountInCents,
-          customerEmail,
+          customerEmail: 'placeholder@example.com', // ✅ Placeholder für Payment Intent Creation
           stripeAccountId: isTestMode ? null : stripeAccountId,
           slug,
           provision
@@ -150,7 +151,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         setClientSecret(data.clientSecret);
         console.log('✅ Client Secret erhalten:', data.clientSecret.substring(0, 20) + '...');
 
-        // ✅ FIX: Einfache Elements Konfiguration OHNE stripeAccount
+        // ✅ Elements Configuration
         const elementsConfig = {
           clientSecret: data.clientSecret,
           appearance: {
@@ -164,9 +165,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           loader: 'auto' as const
         };
 
-        // ✅ WICHTIG: KEINE stripeAccount Config in Elements!
-        // Das Client Secret ist bereits für den Connect Account erstellt
-        console.log('🎯 Elements Config (ohne stripeAccount):', {
+        console.log('🎯 Elements Config:', {
           hasClientSecret: !!elementsConfig.clientSecret,
           testMode: isTestMode
         });
@@ -181,7 +180,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     };
 
     createPaymentIntent();
-  }, [stripe, betrag, customerEmail, stripeAccountId, isTestMode]);
+  }, [stripe, betrag, stripeAccountId, isTestMode]); // ✅ customerEmail dependency entfernt!
 
   // ✅ BESSER: Separater useEffect für Payment Element
   useEffect(() => {
