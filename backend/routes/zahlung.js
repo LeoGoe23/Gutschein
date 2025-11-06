@@ -151,7 +151,10 @@ router.post('/create-stripe-session', async (req, res) => {
       success_url: `${process.env.DOMAIN}/checkoutc/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.DOMAIN}/checkoutc/${slug}?canceled=true`,
       payment_intent_data: {
-        application_fee_amount: provisionAmount // <--- Provision an Plattform
+        application_fee_amount: provisionAmount, // <--- Provision an Plattform
+        transfer_data: {
+          destination: 'acct_1RhHIGJTiwdsp5bo' // <--- DEIN Plattformkonto erhält die Gebühr
+        }
       }
     }, {
       stripeAccount: stripeAccountId
