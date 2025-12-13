@@ -59,7 +59,8 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           console.log('🔑 Stripe Key Status:', {
             testMode: data.testMode,
             keyExists: !!stripeKey,
-            keyPrefix: stripeKey?.substring(0, 7)
+            keyPrefix: stripeKey?.substring(0, 7),
+            stripeAccountId: stripeAccountId || 'nicht vorhanden'
           });
 
           if (!stripeKey) {
@@ -67,8 +68,16 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
             return;
           }
 
-          // Stripe laden
-          const stripeInstance = (window as any).Stripe(stripeKey);
+          // ✅ Stripe MIT Connect Account laden (wenn vorhanden)
+          let stripeLoadConfig: any = {};
+          if (stripeAccountId && !data.testMode) {
+            stripeLoadConfig.stripeAccount = stripeAccountId;
+            console.log('🔗 Lade Stripe MIT Connect Account:', stripeAccountId);
+          } else {
+            console.log('🧪 Lade Stripe OHNE Connect (Test-Mode oder kein Account)');
+          }
+
+          const stripeInstance = (window as any).Stripe(stripeKey, stripeLoadConfig);
           console.log('🎯 Stripe Instance:', stripeInstance ? 'Geladen' : 'Fehler!');
           setStripe(stripeInstance);
         } else {
@@ -211,8 +220,8 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         sepaDebit: 'always'
       },
       wallets: {
-        applePay: 'never',
-        googlePay: 'never'
+        applePay: 'auto',     // ✅ Apple Pay aktiviert (nur auf Apple-Geräten sichtbar)
+        googlePay: 'auto'     // ✅ Google Pay aktiviert (nur auf Android/Chrome)
       }
     });
     
