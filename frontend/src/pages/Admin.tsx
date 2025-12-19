@@ -344,9 +344,14 @@ export default function AdminPage() {
                 <Button
                   variant="contained"
                   onClick={() => navigate('/admin/gutscheine')}
-                  sx={{ ml: 2 }}
                 >
                   Gutscheine verwalten
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate('/admin/blog')}
+                >
+                  Blog verwalten
                 </Button>
               </Box>
             </Box>

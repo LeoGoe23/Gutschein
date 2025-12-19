@@ -28,6 +28,10 @@ import AdminGutscheinVerwaltung from './pages/AdminGutscheinVerwaltung';
 import AdminDemosPage from './pages/AdminDemos';
 import DemoCheckoutPage from './pages/DemoCheckout';
 import DemoFinal from './pages/DemoFinal';
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
+import AdminBlog from './pages/admin/AdminBlog';
+import AdminBlogEditor from './pages/admin/AdminBlogEditor';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -114,8 +118,16 @@ function AppContent() {
       <Route path="/admin/gutscheine" element={<AdminGutscheinVerwaltung />} />
       <Route path="/admin/demos" element={<AdminDemosPage />} />
       <Route path="/demo/:slug" element={<DemoCheckoutPage />} />
-            {/* ✅ DIESE ROUTE HINZUFÜGEN/PRÜFEN: */}
       <Route path="/demofinal/:slug" element={<DemoFinal />} />
+
+      {/* Blog Routes */}
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
+
+      {/* Admin Blog Routes */}
+      <Route path="/admin/blog" element={<AdminBlog />} />
+      <Route path="/admin/blog/new" element={<AdminBlogEditor />} />
+      <Route path="/admin/blog/edit/:id" element={<AdminBlogEditor />} />
     </Routes>
   );
 }

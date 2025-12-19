@@ -59,6 +59,10 @@ export default function TopBar() {
     navigate('/vorteile');
   };
 
+  const handleBlogClick = () => {
+    navigate('/blog');
+  };
+
   const handleAccountClick = () => {
     if (!user) {
       setOpen(true);
@@ -93,6 +97,19 @@ export default function TopBar() {
             }}
           >
             Vorteile
+          </Typography>
+
+          <Typography
+            onClick={handleBlogClick}
+            sx={{
+              cursor: 'pointer',
+              fontSize: '1.1rem',
+              color: '#333',
+              fontWeight: '600',
+              textDecoration: 'none',
+            }}
+          >
+            Blog
           </Typography>
 
           <Typography
@@ -163,6 +180,9 @@ export default function TopBar() {
         <List sx={{ width: 250 }}>
           <ListItem component="li" onClick={() => { navigate('/vorteile'); setDrawerOpen(false); }}>
             <ListItemText primary="Vorteile" />
+          </ListItem>
+          <ListItem component="li" onClick={() => { navigate('/blog'); setDrawerOpen(false); }}>
+            <ListItemText primary="Blog" />
           </ListItem>
           <ListItem component="li" onClick={() => { handleAccountClick(); setDrawerOpen(false); }}>
             <ListItemText primary={user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Mein Konto"} />

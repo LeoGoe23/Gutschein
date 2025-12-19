@@ -133,7 +133,7 @@ router.post('/create-stripe-session', async (req, res) => {
     return res.status(400).json({ error: "amount, customerEmail, stripeAccountId und slug sind erforderlich" });
   }
   try {
-    const provisionRate = provision || 0.08; // <--- NEU: Default 8%
+    const provisionRate = provision || 0.015;
     const provisionAmount = Math.round(amount * provisionRate);
 
     const session = await stripe.checkout.sessions.create({
