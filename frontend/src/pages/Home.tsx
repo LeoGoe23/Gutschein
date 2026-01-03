@@ -96,7 +96,7 @@ export default function HomeLayout() {
             bottom: 0,
             right: 0,
             height: '100%',
-            maxWidth: '50%',
+            width: '55%',
             zIndex: 1,
             pointerEvents: 'none',
             display: { xs: 'none', sm: 'block' },
