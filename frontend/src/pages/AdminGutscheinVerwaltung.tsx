@@ -29,7 +29,7 @@ import {
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../auth/useAuth';
 import { 
   doc, 
@@ -64,6 +64,7 @@ interface Shop {
 
 export default function AdminGutscheinVerwaltung() {
   const user = useAuth();
+  const location = useLocation();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [shops, setShops] = useState<Shop[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
@@ -110,9 +111,15 @@ export default function AdminGutscheinVerwaltung() {
         });
       });
       setShops(shopsArr);
+      
+      // Vorauswahl aus location state
+      const preselectedShopId = location.state?.preselectedShopId;
+      if (preselectedShopId) {
+        setSelectedShopId(preselectedShopId);
+      }
     };
     if (isAdmin) fetchShops();
-  }, [isAdmin]);
+  }, [isAdmin, location.state]);
 
   // Gutscheine eines Shops laden
   const loadGutscheine = async (shopId: string) => {

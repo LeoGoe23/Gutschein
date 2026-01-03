@@ -105,9 +105,9 @@ export default function Blog() {
             </Typography>
           </Box>
         ) : (
-          <Grid container spacing={4}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 4 }}>
             {posts.map((post) => (
-              <Grid item xs={12} md={6} lg={4} key={post._id}>
+              <Box key={post._id}>
                 <Card
                   sx={{
                     height: '100%',
@@ -171,9 +171,9 @@ export default function Blog() {
                     </CardContent>
                   </CardActionArea>
                 </Card>
-              </Grid>
+              </Box>
             ))}
-          </Grid>
+          </Box>
         )}
       </Container>
 

@@ -20,23 +20,30 @@ const API_URL = process.env.REACT_APP_API_URL;
 function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: any; color: string; }) {
   return (
     <Box sx={{
-      flex: '1 1 180px',
-      minWidth: '180px',
+      flex: '1 1 250px',
+      minWidth: '250px',
       display: 'flex',
       alignItems: 'center',
-      p: 2,
-      borderRadius: '12px',
-      boxShadow: 1,
+      p: 3,
+      borderRadius: '16px',
+      boxShadow: 3,
       backgroundColor: '#fff',
-      borderLeft: `4px solid ${color}`,
-      gap: 2
+      borderLeft: `5px solid ${color}`,
+      gap: 3,
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      '&:hover': {
+        transform: 'translateY(-4px)',
+        boxShadow: 5,
+      }
     }}>
-      <Box sx={{ backgroundColor: `${color}20`, borderRadius: '8px', p: 1 }}>
-        {icon}
+      <Box sx={{ backgroundColor: `${color}20`, borderRadius: '12px', p: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ fontSize: '2rem', display: 'flex', color: color }}>
+          {icon}
+        </Box>
       </Box>
       <Box>
-        <Typography variant="body2" sx={{ color: '#555' }}>{label}</Typography>
-        <Typography variant="h5" sx={{ fontWeight: 'bold', mt: 0.5, fontSize: '1.25rem' }}>{value}</Typography>
+        <Typography variant="body1" sx={{ color: '#666', fontWeight: 500, mb: 0.5 }}>{label}</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 'bold', fontSize: '1.75rem', color: '#333' }}>{value}</Typography>
       </Box>
     </Box>
   );
@@ -54,6 +61,7 @@ export default function AdminPage() {
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [kontaktanfragen, setKontaktanfragen] = useState<any[]>([]);
   const [demoGutscheine, setDemoGutscheine] = useState<any[]>([]);
+  const [showLastGutscheine, setShowLastGutscheine] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -189,15 +197,6 @@ export default function AdminPage() {
         }}
       >
         <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto' }}>
-          <Typography variant="h4" fontWeight={700} gutterBottom color="primary">
-            Admin-Bereich
-          </Typography>
-          <Typography variant="h6" fontWeight={500} gutterBottom>
-            Du bist als <b>Admin</b> eingeloggt.
-          </Typography>
-          <Typography variant="body1" color="text.secondary" gutterBottom>
-            Übersicht der wichtigsten Statistiken:
-          </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 5, mt: 3 }}>
             <StatCard
               label="Gesamtumsatz"
@@ -216,12 +215,6 @@ export default function AdminPage() {
               value={stats?.gesamtShops ?? 0}
               icon={<StorefrontIcon />}
               color="#f59e0b"
-            />
-            <StatCard
-              label="Gesamthits"
-              value={stats?.gesamtHits ?? 0}
-              icon={<VisibilityIcon />}
-              color="#6366f1"
             />
           </Box>
 
@@ -460,36 +453,6 @@ export default function AdminPage() {
             </Paper>
           )}
 
-          <Paper
-            elevation={4}
-            sx={{
-              p: { xs: 3, md: 5 },
-              mt: { xs: 2, md: 4 },
-              borderRadius: 4,
-              minWidth: 320,
-              maxWidth: 420,
-              width: '100%',
-              textAlign: 'left',
-              background: 'white',
-            }}
-          >
-            <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>Letzte 3 Gutscheine</Typography>
-            {stats?.letzteDreiGutscheine && stats.letzteDreiGutscheine.length > 0 ? (
-              <List>
-                {stats.letzteDreiGutscheine.map((g: any, i: number) => (
-                  <ListItem key={i}>
-                    <ListItemText
-                      primary={`${g.gutscheinCode} (${g.betrag} €)`}
-                      secondary={`am ${g.kaufdatum}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography color="text.secondary">Keine Gutscheine gefunden.</Typography>
-            )}
-          </Paper>
-
           {/* Shops & Stripe-Konten */}
           <Box sx={{ mt: 6 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -502,12 +465,6 @@ export default function AdminPage() {
                   onClick={() => navigate('/admin/demos')}
                 >
                   Demo-Verwaltung
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={() => navigate('/admin/gutscheine')}
-                >
-                  Gutscheine verwalten
                 </Button>
                 <Button
                   variant="contained"
@@ -536,6 +493,18 @@ export default function AdminPage() {
                       onClick={() => navigate(`/admin/shop/${shop.id}/design`)}
                     >
                       Design bearbeiten
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="small"
+                      onClick={() => {
+                        navigate('/admin/gutscheine', { state: { preselectedShopId: shop.id } });
+                      }}
+                      sx={{ ml: 1 }}
+                    >
+                      Gutscheine verwalten
                     </Button>
                     
                     {/* NEU: Demo erstellen Button */}

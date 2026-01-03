@@ -7,6 +7,7 @@ export default function HeroImage() {
         width: '100%',
         height: '100%',
         objectFit: 'contain',
+        objectPosition: 'top right',
       }}
     />
   );
