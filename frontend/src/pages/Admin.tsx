@@ -1,15 +1,18 @@
-import { Box, CircularProgress, Typography, Paper, Divider, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel, Button } from '@mui/material';
+import { Box, CircularProgress, Typography, Paper, Divider, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel, Button, Chip, IconButton } from '@mui/material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../auth/useAuth';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import EmailIcon from '@mui/icons-material/Email';
+import ContactMailIcon from '@mui/icons-material/ContactMail';
+import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
 import GutscheinDesignAdminEdit from './GutscheinDesignAdminEdit'; // Import hinzufügen
 const API_URL = process.env.REACT_APP_API_URL;
@@ -49,6 +52,8 @@ export default function AdminPage() {
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [shops, setShops] = useState<any[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+  const [kontaktanfragen, setKontaktanfragen] = useState<any[]>([]);
+  const [demoGutscheine, setDemoGutscheine] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -129,6 +134,34 @@ export default function AdminPage() {
     if (isAdmin) fetchShops();
   }, [isAdmin]);
 
+  // Lade Kontaktanfragen
+  useEffect(() => {
+    const fetchKontaktanfragen = async () => {
+      const q = query(collection(db, 'kontaktanfragen'), orderBy('erstelltAm', 'desc'), limit(10));
+      const snapshot = await getDocs(q);
+      const anfragen: any[] = [];
+      snapshot.forEach(docSnap => {
+        anfragen.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setKontaktanfragen(anfragen);
+    };
+    if (isAdmin) fetchKontaktanfragen();
+  }, [isAdmin]);
+
+  // Lade Demo-Gutscheine
+  useEffect(() => {
+    const fetchDemoGutscheine = async () => {
+      const q = query(collection(db, 'demo-gutscheine'), orderBy('kaufdatum', 'desc'), limit(10));
+      const snapshot = await getDocs(q);
+      const demos: any[] = [];
+      snapshot.forEach(docSnap => {
+        demos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setDemoGutscheine(demos);
+    };
+    if (isAdmin) fetchDemoGutscheine();
+  }, [isAdmin]);
+
   if (isAdmin === null) {
     return (
       <Box sx={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -190,6 +223,135 @@ export default function AdminPage() {
               icon={<VisibilityIcon />}
               color="#6366f1"
             />
+          </Box>
+
+          {/* Kontaktanfragen & Demo-Mails */}
+          <Box sx={{ display: 'flex', gap: 3, mb: 5, flexWrap: 'wrap' }}>
+            {/* Kontaktanfragen */}
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, flex: '1 1 400px', minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <ContactMailIcon sx={{ color: '#1976d2' }} />
+                <Typography variant="h6" fontWeight={600}>
+                  Kontaktanfragen (letzte 10)
+                </Typography>
+              </Box>
+              {kontaktanfragen.length > 0 ? (
+                <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  {kontaktanfragen.map((anfrage) => (
+                    <ListItem
+                      key={anfrage.id}
+                      sx={{
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        borderBottom: '1px solid #e0e0e0',
+                        '&:last-child': { borderBottom: 'none' }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, width: '100%', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip
+                            label={anfrage.quelle || 'Unbekannt'}
+                            size="small"
+                            color="primary"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(anfrage.erstelltAm).toLocaleString('de-DE')}
+                          </Typography>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={async () => {
+                            if (!window.confirm('Kontaktanfrage wirklich löschen?')) return;
+                            try {
+                              await deleteDoc(doc(db, 'kontaktanfragen', anfrage.id));
+                              setKontaktanfragen(prev => prev.filter(k => k.id !== anfrage.id));
+                            } catch (error) {
+                              console.error('Fehler beim Löschen:', error);
+                              alert('Fehler beim Löschen der Kontaktanfrage');
+                            }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                        {anfrage.kontakt}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: 'break-word' }}>
+                        {anfrage.nachricht}
+                      </Typography>
+                    </ListItem>
+                  ))}
+                </List>
+              ) : (
+                <Typography color="text.secondary">Keine Kontaktanfragen vorhanden.</Typography>
+              )}
+            </Paper>
+
+            {/* Demo-Gutscheine */}
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, flex: '1 1 400px', minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <EmailIcon sx={{ color: '#10b981' }} />
+                <Typography variant="h6" fontWeight={600}>
+                  Demo-Mails (letzte 10)
+                </Typography>
+              </Box>
+              {demoGutscheine.length > 0 ? (
+                <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  {demoGutscheine.map((demo) => (
+                    <ListItem
+                      key={demo.id}
+                      sx={{
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        borderBottom: '1px solid #e0e0e0',
+                        '&:last-child': { borderBottom: 'none' }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, width: '100%', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(demo.kaufdatum).toLocaleString('de-DE')}
+                          </Typography>
+                          <Chip
+                            label={`${demo.betrag} €`}
+                            size="small"
+                            color="success"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                        </Box>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={async () => {
+                            if (!window.confirm('Demo-Mail wirklich löschen?')) return;
+                            try {
+                              await deleteDoc(doc(db, 'demo-gutscheine', demo.id));
+                              setDemoGutscheine(prev => prev.filter(d => d.id !== demo.id));
+                            } catch (error) {
+                              console.error('Fehler beim Löschen:', error);
+                              alert('Fehler beim Löschen der Demo-Mail');
+                            }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                        {demo.customerEmail}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Code: {demo.gutscheinCode}
+                      </Typography>
+                    </ListItem>
+                  ))}
+                </List>
+              ) : (
+                <Typography color="text.secondary">Keine Demo-Mails vorhanden.</Typography>
+              )}
+            </Paper>
           </Box>
 
           {/* Filter für Monat und Tag */}
