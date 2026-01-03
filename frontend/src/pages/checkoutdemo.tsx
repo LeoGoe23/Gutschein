@@ -1,9 +1,13 @@
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField, Dialog, DialogContent, DialogActions } from '@mui/material';
-import { useState } from 'react';
-import TopLeftLogo from '../components/home/TopLeftLogo'; // <--- Hinzugefügt
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField, Dialog, DialogContent, DialogActions, CircularProgress } from '@mui/material';
+import { useState, useRef } from 'react';
+import TopLeftLogo from '../components/home/TopLeftLogo';
 import LoginModal from '../components/login/LoginModal';
+import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../auth/firebase';
 
 const DEMO_BILD_URL = '/Bild1.png';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const DEMO_DLS = [
   { shortDesc: '30 Min. Massage', longDesc: 'Entspannende Teilkörpermassage', price: '39' },
@@ -21,6 +25,15 @@ export default function GutscheinDemoPage() {
   const [purchasedBetrag, setPurchasedBetrag] = useState<number>(0);
   const [showPopup, setShowPopup] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [pdfGenerated, setPdfGenerated] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const hasSentRef = useRef(false);
+  const [kontaktName, setKontaktName] = useState('');
+  const [kontaktEmail, setKontaktEmail] = useState('');
+  const [kontaktTelefon, setKontaktTelefon] = useState('');
+  const [kontaktNachricht, setKontaktNachricht] = useState('');
+  const [kontaktSending, setKontaktSending] = useState(false);
 
   const handleWeiter = () => {
     if (gutscheinType === 'wert' && (!betrag || betrag <= 0)) {
@@ -34,14 +47,191 @@ export default function GutscheinDemoPage() {
     setShowPaymentForm(true);
   };
 
-  const handleFakePayment = () => {
-    setPurchasedBetrag(selectedDienstleistung ? Number(selectedDienstleistung.price) : betrag || 0);
+  const generateGutscheinCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 12; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  const handleFakePayment = async () => {
+    if (hasSentRef.current) return;
+    hasSentRef.current = true;
+
+    const finalBetrag = selectedDienstleistung ? Number(selectedDienstleistung.price) : betrag || 0;
+    setPurchasedBetrag(finalBetrag);
     setShowSuccessPage(true);
-    
-    // Pop-up nach 1 Sekunde öffnen
-    setTimeout(() => {
-      setShowPopup(true);
-    }, 1000);
+    setIsSending(true);
+
+    try {
+      const gutscheinCode = generateGutscheinCode();
+
+      console.log('🎨 Erstelle Demo-Gutschein...');
+      
+      // Für die Demo: Einfaches PDF direkt erstellen (ohne DOM-Rendering)
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      // Bild laden
+      let bildBase64 = '';
+      try {
+        const response = await fetch(DEMO_BILD_URL);
+        const blob = await response.blob();
+        bildBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (imgError) {
+        console.warn('⚠️ Bild-Konvertierung fehlgeschlagen:', imgError);
+      }
+
+      // Bild im oberen Viertel (A4 = 210mm breit, 297mm hoch) - cover fit
+      if (bildBase64) {
+        // Bild wird abgeschnitten aber nicht gestreckt (wie CSS object-fit: cover)
+        const img = new Image();
+        img.src = bildBase64;
+        await new Promise(resolve => { img.onload = resolve; });
+        
+        const imgRatio = img.width / img.height;
+        const containerRatio = 210 / 74;
+        
+        let imgWidth, imgHeight, offsetX, offsetY;
+        
+        if (imgRatio > containerRatio) {
+          // Bild ist breiter - Höhe passt, Breite wird abgeschnitten
+          imgHeight = 74;
+          imgWidth = 74 * imgRatio;
+          offsetX = -(imgWidth - 210) / 2;
+          offsetY = 0;
+        } else {
+          // Bild ist höher - Breite passt, Höhe wird abgeschnitten
+          imgWidth = 210;
+          imgHeight = 210 / imgRatio;
+          offsetX = 0;
+          offsetY = -(imgHeight - 74) / 2;
+        }
+        
+        doc.addImage(bildBase64, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+      }
+
+      // Text zentriert
+      doc.setFontSize(32);
+      doc.setTextColor(211, 47, 47); // Rot
+      doc.text('Geschenk Gutschein', 105, 100, { align: 'center' });
+
+      doc.setFontSize(18);
+      doc.setTextColor(51, 51, 51);
+      doc.text('über', 105, 115, { align: 'center' });
+
+      // Betrag
+      doc.setFontSize(52);
+      doc.setTextColor(0, 0, 0);
+      const betragText = selectedDienstleistung 
+        ? selectedDienstleistung.shortDesc 
+        : `€ ${finalBetrag}`;
+      doc.text(betragText, 105, 145, { align: 'center' });
+
+      // Gutscheincode
+      doc.setFontSize(20);
+      doc.setFont('courier', 'bold');
+      doc.text(gutscheinCode, 105, 170, { align: 'center' });
+
+      // Linie
+      doc.setDrawColor(211, 47, 47);
+      doc.setLineWidth(1);
+      doc.line(80, 180, 130, 180);
+
+      // Unternehmen
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(211, 47, 47);
+      doc.text('Massage Studio Demo', 105, 200, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(102, 102, 102);
+      doc.text('www.massage-studio-demo.de', 105, 210, { align: 'center' });
+
+      // PDF als Blob
+      const pdfBlob = doc.output('blob');
+      setPdfGenerated(true);
+
+      // PDF zu Base64 konvertieren
+      const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+      function arrayBufferToBase64(buffer: ArrayBuffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+      }
+      const pdfBase64 = arrayBufferToBase64(pdfArrayBuffer);
+
+      // E-Mail versenden
+      const emailData = {
+        empfaengerEmail: customerEmail,
+        unternehmensname: 'Massage Studio Demo',
+        gutscheinCode,
+        betrag: finalBetrag,
+        dienstleistung: selectedDienstleistung,
+        pdfBuffer: pdfBase64,
+        isDemoMode: true
+      };
+
+      console.log('📧 Sende Demo-Email...');
+      console.log('📦 Email-Daten:', {
+        empfaengerEmail: customerEmail,
+        unternehmensname: 'Massage Studio Demo',
+        gutscheinCode,
+        betrag: finalBetrag,
+        pdfBufferLength: pdfBase64.length
+      });
+      
+      const response = await fetch(`${API_URL}/api/gutscheine/demo/send-gutschein`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailData),
+      });
+
+      console.log('📥 Response Status:', response.status);
+      const responseData = await response.json();
+      console.log('📥 Response Data:', responseData);
+
+      if (response.ok) {
+        setEmailSent(true);
+        console.log('✅ Demo-Email erfolgreich versendet');
+
+        // In Firebase speichern
+        try {
+          await addDoc(collection(db, 'demo-gutscheine'), {
+            gutscheinCode,
+            betrag: finalBetrag,
+            empfaengerEmail: customerEmail,
+            dienstleistung: selectedDienstleistung?.shortDesc || null,
+            erstelltAm: new Date().toISOString(),
+            unternehmensname: 'Massage Studio Demo',
+          });
+          console.log('✅ Demo-Gutschein in Firebase gespeichert');
+        } catch (fbError) {
+          console.error('❌ Firebase-Fehler:', fbError);
+        }
+      } else {
+        console.error('❌ Email-Versand fehlgeschlagen:', responseData);
+      }
+    } catch (error) {
+      console.error('❌ Fehler beim Demo-Checkout:', error);
+    } finally {
+      setIsSending(false);
+      // Pop-up nach 1 Sekunde öffnen
+      setTimeout(() => {
+        setShowPopup(true);
+      }, 1000);
+    }
   };
 
   return (
@@ -61,24 +251,7 @@ export default function GutscheinDemoPage() {
         <Box sx={{ maxWidth: '450px', width: '100%', textAlign: { xs: 'center', md: 'left' }, mt: { xs: 8, md: 6 } }}>
           {!showSuccessPage ? (
             <>
-              <Box sx={{ mb: 3 }}>
-                <Button
-                  variant="contained"
-                  sx={{
-                    backgroundColor: '#4caf50',
-                    color: 'white',
-                    px: 3,
-                    py: 1.5,
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    '&:hover': { backgroundColor: '#45a049' }
-                  }}
-                  onClick={() => window.open('https://calendly.com/gutscheinfabrik/15-minute-meeting', '_blank')}
-                >
-                  Sind 15min Ihrer Zeit 60€ wert?
-                </Button>
-              </Box>
+
               <Typography variant="h5" sx={{ fontWeight: 500, mb: 1, color: 'grey.600' }}>
                 Gutschein für
               </Typography>
@@ -166,7 +339,7 @@ export default function GutscheinDemoPage() {
                     </Box>
                   )}
 
-                  <Box sx={{ mt: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'center', alignItems: 'center' }}>
+                  <Box sx={{ mt: 3, display: 'flex', justifyContent: { xs: 'center', md: 'flex-start' } }}>
                     <Button
                       variant="contained"
                       color="primary"
@@ -180,36 +353,7 @@ export default function GutscheinDemoPage() {
                     >
                       Jetzt zahlen
                     </Button>
-                    <Button
-                      variant="outlined"
-                      size="large"
-                      sx={{ 
-                        borderRadius: 2, 
-                        px: 4, 
-                        py: 1.5, 
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        borderColor: '#666',
-                        color: '#666',
-                        '&:hover': { borderColor: '#333', color: '#333' }
-                      }}
-                      onClick={() => setLoginModalOpen(true)}
-                    >
-                      Jetzt registrieren
-                    </Button>
                   </Box>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      display: 'block',
-                      textAlign: 'center',
-                      mt: 2,
-                      color: 'grey.600',
-                      fontStyle: 'italic'
-                    }}
-                  >
-                    Schneller registrieren als dein Kaffee fertig ist.
-                  </Typography>
                 </Box>
               )}
 
@@ -222,27 +366,39 @@ export default function GutscheinDemoPage() {
                     onChange={e => setCustomerEmail(e.target.value)}
                     required
                     fullWidth
-                    sx={{ mb: 2 }}
+                    sx={{ mb: 3 }}
                   />
+
                   <Button
                     variant="contained"
                     size="large"
+                    fullWidth
                     sx={{
                       borderRadius: 2,
                       px: 4,
                       py: 1.5,
-                      backgroundColor: '#e0e0e0',
-                      color: '#000',
+                      backgroundColor: '#1976d2',
+                      color: '#fff',
                       fontWeight: 600,
                       textTransform: 'none',
                       boxShadow: 3,
-                      '&:hover': { backgroundColor: '#bdbdbd' },
-                      mt: 2,
+                      '&:hover': { backgroundColor: '#1565c0', boxShadow: 4 },
+                      '&:disabled': {
+                        backgroundColor: '#ccc',
+                        color: '#666'
+                      }
                     }}
                     onClick={handleFakePayment}
-                    disabled={!customerEmail}
+                    disabled={!customerEmail || isSending}
                   >
-                    Zahlung abschließen
+                    {isSending ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={20} color="inherit" />
+                        Wird verarbeitet...
+                      </Box>
+                    ) : (
+                      `💳 Zahlung abschließen (${selectedDienstleistung ? selectedDienstleistung.price : betrag}€)`
+                    )}
                   </Button>
                 </Box>
               )}
@@ -258,11 +414,41 @@ export default function GutscheinDemoPage() {
                   : `Ihr Wertgutschein über ${purchasedBetrag}€`}
               </Typography>
               <Typography variant="body1" sx={{ mb: 4, color: 'grey.600' }}>
-                Der Gutschein wurde erfolgreich an {customerEmail} gesendet (Demo).
+                Wir freuen uns auf Ihren Besuch!
               </Typography>
-              <Alert severity="success" sx={{ mb: 2 }}>
-                Zahlung erfolgreich!
-              </Alert>
+
+              {/* Status-Anzeigen mit fester Höhe gegen Wackeln */}
+              <Box sx={{ minHeight: '70px', mb: 2 }}>
+                {isSending && !pdfGenerated && (
+                  <Alert severity="info">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CircularProgress size={20} />
+                      <span>Gutschein wird erstellt...</span>
+                    </Box>
+                  </Alert>
+                )}
+
+                {isSending && pdfGenerated && !emailSent && (
+                  <Alert severity="success">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <span>✅ Gutschein erstellt! E-Mail wird versendet...</span>
+                      <CircularProgress size={16} />
+                    </Box>
+                  </Alert>
+                )}
+
+                {emailSent && (
+                  <Alert severity="success">
+                    ✅ Gutschein wurde erfolgreich an {customerEmail} gesendet!
+                  </Alert>
+                )}
+
+                {!emailSent && !isSending && (
+                  <Alert severity="success">
+                    Zahlung erfolgreich!
+                  </Alert>
+                )}
+              </Box>
             </Box>
           )}
         </Box>
@@ -298,61 +484,100 @@ export default function GutscheinDemoPage() {
           }
         }}
       >
-        <DialogContent sx={{ textAlign: 'center', py: 4 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#333' }}>
-            🎉 Sie haben es schon so weit geschafft!
+        <DialogContent sx={{ py: 5, px: 5, textAlign: 'center' }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a1a1a' }}>
+            Jetzt durchstarten!
           </Typography>
-          <Typography variant="body1" sx={{ color: 'grey.700', mb: 3, lineHeight: 1.6 }}>
-            Registrieren Sie sich in unter 7 min und fangen Sie an, Geld im Schlaf zu verdienen!
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 3, flexDirection: 'column', gap: 2 }}>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Button
+          <Box sx={{ 
+            backgroundColor: '#f0f7ff', 
+            borderRadius: 2, 
+            py: 2.5, 
+            px: 3, 
+            mb: 4,
+            border: '2px solid #1976d2'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1976d2', lineHeight: 1.6, fontSize: '1.15rem' }}>
+              Nur 3% Provision • Keine Fixkosten
+            </Typography>
+          </Box>
+
+          {/* Zwei einfache Felder */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 4 }}>
+            <TextField
+              label="Ihre Kontaktmöglichkeit"
+              value={kontaktEmail}
+              onChange={(e) => setKontaktEmail(e.target.value)}
+              fullWidth
+              placeholder="E-Mail oder Telefonnummer"
               variant="outlined"
               sx={{
-                borderColor: '#2196f3',
-                color: '#2196f3',
-                px: 4,
-                py: 1.5,
-                borderRadius: 2,
-                fontWeight: 600,
-                textTransform: 'none',
-                '&:hover': { borderColor: '#1976d2', color: '#1976d2' }
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
               }}
-              onClick={() => {
-                setLoginModalOpen(true);
-                setShowPopup(false);
-              }}
-            >
-              Jetzt registrieren
-            </Button>
-            <Button
-              variant="contained"
+            />
+            <TextField
+              label="Ihre Nachricht (optional)"
+              value={kontaktNachricht}
+              onChange={(e) => setKontaktNachricht(e.target.value)}
+              multiline
+              rows={3}
+              fullWidth
+              placeholder="Was möchten Sie uns mitteilen?"
+              variant="outlined"
               sx={{
-                backgroundColor: '#4caf50',
-                color: 'white',
-                px: 4,
-                py: 1.5,
-                borderRadius: 2,
-                fontWeight: 600,
-                textTransform: 'none',
-                '&:hover': { backgroundColor: '#45a049' }
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
               }}
-              onClick={() => {
-                window.open('https://calendly.com/gutscheinfabrik/15-minute-meeting', '_blank');
-                setShowPopup(false);
-              }}
-            >
-              Kurzgespräch vereinbaren
-            </Button>
+            />
           </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 4, px: 5, flexDirection: 'column', gap: 2 }}>
+          <Button
+            variant="contained"
+            fullWidth
+            disabled={!kontaktEmail || kontaktSending}
+            sx={{
+              backgroundColor: '#1976d2',
+              color: 'white',
+              py: 1.5,
+              borderRadius: 2,
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '1rem',
+              '&:hover': { backgroundColor: '#1565c0' },
+              '&:disabled': { backgroundColor: '#e0e0e0', color: '#999' }
+            }}
+            onClick={async () => {
+              setKontaktSending(true);
+              try {
+                await addDoc(collection(db, 'kontaktanfragen'), {
+                  kontakt: kontaktEmail,
+                  nachricht: kontaktNachricht,
+                  erstelltAm: new Date().toISOString(),
+                  quelle: 'Demo-Checkout'
+                });
+                alert('✅ Vielen Dank! Wir melden uns in Kürze bei Ihnen.');
+                setShowPopup(false);
+                setKontaktEmail('');
+                setKontaktNachricht('');
+              } catch (error) {
+                console.error('Fehler beim Senden:', error);
+                alert('❌ Es gab einen Fehler. Bitte versuchen Sie es erneut.');
+              } finally {
+                setKontaktSending(false);
+              }
+            }}
+          >
+            {kontaktSending ? 'Wird gesendet...' : 'Kontaktanfrage senden'}
+          </Button>
           <Button
             variant="text"
-            sx={{ color: 'grey.600' }}
+            sx={{ color: 'grey.500', textTransform: 'none', fontSize: '0.9rem' }}
             onClick={() => setShowPopup(false)}
           >
-            Später
+            Vielleicht später
           </Button>
         </DialogActions>
       </Dialog>
