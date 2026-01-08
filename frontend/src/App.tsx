@@ -30,7 +30,7 @@ import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminBlogEditor from './pages/admin/AdminBlogEditor';
-import WidgetDemo from './pages/WidgetDemo';
+// import WidgetDemo from './pages/WidgetDemo';
 import EmbedWidget from './pages/EmbedWidget';
 
 // Google Analytics Tracking
@@ -127,7 +127,7 @@ function AppContent() {
       <Route path="/blog/:slug" element={<BlogPost />} />
 
       {/* Widget Routes */}
-      <Route path="/widget-demo" element={<WidgetDemo />} />
+      {/* <Route path="/widget-demo" element={<WidgetDemo />} /> */}
       <Route path="/embed/:slug" element={<EmbedWidget />} />
 
       {/* Admin Blog Routes */}
