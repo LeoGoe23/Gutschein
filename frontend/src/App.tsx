@@ -31,7 +31,7 @@ import BlogPost from './pages/BlogPost';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminBlogEditor from './pages/admin/AdminBlogEditor';
 // import WidgetDemo from './pages/WidgetDemo';
-import EmbedWidget from './pages/EmbedWidget';
+// import EmbedWidget from './pages/EmbedWidget';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -128,7 +128,7 @@ function AppContent() {
 
       {/* Widget Routes */}
       {/* <Route path="/widget-demo" element={<WidgetDemo />} /> */}
-      <Route path="/embed/:slug" element={<EmbedWidget />} />
+      {/* <Route path="/embed/:slug" element={<EmbedWidget />} /> */}
 
       {/* Admin Blog Routes */}
       <Route path="/admin/blog" element={<AdminBlog />} />
