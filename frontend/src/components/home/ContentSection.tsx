@@ -12,7 +12,7 @@ export default function ContentSection() {
 
   return (
     <>
-      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', padding: { xs: '4rem 1rem', md: '6rem 2rem' }, overflow: 'hidden', backgroundColor: '#f4f4f4' }}>
+      <Box id="vorteile" sx={{ width: '100%', display: 'flex', justifyContent: 'center', padding: { xs: '4rem 1rem', md: '6rem 2rem' }, overflow: 'hidden', backgroundColor: '#f4f4f4' }}>
         <Box
           sx={{
             width: '100%',
@@ -101,6 +101,26 @@ export default function ContentSection() {
           >
             Jetzt starten
           </Button>
+
+          {/* <Box sx={{ textAlign: 'center', mt: 3 }}>
+            <Typography sx={{ color: '#999', fontSize: '0.85rem' }}>
+              Mehr erfahren?{' '}
+              <Typography
+                component="span"
+                onClick={() => navigate('/blog')}
+                sx={{
+                  color: '#4F46E5',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  '&:hover': { color: '#4338ca' }
+                }}
+              >
+                Zum Blog
+              </Typography>
+            </Typography>
+          </Box> */}
           <LoginModal open={open} onClose={() => setOpen(false)} />
         </Box>
       </Box>

@@ -1,3 +1,11 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin/
+Disallow: /profil/
+Disallow: /checkout/
+Disallow: /checkoutadmin/
+Disallow: /demo/
+Disallow: /embed/
+
+Sitemap: https://gutscheinery.de/sitemap.xml

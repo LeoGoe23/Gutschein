@@ -56,7 +56,23 @@ export default function TopBar() {
   };
 
   const handleVorteileClick = () => {
-    navigate('/vorteile');
+    // Wenn wir nicht auf Home sind, navigiere erst dorthin
+    if (window.location.pathname !== '/') {
+      navigate('/');
+      // Warte kurz bis die Seite geladen ist, dann scrolle
+      setTimeout(() => {
+        const element = document.getElementById('vorteile');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else {
+      // Bereits auf Home, scrolle direkt
+      const element = document.getElementById('vorteile');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   };
 
   const handleBlogClick = () => {
@@ -178,7 +194,10 @@ export default function TopBar() {
       {/* Drawer for Mobile */}
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <List sx={{ width: 250 }}>
-          <ListItem component="li" onClick={() => { navigate('/vorteile'); setDrawerOpen(false); }}>
+          <ListItem component="li" onClick={() => { 
+            setDrawerOpen(false);
+            handleVorteileClick();
+          }}>
             <ListItemText primary="Vorteile" />
           </ListItem>
           <ListItem component="li" onClick={() => { navigate('/blog'); setDrawerOpen(false); }}>

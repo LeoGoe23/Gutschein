@@ -21,24 +21,25 @@ import Datenschutz from './components/home/legal/Datenschutz';
 import Impressum from './components/home/legal/Impressum';
 import AdminPage from './pages/Admin';
 import Kontakt from './pages/Kontakt';
-import Vorteile from './pages/Vorteile';
 import GutscheinDesignAdminEdit from './pages/GutscheinDesignAdminEdit';
 import CheckoutAdmin from './pages/checkoutadmin';
 import AdminGutscheinVerwaltung from './pages/AdminGutscheinVerwaltung';
 import AdminDemosPage from './pages/AdminDemos';
 import DemoCheckoutPage from './pages/DemoCheckout';
-import DemoFinal from './pages/DemoFinal';
 import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminBlogEditor from './pages/admin/AdminBlogEditor';
+import WidgetDemo from './pages/WidgetDemo';
+import EmbedWidget from './pages/EmbedWidget';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
 
 declare global {
   interface Window {
-    gtag: (command: string, targetId: string, config?: any) => void;
+    gtag: (...args: any[]) => void;
+    dataLayer: any[];
   }
 }
 
@@ -47,20 +48,23 @@ function usePageTracking() {
   const location = useLocation();
 
   useEffect(() => {
+    // DataLayer initialisieren
+    window.dataLayer = window.dataLayer || [];
+    
+    // gtag Funktion definieren
+    window.gtag = function() {
+      window.dataLayer.push(arguments);
+    };
+    
     // Google Analytics Script laden
-    if (!window.gtag) {
+    if (!document.querySelector(`script[src*="googletagmanager.com/gtag/js"]`)) {
       const script = document.createElement('script');
       script.async = true;
       script.src = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`;
       document.head.appendChild(script);
 
       script.onload = () => {
-        window.gtag = function gtag() {
-          (window as any).dataLayer = (window as any).dataLayer || [];
-          (window as any).dataLayer.push(arguments);
-        };
-        
-        window.gtag('js', 'date');
+        window.gtag('js', new Date());
         window.gtag('config', GOOGLE_ANALYTICS_ID, {
           page_title: document.title,
           page_location: window.location.href
@@ -112,17 +116,19 @@ function AppContent() {
       <Route path="/impressum" element={<Impressum />} />
       <Route path="/admin" element={<AdminPage />} />
       <Route path="/kontakt" element={<Kontakt />} />
-      <Route path="/vorteile" element={<Vorteile />} />
       <Route path="/admin/shop/:shopId/design" element={<GutscheinDesignAdminEdit />} />
       <Route path="/checkoutadmin/:slug" element={<CheckoutAdmin />} />
       <Route path="/admin/gutscheine" element={<AdminGutscheinVerwaltung />} />
       <Route path="/admin/demos" element={<AdminDemosPage />} />
       <Route path="/demo/:slug" element={<DemoCheckoutPage />} />
-      <Route path="/demofinal/:slug" element={<DemoFinal />} />
 
       {/* Blog Routes */}
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
+
+      {/* Widget Routes */}
+      <Route path="/widget-demo" element={<WidgetDemo />} />
+      <Route path="/embed/:slug" element={<EmbedWidget />} />
 
       {/* Admin Blog Routes */}
       <Route path="/admin/blog" element={<AdminBlog />} />
