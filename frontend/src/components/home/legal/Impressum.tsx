@@ -32,7 +32,7 @@ export default function Impressum() {
             Kontakt
           </Typography>
           <Typography variant="body1" paragraph>
-            Telefon: 17672910739<br />
+            Telefon: 01577 6394652<br />
             E-Mail: <Link href="mailto:gutscheinfabrik@gmail.com">gutscheinfabrik@gmail.com</Link>
           </Typography>
           <Typography variant="h6" gutterBottom>
@@ -47,7 +47,7 @@ export default function Impressum() {
           <Typography variant="body1" paragraph>
             Unsere zentrale Kontaktstelle für Nutzer und Behörden nach Art. 11, 12 DSA erreichen Sie wie folgt:<br />
             E-Mail: <Link href="mailto:gutscheinfabrik@gmail.com">gutscheinfabrik@gmail.com</Link><br />
-            Telefon: 17672910739<br />
+            Telefon: 01577 6394652<br />
             Die für den Kontakt zur Verfügung stehenden Sprachen sind: Deutsch, Englisch.
           </Typography>
         </Container>

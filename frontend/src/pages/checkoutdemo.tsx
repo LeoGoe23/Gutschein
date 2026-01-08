@@ -1,5 +1,5 @@
 import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField, Dialog, DialogContent, DialogActions, CircularProgress } from '@mui/material';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import LoginModal from '../components/login/LoginModal';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
@@ -34,6 +34,16 @@ export default function GutscheinDemoPage() {
   const [kontaktTelefon, setKontaktTelefon] = useState('');
   const [kontaktNachricht, setKontaktNachricht] = useState('');
   const [kontaktSending, setKontaktSending] = useState(false);
+
+  useEffect(() => {
+    document.title = 'Demo Checkout - Gutscheinery | Jetzt testen';
+    
+    // Meta Description
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', 'Testen Sie unseren Gutschein-Checkout. Einfach, schnell und sicher digitale Gutscheine kaufen.');
+    }
+  }, []);
 
   const handleWeiter = () => {
     if (gutscheinType === 'wert' && (!betrag || betrag <= 0)) {
@@ -211,9 +221,9 @@ export default function GutscheinDemoPage() {
           await addDoc(collection(db, 'demo-gutscheine'), {
             gutscheinCode,
             betrag: finalBetrag,
-            empfaengerEmail: customerEmail,
+            customerEmail: customerEmail,
             dienstleistung: selectedDienstleistung?.shortDesc || null,
-            erstelltAm: new Date().toISOString(),
+            kaufdatum: new Date().toISOString(),
             unternehmensname: 'Massage Studio Demo',
           });
           console.log('✅ Demo-Gutschein in Firebase gespeichert');

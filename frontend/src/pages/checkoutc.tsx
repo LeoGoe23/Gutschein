@@ -70,11 +70,11 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
 
           // ✅ Stripe MIT Connect Account laden (wenn vorhanden)
           let stripeLoadConfig: any = {};
-          if (stripeAccountId && !data.testMode) {
+          if (stripeAccountId) {
             stripeLoadConfig.stripeAccount = stripeAccountId;
-            console.log('🔗 Lade Stripe MIT Connect Account:', stripeAccountId);
+            console.log(`🔗 Lade Stripe MIT Connect Account (${data.testMode ? 'TEST' : 'LIVE'}):`, stripeAccountId);
           } else {
-            console.log('🧪 Lade Stripe OHNE Connect (Test-Mode oder kein Account)');
+            console.log('⚠️ Lade Stripe OHNE Connect Account');
           }
 
           const stripeInstance = (window as any).Stripe(stripeKey, stripeLoadConfig);
@@ -123,7 +123,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         const requestData = {
           amount: amountInCents,
           customerEmail: 'placeholder@example.com', // ✅ Placeholder für Payment Intent Creation
-          stripeAccountId: isTestMode ? null : stripeAccountId,
+          stripeAccountId: stripeAccountId, // ✅ AUCH im Test-Modus Connect Account verwenden
           slug,
           provision
         };
@@ -750,16 +750,6 @@ export default function GutscheinLandingPage() {
 
     loadData();
   }, [slug]);
-
-  // ✅ LÖSCHEN: Diesen kompletten useEffect entfernen!
-  // useEffect(() => {
-  //   const params = new URLSearchParams(location.search);
-  //   if (params.get('success') === 'true') {
-  //     const sessionId = params.get('session_id');
-  //     setShowSuccessPage(true);
-  //     // ... ganze Logic weg
-  //   }
-  // }, [location, checkoutData]);
 
   // ✅ NEU: Einfacher Payment Success Handler
   const handlePaymentSuccess = (betrag: number, email: string) => {

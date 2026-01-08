@@ -159,13 +159,27 @@ export default function AdminPage() {
   // Lade Demo-Gutscheine
   useEffect(() => {
     const fetchDemoGutscheine = async () => {
-      const q = query(collection(db, 'demo-gutscheine'), orderBy('kaufdatum', 'desc'), limit(10));
-      const snapshot = await getDocs(q);
-      const demos: any[] = [];
-      snapshot.forEach(docSnap => {
-        demos.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setDemoGutscheine(demos);
+      try {
+        // Alle Dokumente laden (ohne orderBy um Index-Fehler zu vermeiden)
+        const snapshot = await getDocs(collection(db, 'demo-gutscheine'));
+        const demos: any[] = [];
+        snapshot.forEach(docSnap => {
+          demos.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        
+        // Im Code sortieren (unterstützt beide Feldnamen)
+        demos.sort((a, b) => {
+          const dateA = new Date(a.kaufdatum || a.erstelltAm || 0).getTime();
+          const dateB = new Date(b.kaufdatum || b.erstelltAm || 0).getTime();
+          return dateB - dateA;
+        });
+        
+        // Nur die letzten 10
+        setDemoGutscheine(demos.slice(0, 10));
+      } catch (error) {
+        console.error('Fehler beim Laden der Demo-Gutscheine:', error);
+        setDemoGutscheine([]);
+      }
     };
     if (isAdmin) fetchDemoGutscheine();
   }, [isAdmin]);
@@ -306,7 +320,7 @@ export default function AdminPage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, width: '100%', justifyContent: 'space-between' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="caption" color="text.secondary">
-                            {new Date(demo.kaufdatum).toLocaleString('de-DE')}
+                            {new Date(demo.kaufdatum || demo.erstelltAm).toLocaleString('de-DE')}
                           </Typography>
                           <Chip
                             label={`${demo.betrag} €`}
@@ -333,7 +347,7 @@ export default function AdminPage() {
                         </IconButton>
                       </Box>
                       <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
-                        {demo.customerEmail}
+                        {demo.customerEmail || demo.empfaengerEmail}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                         Code: {demo.gutscheinCode}
@@ -505,38 +519,6 @@ export default function AdminPage() {
                       sx={{ ml: 1 }}
                     >
                       Gutscheine verwalten
-                    </Button>
-                    
-                    {/* NEU: Demo erstellen Button */}
-                    <Button
-                      variant="outlined"
-                      color="success"
-                      size="small"
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(`${API_URL}/api/gutscheine/demo/create`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ shopId: shop.id })
-                          });
-                          
-                          if (response.ok) {
-                            const data = await response.json();
-                            const demoUrl = `${window.location.origin}/demofinal/${data.demoSlug}`;
-                            alert(`Demo erstellt!\n\nURL: ${demoUrl}\n\nDie Demo öffnet sich in einem neuen Tab.`);
-                            window.open(demoUrl, '_blank');
-                          } else {
-                            const errorData = await response.json();
-                            alert(`Fehler beim Erstellen der Demo: ${errorData.error}`);
-                          }
-                        } catch (err) {
-                          console.error('Demo-Erstellung Fehler:', err);
-                          alert('Fehler beim Erstellen der Demo');
-                        }
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      🎭 Demo erstellen
                     </Button>
                     
                     {shop.stripeAccountId && (

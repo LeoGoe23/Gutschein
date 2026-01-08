@@ -29,11 +29,30 @@ export default function Footer() {
           <Link onClick={() => setOpen(true)} underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb', cursor: 'pointer' }}>
             Für Partner
           </Link>
-          <Link component={RouterLink} to="/vorteile" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+          <Link onClick={() => {
+            if (window.location.pathname !== '/') {
+              window.location.href = '/#vorteile';
+            } else {
+              document.getElementById('vorteile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }} underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb', cursor: 'pointer' }}>
             Vorteile
           </Link>
           <Link component={RouterLink} to="/kontakt" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
             Kontakt
+          </Link>
+        </Box>
+
+        {/* Navigation Produkte */}
+        <Box sx={{ flex: '1 1 180px', minWidth: '150px' }}>
+          <Typography sx={{ fontSize: '1.2rem', fontWeight: 600, color: '#4F46E5', mb: '1rem' }}>
+            Entdecken
+          </Typography>
+          <Link component={RouterLink} to="/blog" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+            Blog
+          </Link>
+          <Link component={RouterLink} to="/checkoutdemo" underline="hover" sx={{ display: 'block', mb: '0.5rem', color: '#bbb' }}>
+            Demo testen
           </Link>
         </Box>
 
@@ -59,7 +78,11 @@ export default function Footer() {
             Kontakt
           </Typography>
           <Typography sx={{ color: '#bbb', mb: '0.5rem' }}>
-            Konrad Blersch, Leonhard Götz
+            GutscheinFabrik GbR
+          </Typography>
+          <Typography sx={{ color: '#bbb', mb: '0.5rem' }}>
+            Leonhard Götz<br />
+            Konrad Blersch
           </Typography>
           <Typography sx={{ color: '#bbb' }}>
             Stünzbach 4a<br />Buch am Erlbach

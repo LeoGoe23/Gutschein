@@ -1,4 +1,4 @@
-import { Box, Container, Typography, CircularProgress, Chip, Button } from '@mui/material';
+import { Box, Container, Typography, CircularProgress, Chip, Button, Avatar } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -73,18 +73,18 @@ export default function BlogPost() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+    <Box sx={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%)' }}>
       <SEOHead post={post} type="article" />
 
       {/* Header */}
-      <Box sx={{ position: 'relative', backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+      <Box sx={{ position: 'relative', backgroundColor: 'transparent' }}>
         <LogoTopLeft />
         <Box sx={{ position: 'absolute', top: { xs: '0.5rem', md: '1.5rem' }, right: { xs: '1rem', md: '4rem' }, zIndex: 3 }}>
           <TopBar />
         </Box>
 
         {/* Back Button */}
-        <Container maxWidth="md" sx={{ pt: { xs: 10, md: 12 }, pb: 3 }}>
+        <Container maxWidth="md" sx={{ pt: { xs: 10, md: 12 }, pb: 2 }}>
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={() => navigate('/blog')}
@@ -92,48 +92,122 @@ export default function BlogPost() {
               color: '#6b7280',
               textTransform: 'none',
               fontWeight: 600,
-              '&:hover': { backgroundColor: 'transparent', color: '#111827' }
+              fontSize: '0.9375rem',
+              px: 0,
+              '&:hover': { 
+                backgroundColor: 'transparent', 
+                color: '#667eea',
+                '& .MuiSvgIcon-root': {
+                  transform: 'translateX(-4px)'
+                }
+              },
+              '& .MuiSvgIcon-root': {
+                transition: 'transform 0.2s'
+              }
             }}
           >
-            Zurück zur Übersicht
+            Zurück zum Blog
           </Button>
         </Container>
       </Box>
 
       {/* Article */}
-      <Container maxWidth="md" sx={{ py: { xs: 4, md: 6 } }}>
+      <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 }, pb: { xs: 8, md: 12 } }}>
         <article>
           {/* Featured Image */}
           {post.featuredImage && (
             <Box
-              component="img"
-              src={post.featuredImage}
-              alt={post.title}
               sx={{
+                position: 'relative',
                 width: '100%',
-                height: { xs: '200px', md: '400px' },
-                objectFit: 'cover',
-                borderRadius: 2,
-                mb: 4
+                height: { xs: '280px', md: '500px' },
+                borderRadius: 4,
+                overflow: 'hidden',
+                mb: 5,
+                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '40%',
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 100%)'
+                }
               }}
-            />
+            >
+              <Box
+                component="img"
+                src={post.featuredImage}
+                alt={post.title}
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+              />
+            </Box>
           )}
 
           {/* Metadata */}
-          <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+          <Box sx={{ 
+            mb: 4, 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 2, 
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
             <Chip
-              icon={<AccessTimeIcon />}
+              icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
               label={formatDate(post.publishedAt || post.createdAt)}
-              sx={{ backgroundColor: '#e5e7eb', color: '#374151', fontWeight: 600 }}
+              sx={{ 
+                backgroundColor: '#f3f4f6', 
+                color: '#374151', 
+                fontWeight: 600,
+                px: 1,
+                '& .MuiChip-icon': { color: '#6b7280' }
+              }}
             />
             <Chip
-              icon={<VisibilityIcon />}
-              label={`${post.views} Aufrufe`}
-              sx={{ backgroundColor: '#e5e7eb', color: '#374151', fontWeight: 600 }}
+              icon={<VisibilityIcon sx={{ fontSize: '1rem' }} />}
+              label={`${post.views.toLocaleString('de-DE')} Aufrufe`}
+              sx={{ 
+                backgroundColor: '#ede9fe', 
+                color: '#7c3aed', 
+                fontWeight: 600,
+                px: 1,
+                '& .MuiChip-icon': { color: '#7c3aed' }
+              }}
             />
-            <Typography variant="body2" color="text.secondary">
-              von {post.author}
-            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              px: 2,
+              py: 0.5
+            }}>
+              <Avatar
+                sx={{
+                  width: 28,
+                  height: 28,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700
+                }}
+              >
+                {post.author.charAt(0).toUpperCase()}
+              </Avatar>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: '#374151',
+                  fontWeight: 600
+                }}
+              >
+                {post.author}
+              </Typography>
+            </Box>
           </Box>
 
           {/* Title */}
@@ -141,11 +215,13 @@ export default function BlogPost() {
             variant="h1"
             component="h1"
             sx={{
-              fontSize: { xs: '2rem', md: '3rem' },
-              fontWeight: 800,
+              fontSize: { xs: '2.25rem', md: '3.5rem' },
+              fontWeight: 900,
               color: '#111827',
               mb: 3,
-              lineHeight: 1.2
+              lineHeight: 1.15,
+              letterSpacing: '-0.02em',
+              textAlign: 'center'
             }}
           >
             {post.title}
@@ -156,14 +232,24 @@ export default function BlogPost() {
             <Typography
               variant="h2"
               sx={{
-                fontSize: { xs: '1.1rem', md: '1.25rem' },
+                fontSize: { xs: '1.125rem', md: '1.375rem' },
                 fontWeight: 400,
                 color: '#6b7280',
-                mb: 4,
+                mb: 6,
+                lineHeight: 1.7,
+                textAlign: 'center',
                 fontStyle: 'italic',
-                borderLeft: '4px solid #4F46E5',
-                pl: 3,
-                py: 1
+                position: 'relative',
+                px: { xs: 2, md: 4 },
+                '&::before': {
+                  content: '"\""',
+                  position: 'absolute',
+                  left: { xs: -10, md: 0 },
+                  top: -10,
+                  fontSize: '3rem',
+                  color: '#e5e7eb',
+                  fontFamily: 'Georgia, serif'
+                }
               }}
             >
               {post.metaDescription}
@@ -174,68 +260,122 @@ export default function BlogPost() {
           <Box
             sx={{
               backgroundColor: '#fff',
-              borderRadius: 2,
-              p: { xs: 3, md: 5 },
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              borderRadius: 3,
+              p: { xs: 3, md: 6 },
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              border: '1px solid #f3f4f6',
               '& h1, & h2, & h3, & h4, & h5, & h6': {
-                fontWeight: 700,
+                fontWeight: 800,
                 color: '#111827',
-                mt: 4,
-                mb: 2
+                mt: 5,
+                mb: 3,
+                letterSpacing: '-0.01em',
+                lineHeight: 1.3
               },
-              '& h1': { fontSize: '2rem' },
-              '& h2': { fontSize: '1.75rem' },
-              '& h3': { fontSize: '1.5rem' },
+              '& h1': { 
+                fontSize: { xs: '2rem', md: '2.5rem' },
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              },
+              '& h2': { 
+                fontSize: { xs: '1.75rem', md: '2rem' },
+                borderLeft: '4px solid #667eea',
+                pl: 3
+              },
+              '& h3': { 
+                fontSize: { xs: '1.5rem', md: '1.75rem' },
+                color: '#374151'
+              },
+              '& h4': { fontSize: { xs: '1.25rem', md: '1.5rem' } },
               '& p': {
-                fontSize: '1.1rem',
-                lineHeight: 1.8,
+                fontSize: { xs: '1.0625rem', md: '1.125rem' },
+                lineHeight: 1.85,
                 color: '#374151',
-                mb: 2
+                mb: 3
               },
               '& a': {
-                color: '#4F46E5',
+                color: '#667eea',
                 textDecoration: 'none',
                 fontWeight: 600,
-                '&:hover': { textDecoration: 'underline' }
+                borderBottom: '2px solid transparent',
+                transition: 'border-color 0.2s',
+                '&:hover': { 
+                  borderBottomColor: '#667eea'
+                }
               },
               '& ul, & ol': {
-                pl: 3,
-                mb: 2
-              },
-              '& li': {
-                fontSize: '1.1rem',
+                fontSize: { xs: '1.0625rem', md: '1.125rem' },
                 lineHeight: 1.8,
                 color: '#374151',
-                mb: 1
+                mb: 3,
+                pl: 4
               },
-              '& img': {
-                maxWidth: '100%',
-                height: 'auto',
-                borderRadius: 2,
-                my: 3
+              '& li': {
+                mb: 1.5,
+                pl: 1
               },
               '& blockquote': {
-                borderLeft: '4px solid #4F46E5',
+                borderLeft: '4px solid #667eea',
                 pl: 3,
-                py: 1,
+                py: 2,
+                my: 4,
+                backgroundColor: '#f9fafb',
+                borderRadius: 2,
                 fontStyle: 'italic',
                 color: '#6b7280',
-                my: 3
+                fontSize: { xs: '1.0625rem', md: '1.125rem' }
               },
               '& code': {
                 backgroundColor: '#f3f4f6',
-                padding: '2px 6px',
+                color: '#7c3aed',
+                px: 1,
+                py: 0.5,
                 borderRadius: 1,
                 fontSize: '0.9em',
                 fontFamily: 'monospace'
               },
               '& pre': {
                 backgroundColor: '#1f2937',
-                color: '#f9fafb',
+                color: '#e5e7eb',
                 p: 3,
                 borderRadius: 2,
                 overflow: 'auto',
-                my: 3
+                mb: 3,
+                '& code': {
+                  backgroundColor: 'transparent',
+                  color: 'inherit',
+                  px: 0,
+                  py: 0
+                }
+              },
+              '& img': {
+                maxWidth: '100%',
+                height: 'auto',
+                borderRadius: 2,
+                my: 4,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              },
+              '& hr': {
+                border: 'none',
+                height: '1px',
+                backgroundColor: '#e5e7eb',
+                my: 5
+              },
+              '& table': {
+                width: '100%',
+                borderCollapse: 'collapse',
+                mb: 3,
+                '& th, & td': {
+                  border: '1px solid #e5e7eb',
+                  p: 2,
+                  textAlign: 'left'
+                },
+                '& th': {
+                  backgroundColor: '#f9fafb',
+                  fontWeight: 700
+                }
               }
             }}
             dangerouslySetInnerHTML={{ __html: post.content }}
