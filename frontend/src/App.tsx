@@ -126,6 +126,11 @@ function AppContent() {
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
 
+      <Route path="/gutscheinsystem-friseure" element={<BlogPost />} />
+      <Route path="/gutscheinsystem-floristen" element={<BlogPost />} />
+      <Route path="/gutscheinsystem-massage-salons" element={<BlogPost />} />
+      <Route path="/gutscheinsystem-wellness-clubs" element={<BlogPost />} />
+
       {/* Widget Routes */}
       {/* <Route path="/widget-demo" element={<WidgetDemo />} /> */}
       {/* <Route path="/embed/:slug" element={<EmbedWidget />} /> */}
