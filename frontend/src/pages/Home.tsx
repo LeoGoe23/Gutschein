@@ -26,6 +26,21 @@ export default function HomeLayout() {
     document.title = 'Gutscheinery - Digitale Gutscheine für Ihr Unternehmen';
   }, []);
 
+  // Widget iframe Höhenanpassung
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'gutschein-widget-resize') {
+        const iframe = document.getElementById('gutschein-widget-iframe') as HTMLIFrameElement;
+        if (iframe && event.data.height) {
+          iframe.style.height = `${event.data.height}px`;
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const [showCookieDialog, setShowCookieDialog] = useState(false);
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   const [cookiePrefs, setCookiePrefs] = useState({ statistics: true, marketing: true });
@@ -451,6 +466,213 @@ export default function HomeLayout() {
               }} />
             </Box>
           </Box>
+        </Box>
+      </Box>
+
+      {/* Widget Demo Section */}
+      <Box sx={{ 
+        width: '100%',
+        py: { xs: 10, md: 14 },
+        backgroundColor: '#f4f4f4'
+      }}>
+        <Box sx={{ 
+          maxWidth: '1400px', 
+          mx: 'auto', 
+          px: { xs: 3, md: 6 }
+        }}>
+          {/* Heading */}
+          <Box sx={{ 
+            textAlign: 'center',
+            mb: 6
+          }}>
+            <Typography 
+              variant="overline" 
+              sx={{ 
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                letterSpacing: 2,
+                color: '#667eea',
+                display: 'block',
+                mb: 2
+              }}
+            >
+              WIDGET INTEGRATION
+            </Typography>
+            
+            <Typography 
+              variant="h2" 
+              sx={{ 
+                fontWeight: 700,
+                mb: 3,
+                fontSize: { xs: '2rem', md: '3rem' },
+                lineHeight: 1.2,
+                color: '#1a202c'
+              }}
+            >
+              So sieht es auf Ihrer Website aus
+            </Typography>
+            
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 400,
+                color: '#4a5568',
+                lineHeight: 1.7,
+                fontSize: '1.15rem',
+                maxWidth: '700px',
+                mx: 'auto'
+              }}
+            >
+              Integrieren Sie unser Widget nahtlos in Ihre bestehende Website. 
+              Mit nur zwei Zeilen Code – fertig in unter 2 Minuten.
+            </Typography>
+          </Box>
+
+          {/* Widget Demo */}
+          <Box sx={{
+            maxWidth: '1200px',
+            mx: 'auto'
+          }}>
+            {/* Browser Mockup */}
+            <Box sx={{
+              bgcolor: 'white',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              border: '1px solid #e2e8f0',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 30px 60px -15px rgba(0,0,0,0.3)',
+                transform: 'translateY(-2px)'
+              }
+            }}>
+              {/* Browser Header */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                px: 3,
+                py: 2,
+                bgcolor: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0'
+              }}>
+                {/* Browser Buttons */}
+                <Box sx={{ display: 'flex', gap: 0.75 }}>
+                  <Box sx={{ width: 13, height: 13, borderRadius: '50%', bgcolor: '#ff5f56' }} />
+                  <Box sx={{ width: 13, height: 13, borderRadius: '50%', bgcolor: '#ffbd2e' }} />
+                  <Box sx={{ width: 13, height: 13, borderRadius: '50%', bgcolor: '#27c93f' }} />
+                </Box>
+                
+                {/* URL Bar */}
+                <Box sx={{
+                  flex: 1,
+                  ml: 2,
+                  px: 3,
+                  py: 1,
+                  bgcolor: 'white',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}>
+                  <Box component="span" sx={{ fontSize: '0.9rem' }}>🔒</Box>
+                  <Typography sx={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 500 }}>
+                    ihre-website.de/gutscheine
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Browser Content */}
+              <Box sx={{ 
+                bgcolor: 'white',
+                p: { xs: 3, md: 5 }
+              }}>
+                {/* Nur angedeuteter Header */}
+                <Box sx={{ 
+                  mb: 4
+                }}>
+                  <Typography variant="body2" sx={{ 
+                    color: '#cbd5e0',
+                    fontWeight: 500,
+                    fontSize: '0.85rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Ihre bisherige Webseite...
+                  </Typography>
+                </Box>
+
+                {/* Das Widget */}
+                <iframe
+                  id="gutschein-widget-iframe"
+                  src="/embed/RR2H80"
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    overflow: 'hidden',
+                    height: 'auto',
+                    background: 'transparent',
+                    display: 'block'
+                  }}
+                  title="Gutschein Widget Demo"
+                />
+              </Box>
+            </Box>
+
+            {/* Info Text */}
+            <Box sx={{ textAlign: 'center', mt: 4 }}>
+              <Typography variant="body1" sx={{ 
+                color: '#64748b', 
+                fontSize: '0.95rem',
+                fontWeight: 500
+              }}>
+                ✨ <strong style={{ color: '#10b981' }}>Einfache Integration:</strong> Widget-Code kopieren, auf Ihrer Website einfügen – fertig in 2 Minuten
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* CTA */}
+          {/* <Box sx={{ 
+            textAlign: 'center',
+            mt: 2
+          }}>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                color: '#4a5568',
+                mb: 3,
+                fontSize: '1.05rem'
+              }}
+            >
+              Überzeugt? Starten Sie noch heute mit Ihrem eigenen Gutschein-System.
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => navigate('/gutschein/step1')}
+              sx={{
+                bgcolor: '#667eea',
+                color: 'white',
+                px: 5,
+                py: 1.75,
+                fontSize: '1.05rem',
+                fontWeight: 600,
+                borderRadius: '10px',
+                boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
+                textTransform: 'none',
+                '&:hover': {
+                  bgcolor: '#5568d3',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 20px rgba(102, 126, 234, 0.5)',
+                },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Jetzt kostenlos einrichten
+            </Button>
+          </Box> */}
         </Box>
       </Box>
 
