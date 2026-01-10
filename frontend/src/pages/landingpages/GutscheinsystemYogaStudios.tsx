@@ -4,13 +4,13 @@ import LogoTopLeft from '../../components/home/TopLeftLogo';
 import Footer from '../../components/home/Footer';
 import { Helmet } from 'react-helmet';
 
-export default function GutscheinsystemFloristen() {
+export default function GutscheinsystemYogaStudios() {
 
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%)' }}>
       <Helmet>
-        <title>Digitales Gutscheinsystem für Floristen | Gutscheinery</title>
-        <meta name="description" content="Verkaufen Sie Blumen-Gutscheine digital und automatisiert. Perfekt für Hochsaisons wie Valentinstag, Muttertag und Weihnachten. Einfache Integration." />
+        <title>Digitales Gutscheinsystem für Yoga Studios | Gutscheinery</title>
+        <meta name="description" content="Automatisierter Gutscheinverkauf für Yoga Studios. Verkaufen Sie Yoga-Gutscheine, Workshops und Retreats digital. Neue Schüler gewinnen und Liquidität sichern." />
       </Helmet>
 
       {/* Header */}
@@ -23,7 +23,7 @@ export default function GutscheinsystemFloristen() {
 
       {/* Hero Section */}
       <Box sx={{
-        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
         color: 'white',
         py: { xs: 10, md: 14 },
         pt: { xs: 12, md: 16 }
@@ -35,7 +35,7 @@ export default function GutscheinsystemFloristen() {
             mb: 3,
             textAlign: 'center'
           }}>
-            Digitales Gutscheinsystem für Floristen
+            Digitales Gutscheinsystem für Yoga Studios
           </Typography>
           <Typography variant="h2" sx={{
             fontSize: { xs: '1.25rem', md: '1.75rem' },
@@ -44,7 +44,7 @@ export default function GutscheinsystemFloristen() {
             textAlign: 'center',
             opacity: 0.95
           }}>
-            Mehr Liquidität vor Valentinstag und Muttertag
+            Mehr Schüler binden und Workshops einfach verkaufen
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Button
@@ -53,7 +53,7 @@ export default function GutscheinsystemFloristen() {
               onClick={() => window.location.href = 'https://calendly.com/gutscheinfabrik/15-minute-meeting'}
               sx={{
                 bgcolor: 'white',
-                color: '#f5576c',
+                color: '#38f9d7',
                 px: 4,
                 py: 1.5,
                 fontSize: '1.1rem',
@@ -89,16 +89,16 @@ export default function GutscheinsystemFloristen() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 4 }}>
           {[
             {
-              title: 'Umsatzeinbrüche außerhalb der Hochsaison',
-              description: 'Nach Valentinstag, Muttertag und Weihnachten sind die Kassen leer. Verkaufen Sie Gutscheine im Voraus und sichern Sie sich kontinuierliche Einnahmen.'
+              title: 'Hohe Abbruchrate nach Probestunden',
+              description: 'Viele Interessenten kommen einmal und verschwinden dann. Mit Gutscheinen binden Sie neue Schüler durch Vorauszahlung und erhöhen die Verbindlichkeit.'
             },
             {
-              title: 'Zeitaufwand bei Gutscheinverkauf im Laden',
-              description: 'Während der Hochsaison ist jede Minute wertvoll. Automatisieren Sie den Gutscheinverkauf und konzentrieren Sie sich auf Ihre Kernarbeit.'
+              title: 'Aufwand beim Workshop-Verkauf',
+              description: 'Anmeldungen per E-Mail, Überweisungen nachverfolgen, Listen führen. Automatisieren Sie den Verkauf und sparen Sie wertvolle Zeit für Ihre Praxis.'
             },
             {
-              title: 'Verpasste Online-Verkaufschancen',
-              description: 'Kunden möchten spontan online bestellen – auch außerhalb Ihrer Öffnungszeiten. Mit digitalem Gutscheinverkauf verpassen Sie keine Verkaufschance mehr.'
+              title: 'Schwankende Teilnehmerzahlen',
+              description: 'Mal volle, mal leere Kurse erschweren die Planung. Verkaufen Sie Gutscheine im Voraus und sichern Sie planbare Einnahmen für Ihr Studio.'
             }
           ].map((problem, index) => (
             <Box key={index} sx={{
@@ -135,24 +135,24 @@ export default function GutscheinsystemFloristen() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 4 }}>
             {[
               {
-                title: 'Liquidität vor der Hochsaison aufbauen',
-                description: 'Verkaufen Sie Gutscheine schon Wochen vor Valentinstag oder Muttertag und sichern Sie sich finanzielle Planungssicherheit.'
+                title: 'Höhere Bindung neuer Schüler',
+                description: 'Gutscheininhaber haben bereits investiert und kommen zuverlässiger. Wandeln Sie Probestunden in langfristige Mitgliedschaften um.'
               },
               {
-                title: 'Automatischer 24/7 Verkauf ohne Personalaufwand',
-                description: 'Ihre Kunden kaufen Gutscheine online – auch nachts und am Wochenende. Sie konzentrieren sich auf das Blumenbinden.'
+                title: 'Workshop-Verkauf ohne Verwaltungsaufwand',
+                description: 'Verkaufen Sie Workshops, Retreats und Specials automatisch online. Keine E-Mail-Korrespondenz, keine Zahlungsverfolgung mehr nötig.'
               },
               {
-                title: 'Neue Kunden durch Geschenkgutscheine',
-                description: 'Jeder verschenkte Gutschein bringt potenzielle Neukunden in Ihr Geschäft. Perfekt für Hochsaison-Marketing.'
+                title: 'Geschenkgutscheine als Marketing-Kanal',
+                description: 'Jeder verschenkte Gutschein bringt potenzielle neue Schüler in Ihr Studio. Perfekt für Geburtstage, Weihnachten und besondere Anlässe.'
+              },
+              {
+                title: 'Liquidität für Studio-Entwicklung',
+                description: 'Verkaufen Sie Gutscheine im Voraus und finanzieren Sie neue Kurse, Ausstattung oder Lehrerfortbildungen aus gesichertem Kapital.'
               },
               {
                 title: 'Professionelles digitales Auftreten',
-                description: 'Moderne Kunden erwarten Online-Bestellmöglichkeiten. Bieten Sie digitale Gutscheine und bleiben Sie wettbewerbsfähig.'
-              },
-              {
-                title: 'Sofort einsatzbereit ohne IT-Kenntnisse',
-                description: 'In wenigen Minuten eingerichtet. Keine komplizierte Software, keine Schulung nötig.'
+                description: 'Moderne Yogis erwarten Online-Buchungsmöglichkeiten. Bieten Sie zeitgemäßen Service und positionieren Sie sich als professionelles Studio.'
               }
             ].map((benefit, index) => (
               <Box key={index} sx={{
@@ -192,12 +192,12 @@ export default function GutscheinsystemFloristen() {
           size="large"
           onClick={() => window.location.href = 'https://calendly.com/gutscheinfabrik/15-minute-meeting'}
           sx={{
-            bgcolor: '#f5576c',
+            bgcolor: '#38f9d7',
             px: 5,
             py: 2,
             fontSize: '1.1rem',
             fontWeight: 700,
-            '&:hover': { bgcolor: '#e04658' }
+            '&:hover': { bgcolor: '#2de0c8' }
           }}
         >
           Jetzt kostenlos starten

@@ -1,12 +1,10 @@
 import { Box, Container, Button, Typography } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import TopBar from '../../components/home/TopBar';
 import LogoTopLeft from '../../components/home/TopLeftLogo';
 import Footer from '../../components/home/Footer';
 import { Helmet } from 'react-helmet';
 
 export default function GutscheinsystemFriseure() {
-  const navigate = useNavigate();
 
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%)' }}>
@@ -16,7 +14,7 @@ export default function GutscheinsystemFriseure() {
       </Helmet>
 
       {/* Header */}
-      <Box sx={{ position: 'relative', backgroundColor: 'transparent' }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: 'transparent' }}>
         <LogoTopLeft />
         <Box sx={{ position: 'absolute', top: { xs: '0.5rem', md: '1.5rem' }, right: { xs: '1rem', md: '4rem' }, zIndex: 3 }}>
           <TopBar />
@@ -27,8 +25,8 @@ export default function GutscheinsystemFriseure() {
       <Box sx={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white',
-        py: { xs: 8, md: 12 },
-        mt: { xs: 8, md: 10 }
+        py: { xs: 10, md: 14 },
+        pt: { xs: 12, md: 16 }
       }}>
         <Container maxWidth="lg">
           <Typography variant="h1" sx={{
@@ -52,7 +50,7 @@ export default function GutscheinsystemFriseure() {
             <Button
               variant="contained"
               size="large"
-              onClick={() => navigate('/')}
+              onClick={() => window.location.href = 'https://calendly.com/gutscheinfabrik/15-minute-meeting'}
               sx={{
                 bgcolor: 'white',
                 color: '#667eea',
@@ -192,7 +190,7 @@ export default function GutscheinsystemFriseure() {
         <Button
           variant="contained"
           size="large"
-          onClick={() => navigate('/')}
+          onClick={() => window.location.href = 'https://calendly.com/gutscheinfabrik/15-minute-meeting'}
           sx={{
             bgcolor: '#667eea',
             px: 5,
