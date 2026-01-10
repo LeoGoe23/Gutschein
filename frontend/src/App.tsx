@@ -32,6 +32,10 @@ import AdminBlog from './pages/admin/AdminBlog';
 import AdminBlogEditor from './pages/admin/AdminBlogEditor';
 import WidgetDemo from './pages/WidgetDemo';
 import EmbedWidget from './pages/EmbedWidget';
+import GutscheinsystemFriseure from './pages/landingpages/GutscheinsystemFriseure';
+import GutscheinsystemFloristen from './pages/landingpages/GutscheinsystemFloristen';
+import GutscheinsystemMassageSalons from './pages/landingpages/GutscheinsystemMassageSalons';
+import GutscheinsystemWellnessClubs from './pages/landingpages/GutscheinsystemWellnessClubs';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -126,10 +130,11 @@ function AppContent() {
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
 
-      <Route path="/gutscheinsystem-friseure" element={<BlogPost />} />
-      <Route path="/gutscheinsystem-floristen" element={<BlogPost />} />
-      <Route path="/gutscheinsystem-massage-salons" element={<BlogPost />} />
-      <Route path="/gutscheinsystem-wellness-clubs" element={<BlogPost />} />
+      {/* Landing Pages */}
+      <Route path="/gutscheinsystem-friseure" element={<GutscheinsystemFriseure />} />
+      <Route path="/gutscheinsystem-floristen" element={<GutscheinsystemFloristen />} />
+      <Route path="/gutscheinsystem-massage-salons" element={<GutscheinsystemMassageSalons />} />
+      <Route path="/gutscheinsystem-wellness-clubs" element={<GutscheinsystemWellnessClubs />} />
 
       {/* Widget Routes */}
       <Route path="/widget-demo" element={<WidgetDemo />} />
