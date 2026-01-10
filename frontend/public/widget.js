@@ -51,8 +51,10 @@
 
       // Erstelle iframe mit Styling-Parametern
       const iframe = document.createElement('iframe');
-      // Automatische Umgebungserkennung
-      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      // Erkennung: Wenn das Script von localhost geladen wird, nutze localhost
+      // Sonst nutze die Production-URL
+      const scriptSrc = document.currentScript ? document.currentScript.src : '';
+      const isDevelopment = scriptSrc.includes('localhost') || scriptSrc.includes('127.0.0.1');
       const baseURL = isDevelopment ? 'http://localhost:3000' : 'https://gutscheinery.de';
       
       // Baue URL mit Parametern
