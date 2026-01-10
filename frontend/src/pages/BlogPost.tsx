@@ -1,6 +1,6 @@
 import { Box, Container, Typography, CircularProgress, Chip, Button, Avatar } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -12,11 +12,15 @@ import LogoTopLeft from '../components/home/TopLeftLogo';
 import Footer from '../components/home/Footer';
 
 export default function BlogPost() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: paramSlug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [post, setPost] = useState<BlogPostType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  // Extract slug from either URL params or pathname
+  const slug = paramSlug || location.pathname.replace('/', '');
 
   useEffect(() => {
     if (slug) {

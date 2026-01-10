@@ -1,3 +1,5 @@
 node_modules
 gutschein-backend/
 .env
+.vercel
+.env*.local

@@ -77,8 +77,8 @@ export default function TopBar() {
     }
   };
 
-  const handleBlogClick = () => {
-    navigate('/blog');
+  const handleKontaktClick = () => {
+    navigate('/kontakt');
   };
 
   const handleBranchenClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -144,7 +144,7 @@ export default function TopBar() {
           </Typography>
 
           <Typography
-            onClick={handleBlogClick}
+            onClick={handleKontaktClick}
             sx={{
               cursor: 'pointer',
               fontSize: '1.1rem',
@@ -153,7 +153,7 @@ export default function TopBar() {
               textDecoration: 'none',
             }}
           >
-            Blog
+            Kontakt
           </Typography>
 
           <Typography
@@ -195,42 +195,6 @@ export default function TopBar() {
                 <MenuItem component={Link} to="/profil">Profil</MenuItem>
                 <MenuItem onClick={handleLogout}>Abmelden</MenuItem>
               </Menu>
-
-              {/* Branchen Menu */}
-              <Menu
-                anchorEl={branchenAnchorEl}
-                open={branchenMenuOpen}
-                onClose={handleBranchenClose}
-                anchorOrigin={{
-                  vertical: 'bottom',
-                  horizontal: 'right',
-                }}
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                sx={{
-                  '& .MuiPaper-root': {
-                    mt: 1,
-                    minWidth: 220,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    borderRadius: 2
-                  }
-                }}
-              >
-                <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-friseure')}>
-                  Für Friseure
-                </MenuItem>
-                <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-floristen')}>
-                  Für Floristen
-                </MenuItem>
-                <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-massage-salons')}>
-                  Für Massage-Salons
-                </MenuItem>
-                <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-wellness-clubs')}>
-                  Für Wellness-Clubs
-                </MenuItem>
-              </Menu>
             </>
           ) : (
             <Button
@@ -252,6 +216,42 @@ export default function TopBar() {
               Einloggen
             </Button>
           )}
+
+          {/* Branchen Menu - Available for all users */}
+          <Menu
+            anchorEl={branchenAnchorEl}
+            open={branchenMenuOpen}
+            onClose={handleBranchenClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            sx={{
+              '& .MuiPaper-root': {
+                mt: 1,
+                minWidth: 220,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                borderRadius: 2
+              }
+            }}
+          >
+            <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-friseure')}>
+              Für Friseure
+            </MenuItem>
+            <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-floristen')}>
+              Für Floristen
+            </MenuItem>
+            <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-massage-salons')}>
+              Für Massage-Salons
+            </MenuItem>
+            <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-wellness-clubs')}>
+              Für Wellness-Clubs
+            </MenuItem>
+          </Menu>
         </Box>
       </Box>
 
@@ -276,8 +276,8 @@ export default function TopBar() {
           <ListItem component="li" onClick={() => { navigate('/gutscheinsystem-wellness-clubs'); setDrawerOpen(false); }}>
             <ListItemText primary="Für Wellness-Clubs" sx={{ pl: 2, fontSize: '0.9rem' }} />
           </ListItem>
-          <ListItem component="li" onClick={() => { navigate('/blog'); setDrawerOpen(false); }}>
-            <ListItemText primary="Blog" />
+          <ListItem component="li" onClick={() => { navigate('/kontakt'); setDrawerOpen(false); }}>
+            <ListItemText primary="Kontakt" />
           </ListItem>
           <ListItem component="li" onClick={() => { handleAccountClick(); setDrawerOpen(false); }}>
             <ListItemText primary={user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Mein Konto"} />
