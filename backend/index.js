@@ -9,6 +9,7 @@ const webhookRoute     = require("./routes/webhook");
 const unternehmenRoute = require("./routes/unternehmen");
 const stripeconnect = require("./routes/stripeconnect");
 const blogRoute = require("./routes/blog");
+const adminRoute = require("./routes/admin");
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/webhook", webhookRoute);
 app.use("/api/unternehmen", unternehmenRoute);
 app.use("/api/stripeconnect", stripeconnect);
 app.use("/api/blog", blogRoute);
+app.use("/api/admin", adminRoute);
 
 app.get("/", (req, res) => res.send("API läuft"));
 
