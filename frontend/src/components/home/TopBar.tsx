@@ -251,6 +251,9 @@ export default function TopBar() {
             <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-wellness-clubs')}>
               Für Wellness-Clubs
             </MenuItem>
+            <MenuItem onClick={() => handleBranchenNavigate('/gutscheinsystem-yoga-studios')}>
+              Für Yoga Studios
+            </MenuItem>
           </Menu>
         </Box>
       </Box>
@@ -275,6 +278,9 @@ export default function TopBar() {
           </ListItem>
           <ListItem component="li" onClick={() => { navigate('/gutscheinsystem-wellness-clubs'); setDrawerOpen(false); }}>
             <ListItemText primary="Für Wellness-Clubs" sx={{ pl: 2, fontSize: '0.9rem' }} />
+          </ListItem>
+          <ListItem component="li" onClick={() => { navigate('/gutscheinsystem-yoga-studios'); setDrawerOpen(false); }}>
+            <ListItemText primary="Für Yoga Studios" sx={{ pl: 2, fontSize: '0.9rem' }} />
           </ListItem>
           <ListItem component="li" onClick={() => { navigate('/kontakt'); setDrawerOpen(false); }}>
             <ListItemText primary="Kontakt" />

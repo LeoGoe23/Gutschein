@@ -37,6 +37,7 @@ import GutscheinsystemFriseure from './pages/landingpages/GutscheinsystemFriseur
 import GutscheinsystemFloristen from './pages/landingpages/GutscheinsystemFloristen';
 import GutscheinsystemMassageSalons from './pages/landingpages/GutscheinsystemMassageSalons';
 import GutscheinsystemWellnessClubs from './pages/landingpages/GutscheinsystemWellnessClubs';
+import GutscheinsystemYogaStudios from './pages/landingpages/GutscheinsystemYogaStudios';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -136,6 +137,7 @@ function AppContent() {
       <Route path="/gutscheinsystem-floristen" element={<GutscheinsystemFloristen />} />
       <Route path="/gutscheinsystem-massage-salons" element={<GutscheinsystemMassageSalons />} />
       <Route path="/gutscheinsystem-wellness-clubs" element={<GutscheinsystemWellnessClubs />} />
+      <Route path="/gutscheinsystem-yoga-studios" element={<GutscheinsystemYogaStudios />} />
 
       {/* Widget Routes */}
       <Route path="/widget-demo" element={<WidgetDemo />} />
