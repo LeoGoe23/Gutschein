@@ -33,6 +33,7 @@ import AdminBlog from './pages/admin/AdminBlog';
 import AdminBlogEditor from './pages/admin/AdminBlogEditor';
 import WidgetDemo from './pages/WidgetDemo';
 import EmbedWidget from './pages/EmbedWidget';
+import WidgetDemoBySlug from './pages/WidgetDemoBySlug';
 import GutscheinsystemFriseure from './pages/landingpages/GutscheinsystemFriseure';
 import GutscheinsystemFloristen from './pages/landingpages/GutscheinsystemFloristen';
 import GutscheinsystemMassageSalons from './pages/landingpages/GutscheinsystemMassageSalons';
@@ -141,6 +142,7 @@ function AppContent() {
 
       {/* Widget Routes */}
       <Route path="/widget-demo" element={<WidgetDemo />} />
+      <Route path="/widgetdemo/:slug" element={<WidgetDemoBySlug />} />
       <Route path="/embed/:slug" element={<EmbedWidget />} />
 
       {/* Admin Blog Routes */}

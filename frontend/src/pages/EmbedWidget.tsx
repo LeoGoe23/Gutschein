@@ -20,7 +20,9 @@ const EmbedWidget: React.FC = () => {
   // URL parameters für Customization
   const params = new URLSearchParams(window.location.search);
   const primaryColor = params.get('primaryColor') || '#1976d2';
-  const fontFamily = params.get('fontFamily') || 'inherit';
+  const fontFamily = params.get('fontFamily') || slug?.toUpperCase() === 'JANKIP' 
+    ? "'Cormorant Garamond', Georgia, serif" 
+    : "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   const backgroundColor = params.get('backgroundColor') || 'transparent';
 
   useEffect(() => {
@@ -46,11 +48,24 @@ const EmbedWidget: React.FC = () => {
 
           if (data.dienstleistungen && data.dienstleistungen.length > 0) {
             data.dienstleistungen.forEach((dl: any) => {
-              loadedOptions.push({
-                titel: dl.shortDesc,
-                betrag: parseInt(dl.price),
-                beschreibung: dl.longDesc !== dl.shortDesc ? dl.longDesc : undefined
-              });
+              // Check if it has variants
+              if (dl.varianten && dl.varianten.length > 0) {
+                // Add each variant as a separate option
+                dl.varianten.forEach((variant: any) => {
+                  loadedOptions.push({
+                    titel: `${dl.shortDesc} - ${variant.name}`,
+                    betrag: parseInt(variant.preis),
+                    beschreibung: variant.beschreibung || dl.longDesc
+                  });
+                });
+              } else {
+                // Regular service without variants
+                loadedOptions.push({
+                  titel: dl.shortDesc,
+                  betrag: parseInt(dl.price),
+                  beschreibung: dl.longDesc !== dl.shortDesc ? dl.longDesc : undefined
+                });
+              }
             });
           }
 
