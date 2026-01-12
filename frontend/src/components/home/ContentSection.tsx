@@ -3,12 +3,12 @@ import { Box, Typography, Button, Stack } from '@mui/material';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
-import LoginModal from '../../components/login/LoginModal';
+import KontaktModal from './KontaktModal';
 import { useNavigate } from 'react-router-dom';
 
 export default function ContentSection() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [kontaktOpen, setKontaktOpen] = useState(false);
 
   return (
     <>
@@ -97,10 +97,16 @@ export default function ContentSection() {
               '&:hover': { backgroundColor: '#4338ca' },
               marginTop: '2rem',
             }}
-            onClick={() => setOpen(true)}
+            onClick={() => setKontaktOpen(true)}
           >
-            Jetzt starten
+            Kontakt aufnehmen
           </Button>
+
+          <KontaktModal 
+            open={kontaktOpen} 
+            onClose={() => setKontaktOpen(false)}
+            source="Content-Sektion"
+          />
 
           {/* <Box sx={{ textAlign: 'center', mt: 3 }}>
             <Typography sx={{ color: '#999', fontSize: '0.85rem' }}>
@@ -121,7 +127,6 @@ export default function ContentSection() {
               </Typography>
             </Typography>
           </Box> */}
-          <LoginModal open={open} onClose={() => setOpen(false)} />
         </Box>
       </Box>
     </>

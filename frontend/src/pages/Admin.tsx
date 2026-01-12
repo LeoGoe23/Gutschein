@@ -145,13 +145,18 @@ export default function AdminPage() {
   // Lade Kontaktanfragen
   useEffect(() => {
     const fetchKontaktanfragen = async () => {
-      const q = query(collection(db, 'kontaktanfragen'), orderBy('erstelltAm', 'desc'), limit(10));
-      const snapshot = await getDocs(q);
-      const anfragen: any[] = [];
-      snapshot.forEach(docSnap => {
-        anfragen.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setKontaktanfragen(anfragen);
+      try {
+        const q = query(collection(db, 'kontaktanfragen'), orderBy('timestamp', 'desc'), limit(10));
+        const snapshot = await getDocs(q);
+        const anfragen: any[] = [];
+        snapshot.forEach(docSnap => {
+          anfragen.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        setKontaktanfragen(anfragen);
+      } catch (error) {
+        console.error('Fehler beim Laden der Kontaktanfragen:', error);
+        setKontaktanfragen([]);
+      }
     };
     if (isAdmin) fetchKontaktanfragen();
   }, [isAdmin]);
