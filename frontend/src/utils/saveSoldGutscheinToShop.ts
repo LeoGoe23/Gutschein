@@ -41,6 +41,17 @@ export interface GutscheinVerkaufsStatistik {
   provision: number; // Provision in Cent, falls relevant  
 }
 
+// Hilfsfunktion: Bereinige Namen für Firebase Feldpfade
+const sanitizeFieldName = (name: string): string => {
+  return name
+    .replace(/\./g, '_')  // Punkte durch Unterstriche ersetzen
+    .replace(/\$/g, '')   // Dollar-Zeichen entfernen
+    .replace(/\[/g, '')   // Eckige Klammern entfernen
+    .replace(/\]/g, '')
+    .replace(/\//g, '_')  // Schrägstriche durch Unterstriche
+    .trim();
+};
+
 export const updateUserEinnahmenStats = async ({
   userId,
   betrag,
@@ -65,10 +76,12 @@ export const updateUserEinnahmenStats = async ({
     updates[`Einnahmen.monatlich.${monat}.freieBetrag.anzahl`] = increment(1);
     updates[`Einnahmen.monatlich.${monat}.freieBetrag.umsatz`] = increment(betrag);
   } else if (dienstleistung) {
-    updates[`Einnahmen.dienstleistungen.${dienstleistung}.anzahl`] = increment(1);
-    updates[`Einnahmen.dienstleistungen.${dienstleistung}.umsatz`] = increment(betrag);
-    updates[`Einnahmen.monatlich.${monat}.dienstleistungen.${dienstleistung}.anzahl`] = increment(1);
-    updates[`Einnahmen.monatlich.${monat}.dienstleistungen.${dienstleistung}.umsatz`] = increment(betrag);
+    // ✅ NEU: Dienstleistungsnamen bereinigen für Firebase
+    const safeName = sanitizeFieldName(dienstleistung);
+    updates[`Einnahmen.dienstleistungen.${safeName}.anzahl`] = increment(1);
+    updates[`Einnahmen.dienstleistungen.${safeName}.umsatz`] = increment(betrag);
+    updates[`Einnahmen.monatlich.${monat}.dienstleistungen.${safeName}.anzahl`] = increment(1);
+    updates[`Einnahmen.monatlich.${monat}.dienstleistungen.${safeName}.umsatz`] = increment(betrag);
   }
 
   await updateDoc(userRef, updates);

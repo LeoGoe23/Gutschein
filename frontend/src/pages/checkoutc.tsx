@@ -1,4 +1,5 @@
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField } from '@mui/material';
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import { ExpandMore } from '@mui/icons-material';
 import { useState, useEffect, useRef } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import { useParams, useLocation } from 'react-router-dom';
@@ -193,10 +194,19 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
 
   // ✅ BESSER: Separater useEffect für Payment Element
   useEffect(() => {
-    if (!elements || !clientSecret) return;
+    if (!elements || !clientSecret) {
+      console.log('⏳ Warte auf Payment Element:', { 
+        hasElements: !!elements, 
+        hasClientSecret: !!clientSecret 
+      });
+      return;
+    }
     
     const container = document.getElementById('payment-element');
-    if (!container) return;
+    if (!container) {
+      console.log('⚠️ Payment Element Container nicht gefunden, warte...');
+      return;
+    }
     
     console.log('🎯 Erstelle Payment Element...');
     
@@ -710,8 +720,9 @@ export default function GutscheinLandingPage() {
   const [error, setError] = useState<string>('');
   
   const [betrag, setBetrag] = useState<number | null>(null);
-  const [selectedDienstleistung, setSelectedDienstleistung] = useState<{ shortDesc: string; longDesc: string; price: string } | null>(null);
+  const [selectedDienstleistung, setSelectedDienstleistung] = useState<{ shortDesc: string; longDesc: string; price: string; varianteName?: string } | null>(null);
   const [purchasedBetrag, setPurchasedBetrag] = useState<number>(0);
+  const [expandedAccordion, setExpandedAccordion] = useState<string | false>(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
@@ -825,9 +836,19 @@ export default function GutscheinLandingPage() {
     setShowPaymentForm(true);
   };
 
-  const handleDienstleistungSelect = (dienstleistung: { shortDesc: string; longDesc: string; price: string }) => {
+  const handleDienstleistungSelect = (dienstleistung: { shortDesc: string; longDesc: string; price: string; varianteName?: string }) => {
     setBetrag(Number(dienstleistung.price));
     setSelectedDienstleistung(dienstleistung);
+  };
+
+  const handleVarianteSelect = (dienstleistung: any, variante: any) => {
+    setBetrag(Number(variante.preis));
+    setSelectedDienstleistung({
+      shortDesc: `${dienstleistung.shortDesc} - ${variante.name}`,
+      longDesc: variante.beschreibung || dienstleistung.longDesc,
+      price: variante.preis,
+      varianteName: variante.name
+    });
   };
 
   const handleToggleChange = (event: React.MouseEvent<HTMLElement>, newType: 'wert' | 'dienstleistung') => {
@@ -928,37 +949,105 @@ export default function GutscheinLandingPage() {
                           Welche Dienstleistung möchten Sie verschenken?
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {checkoutData.dienstleistungen.map((dienstleistung, index) => (
-                            <Button
-                              key={index}
-                              variant={selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? "contained" : "outlined"}
-                              onClick={() => handleDienstleistungSelect(dienstleistung)}
-                              sx={{
-                                borderRadius: 2,
-                                px: 3,
-                                py: 2,
-                                textTransform: 'none',
-                                textAlign: 'left',
-                                justifyContent: 'space-between',
-                                display: 'flex',
-                                fontWeight: 600,
-                                width: '100%',
-                                minWidth: '220px',
-                                boxShadow: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? 4 : 1,
-                                borderColor: '#bdbdbd',
-                                backgroundColor: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? '#e3f2fd' : '#fff',
-                                color: '#222',
-                                transition: 'all 0.2s',
-                                '&:hover': {
-                                  backgroundColor: '#f5f5f5',
-                                  boxShadow: 3,
-                                },
-                              }}
-                            >
-                              <span>{dienstleistung.shortDesc}</span>
-                              <span style={{ fontWeight: 700 }}>{dienstleistung.price}€</span>
-                            </Button>
-                          ))}
+                          {checkoutData.dienstleistungen.map((dienstleistung: any, index) => {
+                            // Prüfe ob Dienstleistung Varianten hat
+                            if (dienstleistung.varianten && dienstleistung.varianten.length > 0) {
+                              // Dienstleistung mit Varianten - zeige Accordion
+                              return (
+                                <Accordion
+                                  key={index}
+                                  expanded={expandedAccordion === `panel${index}`}
+                                  onChange={(e, isExpanded) => setExpandedAccordion(isExpanded ? `panel${index}` : false)}
+                                  sx={{
+                                    borderRadius: '8px !important',
+                                    boxShadow: 1,
+                                    '&:before': { display: 'none' },
+                                    mb: 0
+                                  }}
+                                >
+                                  <AccordionSummary
+                                    expandIcon={<ExpandMore />}
+                                    sx={{
+                                      fontWeight: 700,
+                                      '& .MuiAccordionSummary-content': {
+                                        my: 1.5
+                                      }
+                                    }}
+                                  >
+                                    <Typography sx={{ fontWeight: 600 }}>{dienstleistung.shortDesc}</Typography>
+                                  </AccordionSummary>
+                                  <AccordionDetails sx={{ pt: 0, pb: 2 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                      {dienstleistung.varianten.map((variante: any, vIndex: number) => {
+                                        const isSelected = selectedDienstleistung?.shortDesc === `${dienstleistung.shortDesc} - ${variante.name}`;
+                                        return (
+                                          <Button
+                                            key={vIndex}
+                                            variant={isSelected ? "contained" : "outlined"}
+                                            onClick={() => handleVarianteSelect(dienstleistung, variante)}
+                                            sx={{
+                                              borderRadius: 2,
+                                              px: 3,
+                                              py: 1.5,
+                                              textTransform: 'none',
+                                              textAlign: 'left',
+                                              justifyContent: 'space-between',
+                                              display: 'flex',
+                                              fontWeight: 500,
+                                              boxShadow: isSelected ? 3 : 0,
+                                              borderColor: '#bdbdbd',
+                                              backgroundColor: isSelected ? '#1976d2' : '#fff',
+                                              color: isSelected ? '#fff' : '#222',
+                                              '&:hover': {
+                                                backgroundColor: isSelected ? '#1565c0' : '#f5f5f5',
+                                                boxShadow: 2,
+                                              },
+                                            }}
+                                          >
+                                            <span>{variante.name}</span>
+                                            <span style={{ fontWeight: 700 }}>{variante.preis}€</span>
+                                          </Button>
+                                        );
+                                      })}
+                                    </Box>
+                                  </AccordionDetails>
+                                </Accordion>
+                              );
+                            } else {
+                              // Flache Dienstleistung ohne Varianten (wie bisher)
+                              return (
+                                <Button
+                                  key={index}
+                                  variant={selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? "contained" : "outlined"}
+                                  onClick={() => handleDienstleistungSelect(dienstleistung)}
+                                  sx={{
+                                    borderRadius: 2,
+                                    px: 3,
+                                    py: 2,
+                                    textTransform: 'none',
+                                    textAlign: 'left',
+                                    justifyContent: 'space-between',
+                                    display: 'flex',
+                                    fontWeight: 600,
+                                    width: '100%',
+                                    minWidth: '220px',
+                                    boxShadow: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? 4 : 1,
+                                    borderColor: '#bdbdbd',
+                                    backgroundColor: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? '#e3f2fd' : '#fff',
+                                    color: '#222',
+                                    transition: 'all 0.2s',
+                                    '&:hover': {
+                                      backgroundColor: '#f5f5f5',
+                                      boxShadow: 3,
+                                    },
+                                  }}
+                                >
+                                  <span>{dienstleistung.shortDesc}</span>
+                                  <span style={{ fontWeight: 700 }}>{dienstleistung.price}€</span>
+                                </Button>
+                              );
+                            }
+                          })}
                         </Box>
                       </Box>
                     )}

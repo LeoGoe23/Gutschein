@@ -45,6 +45,12 @@ import {
 import { db } from '../auth/firebase';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
+interface Variante {
+  name: string;
+  preis: number;
+  beschreibung?: string;
+}
+
 interface Gutschein {
   id: string;
   name: string;
@@ -54,6 +60,7 @@ interface Gutschein {
   aktiv: boolean;
   reihenfolge?: number;
   typ?: string; // z.B. "dienstleistung", "frei"
+  varianten?: Variante[]; // NEU: Varianten
 }
 
 interface Shop {
@@ -73,6 +80,8 @@ export default function AdminGutscheinVerwaltung() {
   const [editDialog, setEditDialog] = useState(false);
   const [editGutschein, setEditGutschein] = useState<Partial<Gutschein>>({});
   const [isNewGutschein, setIsNewGutschein] = useState(false);
+  const [hasVarianten, setHasVarianten] = useState(false);
+  const [newVariante, setNewVariante] = useState<Variante>({ name: '', preis: 0, beschreibung: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -147,7 +156,8 @@ export default function AdminGutscheinVerwaltung() {
             beschreibung: item.beschreibung || '',
             aktiv: item.aktiv !== false, // Default true
             reihenfolge: item.reihenfolge ?? index,
-            typ: item.typ || ''
+            typ: item.typ || '',
+            varianten: item.varianten || [] // NEU: Varianten laden
           });
         });
         
@@ -262,8 +272,21 @@ export default function AdminGutscheinVerwaltung() {
   const handleSave = async () => {
     const betragValue = editGutschein.betrag || editGutschein.preis || 0;
     
-    if (!editGutschein.name || !betragValue) {
-      alert('Name und Preis sind erforderlich!');
+    // Validierung: Name ist immer erforderlich
+    if (!editGutschein.name) {
+      alert('Name ist erforderlich!');
+      return;
+    }
+
+    // Validierung: Preis nur erforderlich wenn KEINE Varianten
+    if (!hasVarianten && !betragValue) {
+      alert('Preis ist erforderlich!');
+      return;
+    }
+
+    // Validierung: Bei Varianten muss mindestens eine vorhanden sein
+    if (hasVarianten && (!editGutschein.varianten || editGutschein.varianten.length === 0)) {
+      alert('Bitte fügen Sie mindestens eine Variante hinzu!');
       return;
     }
 
@@ -290,11 +313,14 @@ export default function AdminGutscheinVerwaltung() {
           
           gutscheinarten[newId] = {
             name: editGutschein.name,
-            preis: betragValue,
+            preis: hasVarianten ? 0 : betragValue, // Bei Varianten: Preis = 0
             beschreibung: editGutschein.beschreibung || '',
             aktiv: editGutschein.aktiv ?? true,
             reihenfolge: nextReihenfolge,
-            typ: editGutschein.typ || 'dienstleistung'
+            typ: editGutschein.typ || 'dienstleistung',
+            ...(hasVarianten && editGutschein.varianten && editGutschein.varianten.length > 0 
+              ? { varianten: editGutschein.varianten }
+              : {})
           };
         } else {
           // Bestehenden Gutschein aktualisieren
@@ -302,10 +328,13 @@ export default function AdminGutscheinVerwaltung() {
             gutscheinarten[editGutschein.id!] = {
               ...gutscheinarten[editGutschein.id!],
               name: editGutschein.name,
-              preis: betragValue,
+              preis: hasVarianten ? 0 : betragValue, // Bei Varianten: Preis = 0
               beschreibung: editGutschein.beschreibung || '',
               aktiv: editGutschein.aktiv ?? true,
-              typ: editGutschein.typ || gutscheinarten[editGutschein.id!].typ || 'dienstleistung'
+              typ: editGutschein.typ || gutscheinarten[editGutschein.id!].typ || 'dienstleistung',
+              ...(hasVarianten && editGutschein.varianten && editGutschein.varianten.length > 0 
+                ? { varianten: editGutschein.varianten }
+                : {})
             };
           }
         }
@@ -331,8 +360,10 @@ export default function AdminGutscheinVerwaltung() {
       betrag: 0,
       beschreibung: '',
       aktiv: true,
+      varianten: []
     });
     setIsNewGutschein(true);
+    setHasVarianten(false);
     setEditDialog(true);
   };
 
@@ -340,6 +371,7 @@ export default function AdminGutscheinVerwaltung() {
   const handleEdit = (gutschein: Gutschein) => {
     setEditGutschein(gutschein);
     setIsNewGutschein(false);
+    setHasVarianten(!!gutschein.varianten && gutschein.varianten.length > 0);
     setEditDialog(true);
   };
 
@@ -531,24 +563,27 @@ export default function AdminGutscheinVerwaltung() {
                 onChange={(e) => setEditGutschein({...editGutschein, name: e.target.value})}
                 sx={{ mb: 2 }}
               />
-              {/* Im Dialog: Preis statt Betrag */}
-              <TextField
-                margin="dense"
-                label="Preis (€)"
-                type="number"
-                fullWidth
-                variant="outlined"
-                value={editGutschein.betrag || editGutschein.preis || 0}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  setEditGutschein({
-                    ...editGutschein, 
-                    betrag: value,
-                    preis: value
-                  });
-                }}
-                sx={{ mb: 2 }}
-              />
+              
+              {/* Preis nur anzeigen wenn KEINE Varianten */}
+              {!hasVarianten && (
+                <TextField
+                  margin="dense"
+                  label="Preis (€)"
+                  type="number"
+                  fullWidth
+                  variant="outlined"
+                  value={editGutschein.betrag || editGutschein.preis || 0}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    setEditGutschein({
+                      ...editGutschein, 
+                      betrag: value,
+                      preis: value
+                    });
+                  }}
+                  sx={{ mb: 2 }}
+                />
+              )}
 
               <TextField
                 margin="dense"
@@ -592,6 +627,114 @@ export default function AdminGutscheinVerwaltung() {
                   <MenuItem value="frei">Frei</MenuItem>
                 </Select>
               </FormControl>
+
+              {/* NEU: Varianten-Toggle */}
+              <Box sx={{ mb: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  Varianten (optional)
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  Aktivieren Sie Varianten, um mehrere Optionen für diese Dienstleistung anzubieten (z.B. verschiedene Zeitdauern)
+                </Typography>
+                <Button
+                  variant={hasVarianten ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => {
+                    setHasVarianten(!hasVarianten);
+                    if (!hasVarianten && !editGutschein.varianten) {
+                      setEditGutschein({...editGutschein, varianten: []});
+                    }
+                  }}
+                  sx={{ mb: hasVarianten ? 2 : 0 }}
+                >
+                  {hasVarianten ? 'Varianten aktiviert' : 'Varianten aktivieren'}
+                </Button>
+
+                {/* Varianten-Liste und Hinzufügen */}
+                {hasVarianten && (
+                  <Box sx={{ mt: 2 }}>
+                    {/* Bestehende Varianten */}
+                    {editGutschein.varianten && editGutschein.varianten.length > 0 && (
+                      <Box sx={{ mb: 2 }}>
+                        {editGutschein.varianten.map((variante, idx) => (
+                          <Paper key={idx} sx={{ p: 1.5, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" fontWeight={600}>{variante.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">{variante.preis}€</Typography>
+                              {variante.beschreibung && (
+                                <Typography variant="caption" sx={{ display: 'block' }} color="text.secondary">
+                                  {variante.beschreibung}
+                                </Typography>
+                              )}
+                            </Box>
+                            <IconButton 
+                              size="small" 
+                              color="error"
+                              onClick={() => {
+                                const newVarianten = editGutschein.varianten!.filter((_, i) => i !== idx);
+                                setEditGutschein({...editGutschein, varianten: newVarianten});
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Paper>
+                        ))}
+                      </Box>
+                    )}
+
+                    {/* Neue Variante hinzufügen */}
+                    <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: '1px dashed #ccc' }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+                        Neue Variante hinzufügen
+                      </Typography>
+                      <TextField
+                        size="small"
+                        label="Name (z.B. 60 Minuten)"
+                        fullWidth
+                        value={newVariante.name}
+                        onChange={(e) => setNewVariante({...newVariante, name: e.target.value})}
+                        sx={{ mb: 1 }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Preis (€)"
+                        type="number"
+                        fullWidth
+                        value={newVariante.preis || ''}
+                        onChange={(e) => setNewVariante({...newVariante, preis: parseFloat(e.target.value) || 0})}
+                        sx={{ mb: 1 }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Beschreibung (optional)"
+                        fullWidth
+                        value={newVariante.beschreibung || ''}
+                        onChange={(e) => setNewVariante({...newVariante, beschreibung: e.target.value})}
+                        sx={{ mb: 1 }}
+                      />
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        fullWidth
+                        onClick={() => {
+                          if (!newVariante.name || !newVariante.preis) {
+                            alert('Name und Preis sind erforderlich!');
+                            return;
+                          }
+                          const currentVarianten = editGutschein.varianten || [];
+                          setEditGutschein({
+                            ...editGutschein,
+                            varianten: [...currentVarianten, newVariante]
+                          });
+                          setNewVariante({ name: '', preis: 0, beschreibung: '' });
+                        }}
+                      >
+                        Variante hinzufügen
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setEditDialog(false)}>Abbrechen</Button>
