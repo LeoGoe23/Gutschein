@@ -1,11 +1,25 @@
 import { db } from '../auth/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
+export interface DienstleistungVariante {
+  name: string;
+  preis: string;
+  beschreibung?: string;
+}
+
+export interface Dienstleistung {
+  shortDesc: string;
+  longDesc: string;
+  price?: string; // Für flache Dienstleistungen
+  reihenfolge: number;
+  varianten?: DienstleistungVariante[]; // Optional: Für Dienstleistungen mit Varianten
+}
+
 export interface CheckoutData {
   unternehmensname: string;
   bildURL: string;
   gutscheinURL: string;
-  dienstleistungen: any[];
+  dienstleistungen: Dienstleistung[];
   customValue: boolean;
   gutscheinarten: any;
   slug: string;
@@ -64,22 +78,36 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
 };
 
 // Hilfsfunktion um Dienstleistungen aus Gutscheinarten zu extrahieren
-const extractDienstleistungen = (gutscheinarten: any): any[] => {
-  const dienstleistungen: any[] = [];
+const extractDienstleistungen = (gutscheinarten: any): Dienstleistung[] => {
+  const dienstleistungen: Dienstleistung[] = [];
   
   Object.keys(gutscheinarten).forEach(key => {
     const item = gutscheinarten[key];
     if (item.typ === 'dienstleistung') {
-      dienstleistungen.push({
+      const dienstleistung: Dienstleistung = {
         shortDesc: item.name,
         longDesc: item.beschreibung || item.name,
-        price: item.preis.toString(),
-        reihenfolge: item.reihenfolge || 0 // NEU: Reihenfolge hinzufügen
-      });
+        reihenfolge: item.reihenfolge || 0
+      };
+
+      // Check ob Varianten vorhanden sind
+      if (item.varianten && Array.isArray(item.varianten) && item.varianten.length > 0) {
+        // Dienstleistung mit Varianten
+        dienstleistung.varianten = item.varianten.map((v: any) => ({
+          name: v.name,
+          preis: v.preis.toString(),
+          beschreibung: v.beschreibung || ''
+        }));
+      } else {
+        // Flache Dienstleistung (wie bisher)
+        dienstleistung.price = item.preis.toString();
+      }
+
+      dienstleistungen.push(dienstleistung);
     }
   });
   
-  // NEU: Nach Reihenfolge sortieren
+  // Nach Reihenfolge sortieren
   dienstleistungen.sort((a, b) => a.reihenfolge - b.reihenfolge);
   
   return dienstleistungen;
