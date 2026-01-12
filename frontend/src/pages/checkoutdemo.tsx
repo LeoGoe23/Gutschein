@@ -1,7 +1,7 @@
 import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField, Dialog, DialogContent, DialogActions, CircularProgress } from '@mui/material';
 import { useState, useRef, useEffect } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
-import LoginModal from '../components/login/LoginModal';
+import KontaktModal from '../components/home/KontaktModal';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
@@ -24,16 +24,11 @@ export default function GutscheinDemoPage() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [purchasedBetrag, setPurchasedBetrag] = useState<number>(0);
   const [showPopup, setShowPopup] = useState(false);
-  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [showKontaktModal, setShowKontaktModal] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [pdfGenerated, setPdfGenerated] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const hasSentRef = useRef(false);
-  const [kontaktName, setKontaktName] = useState('');
-  const [kontaktEmail, setKontaktEmail] = useState('');
-  const [kontaktTelefon, setKontaktTelefon] = useState('');
-  const [kontaktNachricht, setKontaktNachricht] = useState('');
-  const [kontaktSending, setKontaktSending] = useState(false);
 
   useEffect(() => {
     document.title = 'Demo Checkout - Gutscheinery | Jetzt testen';
@@ -511,76 +506,31 @@ export default function GutscheinDemoPage() {
             </Typography>
           </Box>
 
-          {/* Zwei einfache Felder */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 4 }}>
-            <TextField
-              label="Ihre Kontaktmöglichkeit"
-              value={kontaktEmail}
-              onChange={(e) => setKontaktEmail(e.target.value)}
-              fullWidth
-              placeholder="E-Mail oder Telefonnummer"
-              variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                }
-              }}
-            />
-            <TextField
-              label="Ihre Nachricht (optional)"
-              value={kontaktNachricht}
-              onChange={(e) => setKontaktNachricht(e.target.value)}
-              multiline
-              rows={3}
-              fullWidth
-              placeholder="Was möchten Sie uns mitteilen?"
-              variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                }
-              }}
-            />
-          </Box>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 4, px: 5, flexDirection: 'column', gap: 2 }}>
           <Button
             variant="contained"
             fullWidth
-            disabled={!kontaktEmail || kontaktSending}
             sx={{
-              backgroundColor: '#1976d2',
+              backgroundColor: '#667eea',
               color: 'white',
               py: 1.5,
               borderRadius: 2,
               fontWeight: 600,
               textTransform: 'none',
               fontSize: '1rem',
-              '&:hover': { backgroundColor: '#1565c0' },
-              '&:disabled': { backgroundColor: '#e0e0e0', color: '#999' }
-            }}
-            onClick={async () => {
-              setKontaktSending(true);
-              try {
-                await addDoc(collection(db, 'kontaktanfragen'), {
-                  kontakt: kontaktEmail,
-                  nachricht: kontaktNachricht,
-                  erstelltAm: new Date().toISOString(),
-                  quelle: 'Demo-Checkout'
-                });
-                alert('✅ Vielen Dank! Wir melden uns in Kürze bei Ihnen.');
-                setShowPopup(false);
-                setKontaktEmail('');
-                setKontaktNachricht('');
-              } catch (error) {
-                console.error('Fehler beim Senden:', error);
-                alert('❌ Es gab einen Fehler. Bitte versuchen Sie es erneut.');
-              } finally {
-                setKontaktSending(false);
+              boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
+              '&:hover': { 
+                backgroundColor: '#5568d3',
+                boxShadow: '0 6px 20px rgba(102, 126, 234, 0.5)'
               }
             }}
+            onClick={() => {
+              setShowPopup(false);
+              setShowKontaktModal(true);
+            }}
           >
-            {kontaktSending ? 'Wird gesendet...' : 'Kontaktanfrage senden'}
+            Jetzt Kontakt aufnehmen
           </Button>
           <Button
             variant="text"
@@ -592,8 +542,12 @@ export default function GutscheinDemoPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Login Modal für Registrierung */}
-      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
+      {/* Kontakt Modal */}
+      <KontaktModal 
+        open={showKontaktModal} 
+        onClose={() => setShowKontaktModal(false)}
+        source="Demo-Checkout"
+      />
     </Box>
   );
 }

@@ -13,6 +13,7 @@ import LoginModal from '../components/login/LoginModal';
 import useAuth from '../auth/useAuth';
 import SEOHead from '../components/blog/SEOHead';
 import StructuredData from '../components/StructuredData';
+import KontaktModal from '../components/home/KontaktModal';
 
 export default function HomeLayout() {
   const location = useLocation();
@@ -20,6 +21,7 @@ export default function HomeLayout() {
   const user = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [intendedRoute, setIntendedRoute] = useState<string | null>(null);
+  const [showKontaktModal, setShowKontaktModal] = useState(false);
 
   // SEO für Startseite
   useEffect(() => {
@@ -328,7 +330,7 @@ export default function HomeLayout() {
               ))}
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: { xs: 'center', md: 'flex-start' } }}>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'center', md: 'flex-start' }, flexDirection: { xs: 'column', sm: 'row' } }}>
               <Button
                 variant="contained"
                 size="large"
@@ -361,6 +363,7 @@ export default function HomeLayout() {
               <Button
                 variant="outlined"
                 size="large"
+                onClick={() => setShowKontaktModal(true)}
                 sx={{
                   borderColor: '#667eea',
                   color: '#667eea',
@@ -378,7 +381,7 @@ export default function HomeLayout() {
                   }
                 }}
               >
-                Mehr erfahren
+                Kontakt aufnehmen
               </Button>
             </Box>
           </Box>
@@ -725,6 +728,13 @@ export default function HomeLayout() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Kontakt Modal */}
+      <KontaktModal 
+        open={showKontaktModal} 
+        onClose={() => setShowKontaktModal(false)}
+        source="App-Sektion"
+      />
     </Box>
   );
 }

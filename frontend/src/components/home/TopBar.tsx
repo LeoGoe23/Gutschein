@@ -156,19 +156,6 @@ export default function TopBar() {
             Kontakt
           </Typography>
 
-          <Typography
-            onClick={handleAccountClick}
-            sx={{
-              cursor: 'pointer',
-              fontSize: '1.1rem',
-              color: '#333',
-              fontWeight: '600',
-              textDecoration: 'none',
-            }}
-          >
-            {user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Mein Konto"}
-          </Typography>
-
           {user ? (
             <>
               <Tooltip title="Account">

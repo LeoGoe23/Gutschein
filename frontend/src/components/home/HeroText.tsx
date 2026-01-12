@@ -4,11 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import useAuth from '../../auth/useAuth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../auth/firebase';
-import LoginModal from '../login/LoginModal';
+import KontaktModal from './KontaktModal';
 
 export default function HeroText() {
   const navigate = useNavigate();
-  const [anmeldenOpen, setAnmeldenOpen] = useState(false);
+  const [kontaktOpen, setKontaktOpen] = useState(false);
   const [registrationFinished, setRegistrationFinished] = useState<boolean>(false);
 
   const user = useAuth();
@@ -34,16 +34,6 @@ export default function HeroText() {
 
   const handleStartDemo = () => {
     navigate('/checkoutdemo');
-  };
-
-  const handleAccountClick = () => {
-    if (!user) {
-      setAnmeldenOpen(true);
-    } else if (registrationFinished) {
-      navigate('/profil');
-    } else {
-      navigate('/gutschein/step1');
-    }
   };
 
   return (
@@ -84,7 +74,7 @@ export default function HeroText() {
 
         <Button
           variant="outlined"
-          onClick={handleAccountClick}
+          onClick={() => setKontaktOpen(true)}
           sx={{
             fontSize: '1.1rem',
             padding: '1rem 2.2rem',
@@ -99,11 +89,15 @@ export default function HeroText() {
             },
           }}
         >
-          {user ? (registrationFinished ? "Mein Konto" : "Registrieren") : "Anmelden"}
+          Kontakt aufnehmen
         </Button>
       </Stack>
 
-      <LoginModal open={anmeldenOpen} onClose={() => setAnmeldenOpen(false)} />
+      <KontaktModal 
+        open={kontaktOpen} 
+        onClose={() => setKontaktOpen(false)}
+        source="Hero-Sektion"
+      />
     </Stack>
   );
 }
