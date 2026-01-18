@@ -19,8 +19,7 @@ export default function HeroText() {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setRegistrationFinished(userData.registrationFinished || false);
+            // Check registration status
           }
         } catch (error) {
           console.error("Error checking registration status:", error);

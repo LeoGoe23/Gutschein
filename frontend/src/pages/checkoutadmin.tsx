@@ -207,6 +207,7 @@ function SuccessPage({
     };
 
     sendGutscheinEmail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerEmail, checkoutData.slug, purchasedBetrag, selectedDienstleistung]); // customerEmail als Dependency
 
   return (
