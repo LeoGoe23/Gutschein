@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BlogPost, CreateBlogPostDto, UpdateBlogPostDto } from '../types/blog';
+import { BlogPost, CreateBlogPostDto } from '../types/blog';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 

@@ -123,9 +123,6 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
     // Der Editor-Container hat: border: 4px + eventuell padding
     // Das PDF-Container hat: KEIN border, KEIN padding
     
-    // KORREKTUR: 4px Border vom Editor abziehen!
-    const EDITOR_BORDER_WIDTH = 4; // Border vom Editor
-    
     // 🔥 ECHTES PROBLEM: Koordinaten sind relativ zum BROWSER-VIEWPORT, nicht zum Container!
     // Wir müssen die Container-Position berücksichtigen!
     

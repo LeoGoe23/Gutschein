@@ -1,5 +1,5 @@
 import { db } from '../auth/firebase';
-import { collection, addDoc, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 
 export interface SoldGutscheinData {
   gutscheinCode: string;

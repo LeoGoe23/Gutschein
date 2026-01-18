@@ -1,5 +1,5 @@
 import { auth, db, storage } from '../auth/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // Generiere 6-stelligen alphanumerischen Slug
@@ -65,7 +65,6 @@ export const saveGutscheinData = async (contextData: any) => {
     // 1. Bilder zu Storage hochladen
     let bildURL = '';
     let gutscheinDesignURL = '';
-    let unserDesignPdfURL = '';
 
     // Unternehmensbild hochladen
     if (contextData.bild) {
