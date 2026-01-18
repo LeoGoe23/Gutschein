@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 interface StructuredDataProps {
-  type: 'website' | 'organization' | 'breadcrumb';
+  type: 'website' | 'organization' | 'breadcrumb' | 'faq' | 'service' | 'product';
   data?: any;
 }
 
@@ -31,7 +31,7 @@ export default function StructuredData({ type, data }: StructuredDataProps) {
         '@type': 'Organization',
         name: 'Gutscheinery',
         url: 'https://gutscheinery.de',
-        logo: 'https://gutscheinery.de/logo.png',
+        logo: 'https://gutscheinery.de/logo-google.png',
         description: 'Digitale Gutscheinlösungen für moderne Unternehmen',
         sameAs: [
           // Hier können Sie später Social Media Links hinzufügen
@@ -52,6 +52,52 @@ export default function StructuredData({ type, data }: StructuredDataProps) {
           name: item.name,
           item: item.url
         }))
+      };
+    } else if (type === 'faq' && data) {
+      structuredData = {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: data.questions.map((q: any) => ({
+          '@type': 'Question',
+          name: q.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: q.answer
+          }
+        }))
+      };
+    } else if (type === 'service') {
+      structuredData = {
+        '@context': 'https://schema.org',
+        '@type': 'Service',
+        name: 'Digitales Gutscheinsystem',
+        provider: {
+          '@type': 'Organization',
+          name: 'Gutscheinery'
+        },
+        serviceType: 'Gutschein-Management-System',
+        description: 'Professionelles digitales Gutscheinsystem für Unternehmen. Erstellen, verkaufen und verwalten Sie Gutscheine online.',
+        areaServed: 'DE',
+        availableChannel: {
+          '@type': 'ServiceChannel',
+          serviceUrl: 'https://gutscheinery.de'
+        }
+      };
+    } else if (type === 'product') {
+      structuredData = {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: 'Gutscheinery - Digitales Gutscheinsystem',
+        description: 'Digitale Gutscheinlösung für Unternehmen. Einfach zu bedienen, automatisiert und professionell.',
+        brand: {
+          '@type': 'Brand',
+          name: 'Gutscheinery'
+        },
+        offers: {
+          '@type': 'AggregateOffer',
+          priceCurrency: 'EUR',
+          availability: 'https://schema.org/InStock'
+        }
       };
     }
 
