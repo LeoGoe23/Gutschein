@@ -1,7 +1,6 @@
 import React from 'react';
 import { useEffect } from 'react';
 import { Container, Typography, Link } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import LogoTopLeft from '../TopLeftLogo';
 import Footer from '../Footer';
 

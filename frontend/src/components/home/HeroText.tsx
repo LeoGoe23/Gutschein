@@ -9,7 +9,6 @@ import KontaktModal from './KontaktModal';
 export default function HeroText() {
   const navigate = useNavigate();
   const [kontaktOpen, setKontaktOpen] = useState(false);
-  const [registrationFinished, setRegistrationFinished] = useState<boolean>(false);
 
   const user = useAuth();
 

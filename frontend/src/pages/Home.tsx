@@ -1,7 +1,7 @@
 import { Box, Button, Typography, Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox, Switch, Link } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { CheckCircle, Smartphone, Speed, Security, CloudSync, NotificationsActive } from '@mui/icons-material';
+import { CheckCircle, Smartphone, NotificationsActive } from '@mui/icons-material';
 import TopBar from '../components/home/TopBar';
 import HeroText from '../components/home/HeroText';
 import HeroImage from '../components/home/HeroImage';
@@ -11,7 +11,6 @@ import LogoTopLeft from '../components/home/TopLeftLogo';
 import FAQ from '../components/home/FAQ';
 import LoginModal from '../components/login/LoginModal';
 import useAuth from '../auth/useAuth';
-import SEOHead from '../components/blog/SEOHead';
 import StructuredData from '../components/StructuredData';
 import KontaktModal from '../components/home/KontaktModal';
 

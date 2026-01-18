@@ -6,7 +6,6 @@ import { Helmet } from 'react-helmet';
 
 const WidgetDemoBySlug: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [shopData, setShopData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,21 +34,13 @@ const WidgetDemoBySlug: React.FC = () => {
         // Try uppercase slug first (JANKIP)
         let shopDoc = await getDoc(doc(db, 'users', slug.toUpperCase()));
         if (shopDoc.exists()) {
-          setShopData(shopDoc.data());
+          // Shop data loaded
         } else {
           // Try lowercase slug
           shopDoc = await getDoc(doc(db, 'users', slug.toLowerCase()));
-          if (shopDoc.exists()) {
-            setShopData(shopDoc.data());
-          } else {
-            // Set empty data to allow rendering anyway
-            setShopData({});
-          }
         }
       } catch (error) {
         console.error('Error loading shop data:', error);
-        // Set empty data to allow rendering anyway
-        setShopData({});
       } finally {
         setLoading(false);
       }

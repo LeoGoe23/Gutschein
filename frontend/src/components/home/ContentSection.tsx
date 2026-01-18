@@ -4,10 +4,8 @@ import VerifiedIcon from '@mui/icons-material/Verified';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import KontaktModal from './KontaktModal';
-import { useNavigate } from 'react-router-dom';
 
 export default function ContentSection() {
-  const navigate = useNavigate();
   const [kontaktOpen, setKontaktOpen] = useState(false);
 
   return (
