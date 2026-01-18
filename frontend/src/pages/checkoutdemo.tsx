@@ -2,7 +2,6 @@ import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextFi
 import { useState, useRef, useEffect } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import KontaktModal from '../components/home/KontaktModal';
-import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 
