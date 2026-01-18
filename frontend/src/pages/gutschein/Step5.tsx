@@ -1,6 +1,6 @@
 import { Box, Typography, Button, Stack, Checkbox, FormControlLabel, Link } from '@mui/material';
 import { useGutschein } from '../../context/GutscheinContext';
-import { Email, Phone, Person, Image as ImageIcon, Build } from '@mui/icons-material';
+import { Email, Phone, Person } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
 export default function Zusammenfassung() {

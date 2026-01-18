@@ -139,7 +139,6 @@ export default function GutscheinePage() {
 
   // Gruppiere Gutscheine nach Typ
   const dienstleistungen = Object.entries(formData.Gutscheine).filter(([_, g]) => g.typ === 'dienstleistung');
-  const freierBetrag = Object.entries(formData.Gutscheine).find(([_, g]) => g.typ === 'frei');
 
   return (
     <PageContainer title="Gutscheine">

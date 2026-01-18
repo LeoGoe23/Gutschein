@@ -93,6 +93,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     };
 
     initializeStripe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ✅ DEBUG: Payment Intent erstellen
@@ -190,6 +191,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     };
 
     createPaymentIntent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stripe, betrag, stripeAccountId, isTestMode]); // ✅ customerEmail dependency entfernt!
 
   // ✅ BESSER: Separater useEffect für Payment Element
@@ -578,6 +580,7 @@ function SuccessPage({
     };
 
     sendGutscheinEmail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchasedBetrag, customerEmail]); // ✅ ÄNDERUNG: sessionId dependency entfernt
 
   const generateGutscheinCode = () => {
@@ -714,7 +717,6 @@ const trackWebsiteHit = async (userId: string) => {
 
 export default function GutscheinLandingPage() {
   const { slug } = useParams<{ slug: string }>();
-  const location = useLocation();
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -1133,17 +1135,3 @@ export default function GutscheinLandingPage() {
       </Box>
   );
 }
-
-// Falls Sie eine Funktion haben, die alle Gutscheinarten lädt:
-const loadAllGutscheinarten = (gutscheinarten: any) => {
-  const items = Object.keys(gutscheinarten).map(key => ({
-    id: key,
-    ...gutscheinarten[key],
-    reihenfolge: gutscheinarten[key].reihenfolge || 0
-  }));
-  
-  // Nach Reihenfolge sortieren
-  items.sort((a, b) => a.reihenfolge - b.reihenfolge);
-  
-  return items;
-};
