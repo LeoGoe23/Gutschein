@@ -1,5 +1,5 @@
 import PageContainer from '../../components/profil/PageContainer';
-import { Box, Button, CircularProgress, TextField, Typography, Divider } from '@mui/material';
+import { Box, Button, CircularProgress, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../auth/firebase';
@@ -9,7 +9,6 @@ export default function EinstellungenPage() {
   const [loading, setLoading] = useState(true);
   const [editUnternehmensdaten, setEditUnternehmensdaten] = useState(false);
   const [editKontaktinformationen, setEditKontaktinformationen] = useState(false);
-  const [editZahlungsinformationen, setEditZahlungsinformationen] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
@@ -35,7 +34,6 @@ export default function EinstellungenPage() {
     setData(formData);
     setEditUnternehmensdaten(false);
     setEditKontaktinformationen(false);
-    setEditZahlungsinformationen(false);
   };
 
   if (loading) return (
