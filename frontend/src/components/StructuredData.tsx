@@ -15,7 +15,7 @@ export default function StructuredData({ type, data }: StructuredDataProps) {
         '@type': 'WebSite',
         name: 'Gutscheinery',
         url: 'https://gutscheinery.de',
-        description: 'Digitale Gutscheine für Ihr Unternehmen. Einfach erstellen, verkaufen und verwalten.',
+        description: 'Digitales Gutscheinsystem für Unternehmen. Automatisierte Gutschein-Verwaltung, Online-Verkauf und sofortige Auszahlung.',
         potentialAction: {
           '@type': 'SearchAction',
           target: {
