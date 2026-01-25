@@ -8,7 +8,7 @@
     <priority>1.0</priority>
   </url>
   
-  <!-- Wichtige Content-Seiten für Sitelinks -->
+  <!-- Wichtige Content-Seiten -->
   <url>
     <loc>https://gutscheinery.de/blog</loc>
     <lastmod>2026-01-25</lastmod>
@@ -20,5 +20,57 @@
     <lastmod>2026-01-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  
+  <!-- SEO Landing Pages (indexiert, aber nicht für Sitelinks) -->
+  <url>
+    <loc>https://gutscheinery.de/gutscheinsystem-friseure</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://gutscheinery.de/gutscheinsystem-floristen</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://gutscheinery.de/gutscheinsystem-massage-salons</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://gutscheinery.de/gutscheinsystem-wellness-clubs</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://gutscheinery.de/gutscheinsystem-yoga-studios</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  
+  <!-- Rechtliche Seiten (Pflicht, aber niedrige Priorität) -->
+  <url>
+    <loc>https://gutscheinery.de/impressum</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.1</priority>
+  </url>
+  <url>
+    <loc>https://gutscheinery.de/datenschutz</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.1</priority>
+  </url>
+  <url>
+    <loc>https://gutscheinery.de/agb</loc>
+    <lastmod>2026-01-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.1</priority>
   </url>
 </urlset>

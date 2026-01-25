@@ -59,8 +59,8 @@ export default function Blog() {
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%)' }}>
       <SEOHead
-        title="Blog - Gutscheinery | Tipps und Tricks für digitale Gutscheine"
-        description="Entdecke hilfreiche Artikel, Tipps und Best Practices rund um digitale Gutscheine, Marketing und E-Commerce."
+        title="Gutschein Marketing Blog | Tipps für digitale Gutscheine - Gutscheinery"
+        description="Expertenwissen zu digitalem Gutschein-Verkauf: Marketing-Strategien, Umsatzsteigerung, Best Practices für Restaurants, Wellness & mehr. Jetzt lesen!"
         type="website"
       />
       <StructuredData 

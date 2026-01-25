@@ -11,6 +11,13 @@ export default function Kontakt() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = 'Kontakt | Gutscheinery - Digitales Gutscheinsystem';
+    
+    // Meta Description setzen
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', 'Kontaktieren Sie Gutscheinery für digitale Gutscheinlösungen. Telefon: 0176 72910739 | E-Mail: gutscheinfabrik@gmail.com. Kostenlose Beratung!');
+    }
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
