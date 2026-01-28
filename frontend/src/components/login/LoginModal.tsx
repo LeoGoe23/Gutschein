@@ -8,9 +8,10 @@ import { useNavigate } from 'react-router-dom'; // Importiere useNavigate
 interface Props {
   open: boolean;
   onClose: () => void;
+  openResetPassword?: boolean;
 }
 
-export default function LoginModal({ open, onClose }: Props) {
+export default function LoginModal({ open, onClose, openResetPassword = false }: Props) {
   const navigate = useNavigate(); // Initialisiere den Navigator
 
   const [email, setEmail] = useState('');
@@ -18,10 +19,16 @@ export default function LoginModal({ open, onClose }: Props) {
   const [isRegister, setIsRegister] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(openResetPassword);
   const [resetEmail, setResetEmail] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
+
+  useEffect(() => {
+    if (openResetPassword) {
+      setResetPasswordOpen(true);
+    }
+  }, [openResetPassword]);
 
   useEffect(() => {
     if (success) {

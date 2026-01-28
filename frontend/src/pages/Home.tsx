@@ -21,11 +21,23 @@ export default function HomeLayout() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [intendedRoute, setIntendedRoute] = useState<string | null>(null);
   const [showKontaktModal, setShowKontaktModal] = useState(false);
+  const [openResetPassword, setOpenResetPassword] = useState(false);
 
   // SEO für Startseite
   useEffect(() => {
     document.title = 'Gutscheinery - Digitale Gutscheine für Ihr Unternehmen';
   }, []);
+
+  // Prüfe auf reset-password Query-Parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('reset-password') === 'true') {
+      setShowLoginModal(true);
+      setOpenResetPassword(true);
+      // Entferne den Query-Parameter aus der URL
+      navigate('/', { replace: true });
+    }
+  }, [location.search, navigate]);
 
   // Widget iframe Höhenanpassung
   useEffect(() => {
@@ -92,6 +104,7 @@ export default function HomeLayout() {
 
   const handleCloseLoginModal = () => {
     setShowLoginModal(false);
+    setOpenResetPassword(false);
     setIntendedRoute(null);
     // State clearen
     navigate('/', { replace: true });
@@ -368,7 +381,7 @@ export default function HomeLayout() {
               <Button
                 variant="outlined"
                 size="large"
-                onClick={() => setShowKontaktModal(true)}
+                onClick={() => navigate('/app-info')}
                 sx={{
                   borderColor: '#667eea',
                   color: '#667eea',
@@ -386,7 +399,7 @@ export default function HomeLayout() {
                   }
                 }}
               >
-                Kontakt aufnehmen
+                Infos zur App
               </Button>
             </Box>
           </Box>
@@ -693,7 +706,8 @@ export default function HomeLayout() {
 
       <LoginModal 
         open={showLoginModal} 
-        onClose={handleCloseLoginModal} 
+        onClose={handleCloseLoginModal}
+        openResetPassword={openResetPassword}
       />
 
       <Dialog open={showCookieDialog && !showCookieSettings} onClose={acceptTechnicalCookies}>
