@@ -1,16 +1,33 @@
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField } from '@mui/material';
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField, Chip } from '@mui/material';
+import LocalOfferOutlined from '@mui/icons-material/LocalOfferOutlined';
 import { useState, useEffect, useRef } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import { useParams } from 'react-router-dom';
-import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = ((globalThis as any).process?.env?.REACT_APP_API_URL as string | undefined) || '';
+
+interface RabattCode {
+  code: string;
+  percent: number;
+  maxUses: number;
+  usedCount: number;
+  isActive: boolean;
+}
+
+interface AppliedRabatt {
+  code: string;
+  percent: number;
+  rabattBetrag: number;
+  finalBetrag: number;
+}
 
 interface DemoData {
   name: string;
   bildURL: string;
   customValue: boolean;
+  rabattcodes?: RabattCode[];
   dienstleistungen: Array<{
     shortDesc: string;
     longDesc: string;
@@ -20,21 +37,33 @@ interface DemoData {
 }
 
 // Demo Payment Form - mit echtem E-Mail-Versand
-function DemoPaymentForm({ 
-  betrag, 
+function DemoPaymentForm({
+  finalBetrag,
   selectedDienstleistung,
-  demoData,
-  onPaymentComplete 
-}: { 
-  betrag: number | null; 
+  onPaymentComplete,
+  rabattCodeInput,
+  setRabattCodeInput,
+  aktiveRabattcodes,
+  applyRabattCode,
+  removeRabattCode,
+  appliedRabatt,
+  rabattMessage,
+}: {
+  finalBetrag: number | null;
   selectedDienstleistung: { shortDesc: string; longDesc: string; price: string } | null;
-  demoData: DemoData;
   onPaymentComplete: (email: string) => void;
+  rabattCodeInput: string;
+  setRabattCodeInput: (v: string) => void;
+  aktiveRabattcodes: RabattCode[];
+  applyRabattCode: () => void;
+  removeRabattCode: () => void;
+  appliedRabatt: AppliedRabatt | null;
+  rabattMessage: string;
 }) {
   const [customerEmail, setCustomerEmail] = useState<string>('');
 
-  const handlePayment = async () => {
-    if (!betrag || !customerEmail) {
+  const handlePayment = () => {
+    if (!finalBetrag || !customerEmail) {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
@@ -53,7 +82,117 @@ function DemoPaymentForm({
         sx={{ mb: 3 }}
         placeholder="ihre@email.de"
       />
-      
+
+      {/* Rabattcode-Bereich jetzt hier */}
+      {aktiveRabattcodes.length > 0 && (
+        <Box
+          sx={{
+            mb: 3,
+            p: 2.75,
+            border: '1px solid #cfe3ff',
+            borderRadius: 3,
+            background: 'linear-gradient(130deg, #f8fbff 0%, #eef5ff 60%, #f9fcff 100%)',
+            boxShadow: '0 12px 28px rgba(25,118,210,0.1)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <LocalOfferOutlined sx={{ color: '#1976d2', fontSize: 20 }} />
+            <Typography variant="body1" sx={{ fontWeight: 800 }}>
+              Rabattcode einlösen
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+            {aktiveRabattcodes.slice(0, 4).map((code) => (
+              <Button
+                key={code.code}
+                onClick={() => setRabattCodeInput(code.code)}
+                variant="text"
+                sx={{
+                  minWidth: 0,
+                  px: 1.5,
+                  py: 0.5,
+                  border: '1px solid #90caf9',
+                  borderRadius: '16px',
+                  backgroundColor: '#fff',
+                  color: '#222',
+                  fontWeight: 400,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  boxShadow: 'none',
+                  '&:hover': {
+                    backgroundColor: '#f5faff',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                {code.code}
+              </Button>
+            ))}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              label="Code"
+              value={rabattCodeInput}
+              onChange={(e) => setRabattCodeInput(e.target.value.toUpperCase())}
+              size="small"
+              placeholder="z.B. OPEN10"
+              sx={{
+                flex: '1 1 200px',
+                backgroundColor: '#fff',
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={applyRabattCode}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 700,
+                borderRadius: 2,
+                boxShadow: 2,
+                backgroundColor: '#1976d2',
+                '&:hover': { backgroundColor: '#1565c0' },
+              }}
+            >
+              Einlösen
+            </Button>
+            {appliedRabatt && (
+              <Button variant="text" color="inherit" onClick={removeRabattCode} sx={{ textTransform: 'none' }}>
+                Entfernen
+              </Button>
+            )}
+          </Box>
+          {rabattMessage && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 1.25, color: appliedRabatt ? 'success.main' : 'text.secondary', fontWeight: 700 }}>
+              {rabattMessage}
+            </Typography>
+          )}
+
+          {appliedRabatt && finalBetrag && (
+            <Box
+              sx={{
+                mt: 1.5,
+                p: 1.25,
+                borderRadius: 2,
+                backgroundColor: '#fff',
+                border: '1px solid #cfe3ff',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary', textDecoration: 'line-through' }}>
+                  {(appliedRabatt.finalBetrag + appliedRabatt.rabattBetrag).toFixed(2)}€
+                </Typography>
+                <Typography variant="h6" sx={{ color: 'success.main', fontWeight: 800, lineHeight: 1 }}>
+                  {appliedRabatt.finalBetrag.toFixed(2)}€
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
+
       <Button
         variant="contained"
         size="large"
@@ -72,21 +211,21 @@ function DemoPaymentForm({
         onClick={handlePayment}
         disabled={!customerEmail}
       >
-        💳 Zahlung abschließen ({selectedDienstleistung ? selectedDienstleistung.price : betrag}€)
+        💳 Zahlung abschließen ({(finalBetrag ?? 0).toFixed(2)}€)
       </Button>
     </Box>
   );
 }
 
 // Demo Success Page - mit Status-Updates
-function DemoSuccessPage({ 
-  purchasedBetrag, 
-  selectedDienstleistung, 
+function DemoSuccessPage({
+  purchasedBetrag,
+  selectedDienstleistung,
   customerEmail,
   isSending,
   pdfGenerated,
-  emailSent
-}: { 
+  emailSent,
+}: {
   purchasedBetrag: number;
   selectedDienstleistung?: { shortDesc: string; longDesc: string; price: string } | null;
   customerEmail: string;
@@ -151,6 +290,7 @@ function DemoSuccessPage({
 export default function DemoCheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
   const [demoData, setDemoData] = useState<DemoData | null>(null);
+  const [demoDocId, setDemoDocId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   
@@ -166,7 +306,33 @@ export default function DemoCheckoutPage() {
   const [isSending, setIsSending] = useState(false);
   const [pdfGenerated, setPdfGenerated] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [rabattCodeInput, setRabattCodeInput] = useState('');
+  const [appliedRabatt, setAppliedRabatt] = useState<AppliedRabatt | null>(null);
+  const [rabattMessage, setRabattMessage] = useState('');
   const hasSentRef = useRef(false);
+
+  const aktiveRabattcodes = (demoData?.rabattcodes || []).filter(
+    (code) => code.isActive && (code.usedCount || 0) < code.maxUses
+  );
+
+  const getBasisBetrag = () => {
+    if (selectedDienstleistung) return Number(selectedDienstleistung.price);
+    return betrag;
+  };
+
+  const calculateFinalAmount = (base: number | null, discountPercent?: number) => {
+    if (!base || base <= 0) return null;
+    if (!discountPercent || discountPercent <= 0) return Number(base.toFixed(2));
+
+    const reduced = base - (base * discountPercent) / 100;
+    return Number(Math.max(0, reduced).toFixed(2));
+  };
+
+  const finalBetrag = calculateFinalAmount(getBasisBetrag(), appliedRabatt?.percent);
+
+  const getReducedPrice = (price: number) => {
+    return calculateFinalAmount(price, appliedRabatt?.percent) ?? price;
+  };
 
   // Lade Demo-Daten basierend auf Slug
   useEffect(() => {
@@ -186,7 +352,12 @@ export default function DemoCheckoutPage() {
           setError('Demo nicht gefunden');
         } else {
           const demoDoc = querySnapshot.docs[0];
-          setDemoData(demoDoc.data() as DemoData);
+          const rawData = demoDoc.data() as any;
+          setDemoDocId(demoDoc.id);
+          setDemoData({
+            ...rawData,
+            rabattcodes: Array.isArray(rawData.rabattcodes) ? rawData.rabattcodes : [],
+          } as DemoData);
         }
       } catch (err) {
         console.error('Fehler beim Laden der Demo-Daten:', err);
@@ -198,6 +369,14 @@ export default function DemoCheckoutPage() {
 
     loadDemoData();
   }, [slug]);
+
+  // Voreinstellung: Ersten verfuegbaren Rabattcode automatisch anzeigen
+  useEffect(() => {
+    if (!rabattCodeInput && aktiveRabattcodes.length > 0) {
+      setRabattCodeInput(aktiveRabattcodes[0].code);
+      setRabattMessage(`Tipp: Code ${aktiveRabattcodes[0].code} ist aktuell verfuegbar.`);
+    }
+  }, [aktiveRabattcodes, rabattCodeInput]);
 
   // Loading State
   if (loading) {
@@ -254,6 +433,7 @@ export default function DemoCheckoutPage() {
   const handleDienstleistungSelect = (dienstleistung: { shortDesc: string; longDesc: string; price: string }) => {
     setBetrag(Number(dienstleistung.price));
     setSelectedDienstleistung(dienstleistung);
+    setRabattMessage('');
   };
 
   const handleToggleChange = (event: React.MouseEvent<HTMLElement>, newType: 'wert' | 'dienstleistung') => {
@@ -261,11 +441,73 @@ export default function DemoCheckoutPage() {
       setGutscheinType(newType);
       setBetrag(null);
       setSelectedDienstleistung(null);
+      setAppliedRabatt(null);
+      setRabattMessage('');
     }
   };
 
+  const applyRabattCode = () => {
+    const enteredCode = rabattCodeInput.trim().toUpperCase();
+    const basisBetrag = getBasisBetrag();
+
+    if (!basisBetrag || basisBetrag <= 0) {
+      setRabattMessage('Bitte zuerst Betrag oder Dienstleistung auswählen.');
+      return;
+    }
+
+    if (!enteredCode) {
+      setRabattMessage('Bitte einen Rabattcode eingeben.');
+      return;
+    }
+
+    const availableCodes = demoData?.rabattcodes || [];
+    const match = availableCodes.find((c) => c.code?.toUpperCase() === enteredCode);
+
+    if (!match) {
+      setAppliedRabatt(null);
+      setRabattMessage('Dieser Rabattcode ist nicht gültig.');
+      return;
+    }
+    if (!match.isActive) {
+      setAppliedRabatt(null);
+      setRabattMessage('Dieser Rabattcode ist aktuell deaktiviert.');
+      return;
+    }
+    if ((match.usedCount || 0) >= match.maxUses) {
+      setAppliedRabatt(null);
+      setRabattMessage('Dieser Rabattcode ist bereits ausgeschöpft.');
+      return;
+    }
+
+    const finalAmount = calculateFinalAmount(basisBetrag, match.percent);
+    if (!finalAmount) {
+      setAppliedRabatt(null);
+      setRabattMessage('Rabatt konnte nicht berechnet werden.');
+      return;
+    }
+
+    const rabattBetrag = Number((basisBetrag - finalAmount).toFixed(2));
+    const remaining = Math.max(0, match.maxUses - (match.usedCount || 0));
+
+    setAppliedRabatt({
+      code: match.code,
+      percent: match.percent,
+      rabattBetrag,
+      finalBetrag: finalAmount,
+    });
+    setRabattMessage(
+      `Code aktiv: ${match.code}. Sie sparen ${rabattBetrag.toFixed(2)}€ (${match.percent}%) - von ${basisBetrag.toFixed(2)}€ auf ${finalAmount.toFixed(2)}€. Noch ${remaining} verfügbar.`
+    );
+  };
+
+  const removeRabattCode = () => {
+    setAppliedRabatt(null);
+    setRabattCodeInput('');
+    setRabattMessage('Rabattcode entfernt.');
+  };
+
   const handleWeiterZurBestellung = () => {
-    if (!betrag) {
+    if (!finalBetrag || finalBetrag <= 0) {
       alert('Bitte wählen Sie einen Betrag oder eine Dienstleistung aus.');
       return;
     }
@@ -287,8 +529,8 @@ export default function DemoCheckoutPage() {
     hasSentRef.current = true;
 
     setCustomerEmail(email);
-    const finalBetrag = selectedDienstleistung ? Number(selectedDienstleistung.price) : betrag || 0;
-    setPurchasedBetrag(finalBetrag);
+    const finalBetragToCharge = finalBetrag || 0;
+    setPurchasedBetrag(finalBetragToCharge);
     setShowSuccessPage(true);
     setIsSending(true);
 
@@ -298,7 +540,7 @@ export default function DemoCheckoutPage() {
       
       // PDF erstellen
       const { jsPDF } = await import('jspdf');
-      const doc = new jsPDF();
+      const pdfDoc = new jsPDF();
       
       // Bild laden
       let bildBase64 = '';
@@ -339,43 +581,43 @@ export default function DemoCheckoutPage() {
           offsetY = -(imgHeight - 74) / 2;
         }
         
-        doc.addImage(bildBase64, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+        pdfDoc.addImage(bildBase64, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
       }
 
       // Text zentriert
-      doc.setFontSize(32);
-      doc.setTextColor(211, 47, 47);
-      doc.text('Geschenk Gutschein', 105, 100, { align: 'center' });
+      pdfDoc.setFontSize(32);
+      pdfDoc.setTextColor(211, 47, 47);
+      pdfDoc.text('Geschenk Gutschein', 105, 100, { align: 'center' });
 
-      doc.setFontSize(18);
-      doc.setTextColor(51, 51, 51);
-      doc.text('über', 105, 115, { align: 'center' });
+      pdfDoc.setFontSize(18);
+      pdfDoc.setTextColor(51, 51, 51);
+      pdfDoc.text('über', 105, 115, { align: 'center' });
 
       // Betrag
-      doc.setFontSize(52);
-      doc.setTextColor(0, 0, 0);
+      pdfDoc.setFontSize(52);
+      pdfDoc.setTextColor(0, 0, 0);
       const betragText = selectedDienstleistung 
         ? selectedDienstleistung.shortDesc 
         : `€ ${finalBetrag}`;
-      doc.text(betragText, 105, 145, { align: 'center' });
+      pdfDoc.text(betragText, 105, 145, { align: 'center' });
 
       // Gutscheincode
-      doc.setFontSize(20);
-      doc.setFont('courier', 'bold');
-      doc.text(gutscheinCode, 105, 170, { align: 'center' });
+      pdfDoc.setFontSize(20);
+      pdfDoc.setFont('courier', 'bold');
+      pdfDoc.text(gutscheinCode, 105, 170, { align: 'center' });
 
       // Linie
-      doc.setDrawColor(211, 47, 47);
-      doc.setLineWidth(1);
-      doc.line(80, 180, 130, 180);
+      pdfDoc.setDrawColor(211, 47, 47);
+      pdfDoc.setLineWidth(1);
+      pdfDoc.line(80, 180, 130, 180);
 
       // Unternehmen
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.setTextColor(211, 47, 47);
-      doc.text(demoData?.name || 'Demo', 105, 200, { align: 'center' });
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.setFontSize(14);
+      pdfDoc.setTextColor(211, 47, 47);
+      pdfDoc.text(demoData?.name || 'Demo', 105, 200, { align: 'center' });
 
-      const pdfBlob = doc.output('blob');
+      const pdfBlob = pdfDoc.output('blob');
       setPdfGenerated(true);
 
       // PDF zu Base64
@@ -396,10 +638,12 @@ export default function DemoCheckoutPage() {
         empfaengerEmail: email,
         unternehmensname: demoData?.name || 'Demo',
         gutscheinCode,
-        betrag: finalBetrag,
+        betrag: finalBetragToCharge,
         dienstleistung: selectedDienstleistung,
         pdfBuffer: pdfBase64,
-        isDemoMode: true
+        isDemoMode: true,
+        rabattCode: appliedRabatt?.code || null,
+        rabattProzent: appliedRabatt?.percent || null
       };
 
       console.log('📧 Sende Demo-Email...');
@@ -421,7 +665,11 @@ export default function DemoCheckoutPage() {
         try {
           await addDoc(collection(db, 'demo-gutscheine'), {
             gutscheinCode,
-            betrag: finalBetrag,
+            betrag: finalBetragToCharge,
+            originalBetrag: getBasisBetrag(),
+            rabattCode: appliedRabatt?.code || null,
+            rabattProzent: appliedRabatt?.percent || null,
+            rabattBetrag: appliedRabatt?.rabattBetrag || 0,
             customerEmail: email,
             dienstleistung: selectedDienstleistung?.shortDesc || null,
             kaufdatum: new Date().toISOString(),
@@ -429,6 +677,30 @@ export default function DemoCheckoutPage() {
             slug: slug
           });
           console.log('✅ Demo-Gutschein in Firebase gespeichert');
+
+          if (appliedRabatt && demoDocId) {
+            try {
+              const demoRef = doc(db, 'demos', demoDocId);
+              const latestSnap = await getDoc(demoRef);
+              if (latestSnap.exists()) {
+                const latestData = latestSnap.data() as any;
+                const latestCodes: RabattCode[] = Array.isArray(latestData.rabattcodes) ? latestData.rabattcodes : [];
+                const updatedCodes = latestCodes.map((code) => {
+                  if (code.code?.toUpperCase() !== appliedRabatt.code.toUpperCase()) return code;
+                  const usedCount = Number(code.usedCount || 0);
+                  return {
+                    ...code,
+                    usedCount: usedCount + 1,
+                  };
+                });
+
+                await updateDoc(demoRef, { rabattcodes: updatedCodes });
+                setDemoData((prev) => (prev ? { ...prev, rabattcodes: updatedCodes } : prev));
+              }
+            } catch (usageError) {
+              console.warn('Rabattcode-Nutzung konnte nicht aktualisiert werden:', usageError);
+            }
+          }
         } catch (fbError) {
           console.error('❌ Firebase-Fehler:', fbError);
         }
@@ -469,6 +741,8 @@ export default function DemoCheckoutPage() {
               <Typography variant="body1" sx={{ color: 'grey.700', mb: 4, lineHeight: 1.6 }}>
                 {getBeschreibung()}
               </Typography>
+
+              {/* Rabattcode-Einlösung nur im Zahlungsformular */}
 
               {/* Toggle für beide Optionen - identisch zu checkoutc */}
               {hasBoth && (
@@ -533,6 +807,10 @@ export default function DemoCheckoutPage() {
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {demoData.dienstleistungen.map((dienstleistung, index) => (
+                          (() => {
+                            const originalPrice = Number(dienstleistung.price);
+                            const reducedPrice = getReducedPrice(originalPrice);
+                            return (
                           <Button
                             key={index}
                             variant={selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? "contained" : "outlined"}
@@ -560,8 +838,21 @@ export default function DemoCheckoutPage() {
                             }}
                           >
                             <span>{dienstleistung.shortDesc}</span>
-                            <span style={{ fontWeight: 700 }}>{dienstleistung.price}€</span>
+                            {!appliedRabatt ? (
+                              <span style={{ fontWeight: 700 }}>{dienstleistung.price}€</span>
+                            ) : (
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                                <Typography sx={{ textDecoration: 'line-through', color: 'text.secondary', fontSize: '0.95rem', fontWeight: 500 }}>
+                                  {originalPrice.toFixed(2)}€
+                                </Typography>
+                                <Typography sx={{ color: 'success.main', fontWeight: 800, fontSize: '1rem' }}>
+                                  {reducedPrice.toFixed(2)}€
+                                </Typography>
+                              </Box>
+                            )}
                           </Button>
+                            );
+                          })()
                         ))}
                       </Box>
                     </Box>
@@ -592,16 +883,46 @@ export default function DemoCheckoutPage() {
                       Jetzt zahlen
                     </Button>
                   </Box>
+
+                  {getBasisBetrag() && (
+                    <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, backgroundColor: '#f8fafc', border: '1px solid #e3eefc' }}>
+                      {!appliedRabatt ? (
+                        <Typography variant="body2" color="text.secondary">
+                          Preis: {Number(getBasisBetrag()).toFixed(2)}€
+                        </Typography>
+                      ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                            {Number(getBasisBetrag()).toFixed(2)}€
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 800 }}>
+                            {appliedRabatt.finalBetrag.toFixed(2)}€
+                          </Typography>
+                        </Box>
+                      )}
+                      {appliedRabatt && (
+                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 600 }}>
+                          Mit Code {appliedRabatt.code}: {appliedRabatt.finalBetrag.toFixed(2)}€ (-{appliedRabatt.rabattBetrag.toFixed(2)}€)
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
                 </Box>
               )}
 
               {/* Payment Form */}
               {showPaymentForm && (
                 <DemoPaymentForm
-                  betrag={betrag}
+                  finalBetrag={finalBetrag}
                   selectedDienstleistung={selectedDienstleistung}
-                  demoData={demoData}
                   onPaymentComplete={handlePaymentComplete}
+                  rabattCodeInput={rabattCodeInput}
+                  setRabattCodeInput={setRabattCodeInput}
+                  aktiveRabattcodes={aktiveRabattcodes}
+                  applyRabattCode={applyRabattCode}
+                  removeRabattCode={removeRabattCode}
+                  appliedRabatt={appliedRabatt}
+                  rabattMessage={rabattMessage}
                 />
               )}
             </>

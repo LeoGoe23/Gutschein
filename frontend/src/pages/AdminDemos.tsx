@@ -1,11 +1,11 @@
-import { Box, Typography, Paper, Button, TextField, Switch, FormControlLabel, List, ListItem, ListItemText, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Alert, LinearProgress } from '@mui/material';
+import { Box, Typography, Paper, Button, TextField, Switch, FormControlLabel, List, ListItem, ListItemText, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Alert, LinearProgress, MenuItem } from '@mui/material';
 import { Add, Edit, Delete, CloudUpload, Image } from '@mui/icons-material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../auth/useAuth';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, storage } from '../auth/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
@@ -14,6 +14,7 @@ interface DemoData {
   name: string;
   bildURL: string;
   customValue: boolean;
+  rabattcodes: RabattCode[];
   dienstleistungen: Array<{
     shortDesc: string;
     longDesc: string;
@@ -30,11 +31,52 @@ interface DienstleistungForm {
   price: string;
 }
 
+interface RabattCode {
+  code: string;
+  percent: number;
+  maxUses: number;
+  usedCount: number;
+  isActive: boolean;
+}
+
+interface RabattCodeForm {
+  code: string;
+  percent: string;
+  maxUses: string;
+}
+
+interface CheckoutSource {
+  userId: string;
+  slug: string;
+  name: string;
+}
+
+const sanitizeForFirestore = (value: any): any => {
+  if (value === undefined) return undefined;
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeForFirestore(item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (value && typeof value === 'object') {
+    const cleanedEntries = Object.entries(value)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, sanitizeForFirestore(v)]);
+
+    return Object.fromEntries(cleanedEntries);
+  }
+
+  return value;
+};
+
 export default function AdminDemosPage() {
   const user = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [demos, setDemos] = useState<DemoData[]>([]);
+  const [checkoutSources, setCheckoutSources] = useState<CheckoutSource[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingDemo, setEditingDemo] = useState<DemoData | null>(null);
   
@@ -43,12 +85,16 @@ export default function AdminDemosPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [copySourceSlug, setCopySourceSlug] = useState('');
+  const [isImportingCheckout, setIsImportingCheckout] = useState(false);
+  const [importInfo, setImportInfo] = useState<string>('');
   
   // Formular States
   const [formData, setFormData] = useState<DemoData>({
     name: '',
     bildURL: '',
     customValue: false,
+    rabattcodes: [],
     dienstleistungen: [],
     slug: '',
     createdAt: ''
@@ -57,6 +103,11 @@ export default function AdminDemosPage() {
     shortDesc: '',
     longDesc: '',
     price: ''
+  });
+  const [newRabattCode, setNewRabattCode] = useState<RabattCodeForm>({
+    code: '',
+    percent: '10',
+    maxUses: '10'
   });
 
   // Admin-Check
@@ -82,6 +133,7 @@ export default function AdminDemosPage() {
   useEffect(() => {
     if (isAdmin) {
       loadDemos();
+      loadCheckoutSources();
     }
   }, [isAdmin]);
 
@@ -92,7 +144,18 @@ export default function AdminDemosPage() {
       const demoList: DemoData[] = [];
       
       demoSnapshot.forEach((doc) => {
-        demoList.push({ id: doc.id, ...doc.data() } as DemoData);
+        const rawData = doc.data() as any;
+        demoList.push({
+          id: doc.id,
+          name: rawData.name || '',
+          bildURL: rawData.bildURL || '',
+          customValue: Boolean(rawData.customValue),
+          rabattcodes: Array.isArray(rawData.rabattcodes) ? rawData.rabattcodes : [],
+          dienstleistungen: Array.isArray(rawData.dienstleistungen) ? rawData.dienstleistungen : [],
+          slug: rawData.slug || '',
+          createdAt: rawData.createdAt || new Date(0).toISOString(),
+          bildFileName: rawData.bildFileName,
+        });
       });
       
       // Nach Erstellungsdatum sortieren (neueste zuerst)
@@ -101,6 +164,41 @@ export default function AdminDemosPage() {
       setDemos(demoList);
     } catch (error) {
       console.error('Fehler beim Laden der Demos:', error);
+    }
+  };
+
+  const loadCheckoutSources = async () => {
+    try {
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const sourceList: CheckoutSource[] = [];
+
+      usersSnapshot.forEach((userDoc) => {
+        const data = userDoc.data() as any;
+        const slug = (data.slug || '').toString().trim();
+        const checkout = data.Checkout || {};
+        const name = (checkout.Unternehmensname || data.Unternehmensdaten?.Unternehmensname || '').toString().trim();
+        const hasCheckoutConfig = Boolean(
+          checkout && (
+            checkout.Freibetrag ||
+            checkout.BildURL ||
+            checkout.Unternehmensname ||
+            (checkout.Gutscheinarten && Object.keys(checkout.Gutscheinarten).length > 0)
+          )
+        );
+
+        if (slug && hasCheckoutConfig) {
+          sourceList.push({
+            userId: userDoc.id,
+            slug,
+            name: name || slug,
+          });
+        }
+      });
+
+      sourceList.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      setCheckoutSources(sourceList);
+    } catch (error) {
+      console.error('Fehler beim Laden der Checkout-Quellen:', error);
     }
   };
 
@@ -114,6 +212,112 @@ export default function AdminDemosPage() {
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
+  };
+
+  const ensureUniqueDemoSlug = (baseSlug: string) => {
+    let slug = generateSlug(baseSlug);
+    let suffix = 2;
+
+    while (demos.some((d) => d.slug === slug && d.id !== editingDemo?.id)) {
+      slug = `${generateSlug(baseSlug)}-${suffix}`;
+      suffix += 1;
+    }
+
+    return slug;
+  };
+
+  const mapCheckoutDienstleistungenToDemo = (gutscheinarten: any): DemoData['dienstleistungen'] => {
+    const mapped: Array<{ shortDesc: string; longDesc: string; price: string; reihenfolge: number }> = [];
+
+    Object.keys(gutscheinarten || {}).forEach((key) => {
+      const item = gutscheinarten[key];
+      if (!item || item.typ !== 'dienstleistung') return;
+
+      const baseOrder = Number(item.reihenfolge || 0);
+
+      if (Array.isArray(item.varianten) && item.varianten.length > 0) {
+        item.varianten.forEach((variante: any, index: number) => {
+          mapped.push({
+            shortDesc: `${item.name} - ${variante.name}`,
+            longDesc: variante.beschreibung || item.beschreibung || item.name || '',
+            price: String(variante.preis ?? ''),
+            reihenfolge: baseOrder * 100 + index,
+          });
+        });
+      } else {
+        mapped.push({
+          shortDesc: item.name || '',
+          longDesc: item.beschreibung || item.name || '',
+          price: String(item.preis ?? ''),
+          reihenfolge: baseOrder,
+        });
+      }
+    });
+
+    return mapped
+      .sort((a, b) => a.reihenfolge - b.reihenfolge)
+      .map(({ shortDesc, longDesc, price }) => ({ shortDesc, longDesc, price }));
+  };
+
+  const importFromCheckoutSlug = async () => {
+    const sourceSlug = copySourceSlug.trim();
+    if (!sourceSlug) {
+      alert('Bitte zuerst einen Checkout-Slug eingeben.');
+      return;
+    }
+
+    if (formData.name || formData.slug || formData.dienstleistungen.length > 0 || selectedFile) {
+      const shouldOverwrite = window.confirm('Vorhandene Formularwerte werden ueberschrieben. Fortfahren?');
+      if (!shouldOverwrite) return;
+    }
+
+    setIsImportingCheckout(true);
+    setImportInfo('');
+
+    try {
+      const usersRef = collection(db, 'users');
+      const qExact = query(usersRef, where('slug', '==', sourceSlug));
+      let snap = await getDocs(qExact);
+
+      // Fallback: Viele alte Datensaetze nutzen andere Gross-/Kleinschreibung.
+      if (snap.empty && sourceSlug !== sourceSlug.toLowerCase()) {
+        const qLower = query(usersRef, where('slug', '==', sourceSlug.toLowerCase()));
+        snap = await getDocs(qLower);
+      }
+
+      if (snap.empty) {
+        alert('Keine Checkout-Seite mit diesem Slug gefunden.');
+        return;
+      }
+
+      const userData = snap.docs[0].data() as any;
+      const checkout = userData.Checkout || {};
+
+      const importedName = checkout.Unternehmensname || userData.Unternehmensdaten?.Unternehmensname || '';
+      const importedImage = checkout.BildURL || '';
+      const importedCustomValue = Boolean(checkout.Freibetrag);
+      const importedDienstleistungen = mapCheckoutDienstleistungenToDemo(checkout.Gutscheinarten || {});
+      const importedSlug = ensureUniqueDemoSlug(`${(userData.slug || sourceSlug)}-demo`);
+
+      setFormData((prev) => ({
+        ...prev,
+        name: importedName,
+        bildURL: importedImage,
+        customValue: importedCustomValue,
+        rabattcodes: prev.rabattcodes || [],
+        dienstleistungen: importedDienstleistungen,
+        slug: importedSlug,
+      }));
+
+      setSelectedFile(null);
+      setPreviewUrl(importedImage);
+      setImportInfo(`Import abgeschlossen: ${importedDienstleistungen.length} Dienstleistungen uebernommen.`);
+    } catch (error) {
+      console.error('Fehler beim Import aus Checkout:', error);
+      alert('Import fehlgeschlagen. Bitte erneut versuchen.');
+    } finally {
+      setIsImportingCheckout(false);
+    }
   };
 
   // Auto-Slug generieren wenn Name sich ändert
@@ -131,20 +335,27 @@ export default function AdminDemosPage() {
       name: '',
       bildURL: '',
       customValue: false,
+      rabattcodes: [],
       dienstleistungen: [],
       slug: '',
       createdAt: ''
     });
+    setNewRabattCode({ code: '', percent: '10', maxUses: '10' });
     setSelectedFile(null);
     setPreviewUrl('');
+    setCopySourceSlug('');
+    setImportInfo('');
     setOpenDialog(true);
   };
 
   const openEditDialog = (demo: DemoData) => {
     setEditingDemo(demo);
-    setFormData({ ...demo });
+    setFormData({ ...demo, rabattcodes: Array.isArray(demo.rabattcodes) ? demo.rabattcodes : [] });
     setSelectedFile(null);
     setPreviewUrl(demo.bildURL);
+    setCopySourceSlug('');
+    setImportInfo('');
+    setNewRabattCode({ code: '', percent: '10', maxUses: '10' });
     setOpenDialog(true);
   };
 
@@ -248,13 +459,15 @@ export default function AdminDemosPage() {
         }
       }
 
-      const demoData = {
+      const demoDataRaw = {
         ...formData,
         bildURL,
         bildFileName,
         slug: formData.slug.toLowerCase(),
         createdAt: editingDemo ? formData.createdAt : new Date().toISOString()
       };
+
+      const demoData = sanitizeForFirestore(demoDataRaw);
 
       if (editingDemo) {
         await updateDoc(doc(db, 'demos', editingDemo.id!), demoData);
@@ -267,7 +480,8 @@ export default function AdminDemosPage() {
       alert(editingDemo ? 'Demo erfolgreich aktualisiert!' : 'Demo erfolgreich erstellt!');
     } catch (error) {
       console.error('Fehler beim Speichern:', error);
-      alert('Fehler beim Speichern der Demo');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Fehler beim Speichern der Demo: ${errorMessage}`);
     }
   };
 
@@ -309,6 +523,61 @@ export default function AdminDemosPage() {
     setFormData({
       ...formData,
       dienstleistungen: formData.dienstleistungen.filter((_, i) => i !== index)
+    });
+  };
+
+  const addRabattCode = () => {
+    const normalizedCode = newRabattCode.code.trim().toUpperCase();
+    const percent = Number(newRabattCode.percent);
+    const maxUses = Number(newRabattCode.maxUses);
+
+    if (!normalizedCode) {
+      alert('Bitte einen Rabattcode eingeben.');
+      return;
+    }
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 100) {
+      alert('Der Rabatt muss zwischen 1 und 100 Prozent liegen.');
+      return;
+    }
+    if (!Number.isFinite(maxUses) || maxUses <= 0) {
+      alert('Das Einloeselimit muss groesser als 0 sein.');
+      return;
+    }
+    if (formData.rabattcodes.some((c) => c.code === normalizedCode)) {
+      alert('Dieser Rabattcode ist bereits vorhanden.');
+      return;
+    }
+
+    setFormData({
+      ...formData,
+      rabattcodes: [
+        ...formData.rabattcodes,
+        {
+          code: normalizedCode,
+          percent,
+          maxUses,
+          usedCount: 0,
+          isActive: true,
+        },
+      ],
+    });
+
+    setNewRabattCode({ code: '', percent: '10', maxUses: '10' });
+  };
+
+  const removeRabattCode = (index: number) => {
+    setFormData({
+      ...formData,
+      rabattcodes: formData.rabattcodes.filter((_, i) => i !== index),
+    });
+  };
+
+  const toggleRabattCodeActive = (index: number, active: boolean) => {
+    setFormData({
+      ...formData,
+      rabattcodes: formData.rabattcodes.map((code, i) =>
+        i === index ? { ...code, isActive: active } : code
+      ),
     });
   };
 
@@ -398,6 +667,7 @@ export default function AdminDemosPage() {
                           <Typography variant="body2" color="text.secondary">
                             Freier Betrag: {demo.customValue ? 'Ja' : 'Nein'} | 
                             Dienstleistungen: {demo.dienstleistungen.length} | 
+                            Rabattcodes: {demo.rabattcodes?.length || 0} | 
                             Erstellt: {new Date(demo.createdAt).toLocaleDateString()}
                           </Typography>
                         </Box>
@@ -434,6 +704,54 @@ export default function AdminDemosPage() {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+            <Box sx={{ border: '1px dashed #90caf9', p: 2, borderRadius: 2, backgroundColor: '#f8fbff' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                Aus echter Checkout-Seite kopieren
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Geben Sie einen bestehenden Checkout-Slug ein (z.B. /checkout/slug). Name, Bild, Gutscheinoptionen und Dienstleistungen werden automatisch uebernommen.
+              </Typography>
+              {checkoutSources.length > 0 && (
+                <TextField
+                  select
+                  label="Vorhandene Checkout-Seite auswaehlen"
+                  value={checkoutSources.some((source) => source.slug === copySourceSlug) ? copySourceSlug : ''}
+                  onChange={(e) => setCopySourceSlug(e.target.value)}
+                  size="small"
+                  fullWidth
+                  sx={{ mb: 2 }}
+                >
+                  {checkoutSources.map((source) => (
+                    <MenuItem key={source.userId} value={source.slug}>
+                      {source.name} ({source.slug})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                <TextField
+                  label="Checkout-Slug"
+                  placeholder="z.B. massage-studio-berlin"
+                  value={copySourceSlug}
+                  onChange={(e) => setCopySourceSlug(e.target.value)}
+                  size="small"
+                  sx={{ flex: '1 1 260px' }}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={importFromCheckoutSlug}
+                  disabled={isImportingCheckout || !copySourceSlug.trim()}
+                >
+                  {isImportingCheckout ? 'Importiere...' : 'Daten uebernehmen'}
+                </Button>
+              </Box>
+              {importInfo && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  {importInfo}
+                </Alert>
+              )}
+            </Box>
+
             <TextField
               label="Name"
               value={formData.name}
@@ -518,6 +836,89 @@ export default function AdminDemosPage() {
               }
               label="Freier Betrag erlaubt"
             />
+
+            <Typography variant="h6">Rabattcodes (Demo)</Typography>
+            <Box sx={{ border: '1px dashed #ccc', p: 2, borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                Neuen Rabattcode hinzufügen:
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="Code"
+                  value={newRabattCode.code}
+                  onChange={(e) => setNewRabattCode({ ...newRabattCode, code: e.target.value.toUpperCase() })}
+                  size="small"
+                  placeholder="z.B. OPEN10"
+                  sx={{ flex: '1 1 200px' }}
+                />
+                <TextField
+                  label="Rabatt in %"
+                  type="number"
+                  value={newRabattCode.percent}
+                  onChange={(e) => setNewRabattCode({ ...newRabattCode, percent: e.target.value })}
+                  size="small"
+                  sx={{ flex: '0 1 140px' }}
+                />
+                <TextField
+                  label="Max. Einlösungen"
+                  type="number"
+                  value={newRabattCode.maxUses}
+                  onChange={(e) => setNewRabattCode({ ...newRabattCode, maxUses: e.target.value })}
+                  size="small"
+                  sx={{ flex: '0 1 160px' }}
+                />
+                <Button variant="contained" onClick={addRabattCode} sx={{ flex: '0 0 auto' }}>
+                  Hinzufügen
+                </Button>
+              </Box>
+
+              {formData.rabattcodes.length > 0 && (
+                <Box>
+                  {formData.rabattcodes.map((code, index) => (
+                    <Box
+                      key={`${code.code}-${index}`}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        p: 2,
+                        border: '1px solid #eee',
+                        borderRadius: 2,
+                        mb: 1,
+                        backgroundColor: '#fafafa',
+                        gap: 2,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="body2" fontWeight={700}>
+                          {code.code} - {code.percent}% Rabatt
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Einlösungen: {code.usedCount || 0}/{code.maxUses}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={code.isActive}
+                              onChange={(e) => toggleRabattCodeActive(index, e.target.checked)}
+                              size="small"
+                            />
+                          }
+                          label={code.isActive ? 'Aktiv' : 'Inaktiv'}
+                          sx={{ mr: 0 }}
+                        />
+                        <IconButton size="small" onClick={() => removeRabattCode(index)} color="error">
+                          <Delete />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
 
             <Typography variant="h6">Dienstleistungen</Typography>
             
