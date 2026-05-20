@@ -16,6 +16,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
 import GutscheinDesignAdminEdit from './GutscheinDesignAdminEdit'; // Import hinzufügen
 const API_URL = process.env.REACT_APP_API_URL;
+const ADMIN_NODE_ENV = ((globalThis as any).process?.env?.NODE_ENV as string | undefined) || '';
+const ADMIN_HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
+const IS_DEV = ADMIN_NODE_ENV === 'development' || ADMIN_HOSTNAME === 'localhost' || ADMIN_HOSTNAME === '127.0.0.1';
 
 function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: any; color: string; }) {
   return (
@@ -493,6 +496,46 @@ export default function AdminPage() {
                 </Button>
               </Box>
             </Box>
+
+            {IS_DEV && (
+              <Paper elevation={2} sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                  Dev-only: Kundensicht testen
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Nur in Development aktiv. Öffnet die Profilansicht eines ausgewählten Kunden im sicheren Nur-Lesen-Modus.
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <FormControl sx={{ minWidth: 260, flex: '1 1 260px' }}>
+                    <InputLabel id="dev-preview-user-label">Kunde wählen</InputLabel>
+                    <Select
+                      labelId="dev-preview-user-label"
+                      value={selectedShopId || ''}
+                      label="Kunde wählen"
+                      onChange={(e) => setSelectedShopId(e.target.value || null)}
+                    >
+                      <MenuItem value="">Bitte wählen</MenuItem>
+                      {shops.map((shop) => (
+                        <MenuItem key={shop.id} value={shop.id}>
+                          {shop.unternehmensname || shop.email || shop.id}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <Button
+                    variant="contained"
+                    disabled={!selectedShopId}
+                    onClick={() => {
+                      if (!selectedShopId) return;
+                      navigate(`/profil/einnahmen?devPreview=1&asUser=${encodeURIComponent(selectedShopId)}`);
+                    }}
+                  >
+                    Kundensicht öffnen
+                  </Button>
+                </Box>
+              </Paper>
+            )}
+
             <Paper elevation={2} sx={{ p: 2, borderRadius: 3 }}>
               <List>
                 {shops.map(shop => (

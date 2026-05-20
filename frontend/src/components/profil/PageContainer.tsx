@@ -11,16 +11,18 @@ export default function PageContainer({ title, children }: Props) {
     <Box sx={{
       backgroundColor: '#F9FAFB',
       borderRadius: '12px',
-      padding: '3rem',
+      width: '100%',
+      boxSizing: 'border-box',
+      padding: { xs: '1rem', sm: '1.25rem', md: '2rem' },
       boxShadow: '0 0 10px rgba(0,0,0,0.05)',
-      minHeight: 'calc(100vh - 4rem)', // Optional, damit Seitenhöhe konsistent wirkt
+      minHeight: { xs: 'auto', md: 'calc(100vh - 4rem)' }, // Optional, damit Seitenhöhe konsistent wirkt
       display: 'flex',
       flexDirection: 'column',
       gap: '0rem',
-      marginLeft: '2rem', // Weiter rechts
-      marginTop: '0rem'   // Weiter unten
+      marginLeft: 0,
+      marginTop: 0,
     }}>
-      <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>
+      <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2, fontSize: { xs: '1.45rem', md: '1.9rem' } }}>
         {title}
       </Typography>
 

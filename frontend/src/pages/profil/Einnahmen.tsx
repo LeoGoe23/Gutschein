@@ -3,14 +3,13 @@ import PageContainer from '../../components/profil/PageContainer';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
 import { useEffect, useState } from 'react';
 import { doc, getDoc, collection, getDocs, query, orderBy, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../auth/firebase';
+import useProfileViewContext from '../../auth/useProfileViewContext';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -29,6 +28,7 @@ import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 
 export default function EinnahmenPage() {
+  const { effectiveUserId, loading: previewLoading, isReadonlyView } = useProfileViewContext();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [verkaufteGutscheine, setVerkaufteGutscheine] = useState<any[]>([]);
@@ -38,8 +38,11 @@ export default function EinnahmenPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!auth.currentUser) return;
-      const docRef = doc(db, 'users', auth.currentUser.uid);
+      if (!effectiveUserId) {
+        setLoading(false);
+        return;
+      }
+      const docRef = doc(db, 'users', effectiveUserId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -49,7 +52,7 @@ export default function EinnahmenPage() {
     };
 
     fetchData();
-  }, []);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     const SHOP_ID = data?.slug;
@@ -91,6 +94,7 @@ export default function EinnahmenPage() {
   }, [allGutscheine, filter, sortOrder]);
 
   const toggleEinloesen = async (gutscheinId: string, currentStatus: boolean) => {
+    if (isReadonlyView) return;
     const SHOP_ID = data?.slug;
     if (!SHOP_ID) return;
 
@@ -114,19 +118,21 @@ export default function EinnahmenPage() {
     }
   };
 
-  if (loading) return <CircularProgress sx={{ m: 4 }} />;
+  if (loading || previewLoading) return <CircularProgress sx={{ m: 4 }} />;
 
-  // Hilfsfunktionen für aktuelle Monatsdaten
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monatData = data?.Einnahmen?.monatlich?.[currentMonth] || {};
+  const monthlyStats = Object.entries(data?.Einnahmen?.monatlich || {})
+    .map(([monat, werte]: any) => ({
+      monat,
+      umsatz: Number(werte?.gesamtUmsatz || 0),
+      anzahl: Number(werte?.anzahlVerkäufe || 0),
+    }))
+    .sort((a, b) => b.monat.localeCompare(a.monat));
 
-  const chartData = Object.entries(data?.Einnahmen?.monatlich || {}).map(([monat, werte]: any) => ({
-    monat,
-    umsatz: werte.gesamtUmsatz || 0,
-    anzahl: werte.anzahlVerkäufe || 0,
-    hits: werte.hits || 0
-  })).sort((a, b) => a.monat.localeCompare(b.monat));
+  const formatMonat = (value: string) => {
+    const [year, month] = value.split('-');
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    return date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  };
 
   // Statistiken für die Filter
   const eingeloestCount = allGutscheine.filter(g => g.eingeloest === true).length;
@@ -134,68 +140,85 @@ export default function EinnahmenPage() {
 
   return (
     <PageContainer title="Einnahmen">
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mt: 3 }}>
+      {isReadonlyView && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Dev-Preview: Änderungen sind deaktiviert.
+        </Alert>
+      )}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.5, md: 3 }, mt: 3 }}>
         <StatCard label="Gesamtumsatz" value={`${data?.Einnahmen?.gesamtUmsatz ?? 0} €`} icon={<MonetizationOnIcon />} color="#3b82f6" />
         <StatCard label="Gesamtverkäufe" value={data?.Einnahmen?.anzahlVerkäufe ?? 0} icon={<LocalActivityIcon />} color="#10b981" />
-        <StatCard label="Umsatz aktueller Monat" value={`${monatData.gesamtUmsatz ?? 0} €`} icon={<TrendingUpIcon />} color="#f59e0b" />
-        <StatCard 
-          label="Aufrufe aktueller Monat" 
-          value={monatData.hits ?? 0}
-          icon={<AccessTimeIcon />} 
-          color="#6366f1" 
-        />
       </Box>
 
-      <Paper elevation={2} sx={{ mt: 4, borderRadius: '16px', overflow: 'hidden' }}>
-        <Box sx={{ p: 3, backgroundColor: '#fafafa' }}>
-          <Typography variant="h5" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
-            Umsatzentwicklung
+      <Paper elevation={2} sx={{ mt: 3, borderRadius: '16px', overflow: 'hidden' }}>
+        <Box sx={{ p: { xs: 2, md: 3 }, backgroundColor: '#fafafa' }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, color: '#1a1a1a', fontSize: { xs: '1.1rem', md: '1.4rem' } }}>
+            Verkaufsstatistik nach Monaten
           </Typography>
         </Box>
         <Divider />
-        <Box sx={{ p: 3 }}>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={chartData}>
-              <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-              <XAxis dataKey="monat" />
-              <YAxis yAxisId="left" />
-              <YAxis 
-                yAxisId="right" 
-                orientation="right" 
-                tickFormatter={(value) => String(Math.floor(value))}
-                domain={[0, 'dataMax']} 
-              />
-              <Tooltip />
-              <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="umsatz" stroke="#3b82f6" strokeWidth={3} name="Umsatz (€)" />
-              <Line yAxisId="right" type="monotone" dataKey="anzahl" stroke="#10b981" strokeWidth={3} name="Verkaufte Gutscheine" />
-            </LineChart>
-          </ResponsiveContainer>
+        <Box sx={{ p: { xs: 2, md: 3 }, display: 'grid', gap: 1.25 }}>
+          {monthlyStats.length === 0 && (
+            <Typography sx={{ color: '#6b7280' }}>
+              Noch keine Monatsdaten vorhanden.
+            </Typography>
+          )}
+
+          {monthlyStats.slice(0, 8).map((item) => (
+            <Box
+              key={item.monat}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.5,
+                p: { xs: 1.25, md: 1.5 },
+                borderRadius: 2,
+                border: '1px solid #e5e7eb',
+                backgroundColor: '#fff',
+              }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, color: '#111827', textTransform: 'capitalize', fontSize: { xs: '0.92rem', md: '1rem' } }}>
+                  {formatMonat(item.monat)}
+                </Typography>
+                <Typography sx={{ color: '#6b7280', fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+                  {item.anzahl} Verkäufe
+                </Typography>
+              </Box>
+
+              <Typography sx={{ fontWeight: 800, color: '#2563eb', fontSize: { xs: '1rem', md: '1.1rem' }, whiteSpace: 'nowrap' }}>
+                {item.umsatz} €
+              </Typography>
+            </Box>
+          ))}
         </Box>
       </Paper>
 
       <Paper elevation={2} sx={{ mt: 4, borderRadius: '16px', overflow: 'hidden' }}>
-        <Box sx={{ p: 3, backgroundColor: '#fafafa' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+        <Box sx={{ p: { xs: 2, md: 3 }, backgroundColor: '#fafafa' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' }, flexWrap: 'wrap', gap: { xs: 1.5, md: 3 } }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1a1a1a', fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
               Verkaufte Gutscheine ({verkaufteGutscheine.length})
             </Typography>
             
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', width: { xs: '100%', md: 'auto' } }}>
               {/* Filter Buttons */}
               <ToggleButtonGroup
                 value={filter}
                 exclusive
                 onChange={(_, newFilter) => newFilter && setFilter(newFilter)}
                 sx={{
+                  width: { xs: '100%', md: 'auto' },
                   '& .MuiToggleButton-root': {
-                    px: 3,
-                    py: 1.5,
-                    fontSize: '0.95rem',
+                    px: { xs: 1.5, md: 3 },
+                    py: { xs: 1, md: 1.5 },
+                    fontSize: { xs: '0.82rem', md: '0.95rem' },
                     fontWeight: 500,
                     textTransform: 'none',
                     borderRadius: '10px !important',
                     border: '2px solid #e0e0e0 !important',
+                    flex: { xs: 1, md: 'unset' },
                     '&.Mui-selected': {
                       backgroundColor: '#1976d2 !important',
                       color: 'white !important',
@@ -224,13 +247,14 @@ export default function EinnahmenPage() {
                 selected={false}
                 onChange={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
                 sx={{
-                  px: 3,
-                  py: 1.5,
-                  fontSize: '0.95rem',
+                  px: { xs: 1.5, md: 3 },
+                  py: { xs: 1, md: 1.5 },
+                  fontSize: { xs: '0.82rem', md: '0.95rem' },
                   fontWeight: 500,
                   textTransform: 'none',
                   borderRadius: '10px !important',
                   border: '2px solid #e0e0e0 !important',
+                  width: { xs: '100%', md: 'auto' },
                   '&:hover': {
                     backgroundColor: '#f5f5f5',
                   }
@@ -246,8 +270,76 @@ export default function EinnahmenPage() {
         <Divider />
 
         {verkaufteGutscheine.length ? (
-          <TableContainer>
-            <Table sx={{ minWidth: 650 }}>
+          <>
+            <Box sx={{ display: { xs: 'block', md: 'none' }, p: 1.5 }}>
+              {verkaufteGutscheine.map((gutschein: any) => {
+                const verkauftAmDate = new Date(gutschein.kaufdatum);
+                const eingeloesetAmDate = gutschein.eingeloesetAm ? new Date(gutschein.eingeloesetAm) : null;
+
+                return (
+                  <Box
+                    key={gutschein.id}
+                    sx={{
+                      p: 1.5,
+                      mb: 1.25,
+                      borderRadius: 2,
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: gutschein.eingeloest ? '#f0f9ff' : '#fff',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+                      <Chip
+                        icon={gutschein.eingeloest ? <CheckCircleIcon /> : <PendingIcon />}
+                        label={gutschein.eingeloest ? 'Eingelöst' : 'Offen'}
+                        color={gutschein.eingeloest ? 'success' : 'warning'}
+                        variant={gutschein.eingeloest ? 'filled' : 'outlined'}
+                        sx={{ fontWeight: 700 }}
+                      />
+                      <Typography sx={{ fontWeight: 800, color: '#059669' }}>{gutschein.betrag} €</Typography>
+                    </Box>
+
+                    <Typography sx={{ fontSize: '0.78rem', color: '#6b7280', mb: 0.35 }}>Gutschein-Code</Typography>
+                    <Typography
+                      sx={{
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        fontSize: '1.15rem',
+                        color: '#1f2937',
+                        letterSpacing: '0.3px',
+                        wordBreak: 'break-all',
+                        mb: 1,
+                      }}
+                    >
+                      {gutschein.gutscheinCode}
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.78rem', color: '#6b7280' }}>Verkauft am</Typography>
+                        <Typography sx={{ fontSize: '0.9rem', color: '#1f2937', fontWeight: 600 }}>
+                          {verkauftAmDate.toLocaleDateString('de-DE')} {verkauftAmDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                        {eingeloesetAmDate && (
+                          <Typography sx={{ fontSize: '0.78rem', color: '#065f46', mt: 0.35 }}>
+                            Eingelöst: {eingeloesetAmDate.toLocaleDateString('de-DE')}
+                          </Typography>
+                        )}
+                      </Box>
+
+                      <Checkbox
+                        checked={gutschein.eingeloest || false}
+                        onChange={() => toggleEinloesen(gutschein.id, gutschein.eingeloest || false)}
+                        disabled={isReadonlyView}
+                        color="success"
+                      />
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            <TableContainer sx={{ overflowX: 'auto', display: { xs: 'none', md: 'block' } }}>
+              <Table sx={{ minWidth: 650 }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
                   <TableCell sx={{ 
@@ -369,6 +461,7 @@ export default function EinnahmenPage() {
                           <Checkbox
                             checked={gutschein.eingeloest || false}
                             onChange={() => toggleEinloesen(gutschein.id, gutschein.eingeloest || false)}
+                            disabled={isReadonlyView}
                             color="success"
                             sx={{ 
                               transform: 'scale(1.3)',
@@ -399,7 +492,8 @@ export default function EinnahmenPage() {
                 })}
               </TableBody>
             </Table>
-          </TableContainer>
+            </TableContainer>
+          </>
         ) : (
           <Box sx={{ p: 6, textAlign: 'center' }}>
             <Typography variant="h6" sx={{ color: '#6b7280', mb: 1 }}>
@@ -429,14 +523,14 @@ function StatCard({ label, value, icon, color }: StatCardProps) {
     <Paper 
       elevation={2}
       sx={{
-        flex: '1 1 280px',
-        minWidth: '280px',
+        flex: { xs: '1 1 100%', sm: '1 1 280px' },
+        minWidth: { xs: 0, sm: '280px' },
         display: 'flex',
         alignItems: 'center',
-        p: 3,
+        p: { xs: 2, md: 3 },
         borderRadius: '16px',
         borderLeft: `5px solid ${color}`,
-        gap: 3,
+        gap: { xs: 1.5, md: 3 },
         transition: 'box-shadow 0.2s ease, border-left-width 0.2s ease',
         '&:hover': {
           boxShadow: 6,
@@ -447,20 +541,20 @@ function StatCard({ label, value, icon, color }: StatCardProps) {
       <Box sx={{ 
         backgroundColor: `${color}20`, 
         borderRadius: '12px', 
-        p: 2,
+        p: { xs: 1.25, md: 2 },
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center'
       }}>
         {React.isValidElement(icon)
-          ? React.cloneElement(icon as React.ReactElement<any, any>, { sx: { fontSize: '2rem', color } })
+          ? React.cloneElement(icon as React.ReactElement<any, any>, { sx: { fontSize: { xs: '1.4rem', md: '2rem' }, color } })
           : icon}
       </Box>
       <Box sx={{ flex: 1 }}>
-        <Typography variant="body1" sx={{ color: '#6b7280', fontSize: '1rem', mb: 0.5 }}>
+        <Typography variant="body1" sx={{ color: '#6b7280', fontSize: { xs: '0.85rem', md: '1rem' }, mb: 0.5 }}>
           {label}
         </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.8rem' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1f2937', fontSize: { xs: '1.35rem', md: '1.8rem' } }}>
           {value}
         </Typography>
       </Box>
