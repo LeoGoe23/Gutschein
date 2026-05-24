@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Typography, Paper, Divider, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel, Button, Chip, IconButton } from '@mui/material';
+import { Box, CircularProgress, Typography, Paper, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel, Button, Chip, IconButton, TextField } from '@mui/material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
 import { useEffect, useState } from 'react';
@@ -14,8 +14,8 @@ import EmailIcon from '@mui/icons-material/Email';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
-import GutscheinDesignAdminEdit from './GutscheinDesignAdminEdit'; // Import hinzufügen
 const API_URL = process.env.REACT_APP_API_URL;
+const API_BASE = API_URL || '';
 const ADMIN_NODE_ENV = ((globalThis as any).process?.env?.NODE_ENV as string | undefined) || '';
 const ADMIN_HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
 const IS_DEV = ADMIN_NODE_ENV === 'development' || ADMIN_HOSTNAME === 'localhost' || ADMIN_HOSTNAME === '127.0.0.1';
@@ -52,6 +52,14 @@ function StatCard({ label, value, icon, color }: { label: string; value: string 
   );
 }
 
+type ResetLinkResponse = {
+  resetLink?: string;
+};
+
+type StartPasswordResponse = {
+  temporaryPassword?: string;
+};
+
 export default function AdminPage() {
   const user = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -64,8 +72,111 @@ export default function AdminPage() {
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [kontaktanfragen, setKontaktanfragen] = useState<any[]>([]);
   const [demoGutscheine, setDemoGutscheine] = useState<any[]>([]);
-  const [showLastGutscheine, setShowLastGutscheine] = useState(false);
+  const [selectedCustomerShopId, setSelectedCustomerShopId] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [authActionLoading, setAuthActionLoading] = useState(false);
+  const [authActionError, setAuthActionError] = useState('');
+  const [generatedResetLink, setGeneratedResetLink] = useState('');
+  const [generatedStartPassword, setGeneratedStartPassword] = useState('');
+  const [authActionSuccess, setAuthActionSuccess] = useState('');
   const navigate = useNavigate();
+  const customerShopsWithEmail = shops.filter(
+    (shop) => typeof shop.email === 'string' && shop.email.trim().length > 0
+  );
+
+  const copyToClipboard = async (value: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setAuthActionSuccess(successMessage);
+    } catch (error) {
+      setAuthActionError('Konnte nicht in die Zwischenablage kopieren.');
+    }
+  };
+
+  const withAdminAuthHeaders = async () => {
+    if (!user) throw new Error('Nicht angemeldet.');
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
+  };
+
+  const validateCustomerEmail = () => {
+    const normalized = customerEmail.trim().toLowerCase();
+    if (!normalized) {
+      setAuthActionError('Bitte eine Kunden-E-Mail eingeben.');
+      return null;
+    }
+    return normalized;
+  };
+
+  const handleSelectCustomerShop = (shopId: string) => {
+    setSelectedCustomerShopId(shopId);
+
+    const selectedShop = shops.find((shop) => shop.id === shopId);
+    if (selectedShop?.email) {
+      setCustomerEmail(String(selectedShop.email).trim().toLowerCase());
+      setAuthActionError('');
+      setAuthActionSuccess('');
+    }
+  };
+
+  const handleGenerateResetLink = async () => {
+    const email = validateCustomerEmail();
+    if (!email) return;
+
+    setAuthActionLoading(true);
+    setAuthActionError('');
+    setAuthActionSuccess('');
+    setGeneratedStartPassword('');
+
+    try {
+      const headers = await withAdminAuthHeaders();
+      const response = await axios.post<ResetLinkResponse>(
+        `${API_BASE}/api/admin/customer-auth/reset-link`,
+        { email },
+        { headers }
+      );
+
+      setGeneratedResetLink(response.data.resetLink || '');
+      setAuthActionSuccess('Reset-Link wurde erfolgreich erstellt.');
+    } catch (err: any) {
+      setGeneratedResetLink('');
+      setAuthActionError(err.response?.data?.error || err.message || 'Fehler beim Erstellen des Reset-Links.');
+    } finally {
+      setAuthActionLoading(false);
+    }
+  };
+
+  const handleSetStartPassword = async () => {
+    const email = validateCustomerEmail();
+    if (!email) return;
+
+    const confirmed = window.confirm(
+      'Neues Startpasswort für diesen Kunden setzen? Das alte Passwort wird sofort ersetzt.'
+    );
+    if (!confirmed) return;
+
+    setAuthActionLoading(true);
+    setAuthActionError('');
+    setAuthActionSuccess('');
+    setGeneratedResetLink('');
+
+    try {
+      const headers = await withAdminAuthHeaders();
+      const response = await axios.post<StartPasswordResponse>(
+        `${API_BASE}/api/admin/customer-auth/start-password`,
+        { email },
+        { headers }
+      );
+
+      setGeneratedStartPassword(response.data.temporaryPassword || '');
+      setAuthActionSuccess('Startpasswort wurde gesetzt. Bitte sicher an den Kunden weitergeben.');
+    } catch (err: any) {
+      setGeneratedStartPassword('');
+      setAuthActionError(err.response?.data?.error || err.message || 'Fehler beim Setzen des Startpassworts.');
+    } finally {
+      setAuthActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (user === null) {
@@ -477,6 +588,106 @@ export default function AdminPage() {
 
           {/* Shops & Stripe-Konten */}
           <Box sx={{ mt: 6 }}>
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+              <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
+                Kundenzugang verwalten
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Erzeuge für Kunden einen direkten Passwort-Reset-Link oder setze ein neues Startpasswort.
+              </Typography>
+
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 280, flex: '1 1 280px' }}>
+                  <InputLabel id="customer-account-select-label">Bestehenden Account wählen</InputLabel>
+                  <Select
+                    labelId="customer-account-select-label"
+                    value={selectedCustomerShopId}
+                    label="Bestehenden Account wählen"
+                    onChange={(e) => handleSelectCustomerShop(String(e.target.value))}
+                  >
+                    <MenuItem value="">Bitte wählen</MenuItem>
+                    {customerShopsWithEmail.map((shop) => (
+                      <MenuItem key={shop.id} value={shop.id}>
+                        {(shop.unternehmensname || 'Ohne Unternehmensname') + ' - ' + shop.email}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  label="Kunden-E-Mail"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  size="small"
+                  sx={{ minWidth: 280, flex: '1 1 280px' }}
+                />
+                <Button
+                  variant="contained"
+                  disabled={authActionLoading}
+                  onClick={handleGenerateResetLink}
+                >
+                  Reset-Link erzeugen
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  disabled={authActionLoading}
+                  onClick={handleSetStartPassword}
+                >
+                  Startpasswort setzen
+                </Button>
+              </Box>
+
+              {authActionError && (
+                <Typography sx={{ mt: 1.5, color: 'error.main', fontWeight: 500 }}>
+                  {authActionError}
+                </Typography>
+              )}
+
+              {authActionSuccess && (
+                <Typography sx={{ mt: 1.5, color: 'success.main', fontWeight: 500 }}>
+                  {authActionSuccess}
+                </Typography>
+              )}
+
+              {generatedResetLink && (
+                <Box sx={{ mt: 2, p: 2, borderRadius: 2, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Reset-Link</Typography>
+                  <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{generatedResetLink}</Typography>
+                  <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => copyToClipboard(generatedResetLink, 'Reset-Link wurde kopiert.')}
+                    >
+                      Link kopieren
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+
+              {generatedStartPassword && (
+                <Box sx={{ mt: 2, p: 2, borderRadius: 2, backgroundColor: '#fff7ed', border: '1px solid #fdba74' }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Neues Startpasswort</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, letterSpacing: '0.03em' }}>
+                    {generatedStartPassword}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Nur einmal sicher weitergeben. Empfiehl dem Kunden direkt danach ein eigenes Passwort zu setzen.
+                  </Typography>
+                  <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => copyToClipboard(generatedStartPassword, 'Startpasswort wurde kopiert.')}
+                    >
+                      Passwort kopieren
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+            </Paper>
+
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" fontWeight={600}>
                 Shops & Stripe-Konten

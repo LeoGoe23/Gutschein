@@ -1,5 +1,5 @@
 import { Modal, Box, Typography, TextField, Button, Divider, Link } from '@mui/material';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } from "firebase/auth";
 import { auth, db } from '../../auth/firebase';
 import { doc, setDoc, getDoc, DocumentReference } from "firebase/firestore";
 import { useState, useEffect } from 'react';
@@ -23,6 +23,12 @@ export default function LoginModal({ open, onClose, openResetPassword = false }:
   const [resetEmail, setResetEmail] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [forcePasswordOpen, setForcePasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [forcePasswordError, setForcePasswordError] = useState('');
+  const [forcePasswordLoading, setForcePasswordLoading] = useState(false);
+  const [postLoginRoute, setPostLoginRoute] = useState('/profil');
 
   useEffect(() => {
     if (openResetPassword) {
@@ -155,13 +161,21 @@ export default function LoginModal({ open, onClose, openResetPassword = false }:
         const userDocRef = doc(db, "users", user.uid);
 
         const userDoc = await getDoc(userDocRef);
-        const registrationFinished = userDoc.exists() && userDoc.data().registrationFinished;
+        const userData = userDoc.exists() ? userDoc.data() : {};
+        const registrationFinished = Boolean(userData.registrationFinished);
+        const forcePasswordChange = Boolean(userData.forcePasswordChange);
+        const nextRoute = registrationFinished ? '/profil' : '/gutschein/step1';
 
-        if (registrationFinished) {
-          navigate('/profil'); // Navigiere zu /profil
-        } else {
-          navigate('/gutschein/step1'); // Navigiere zu /gutschein/step1
+        if (forcePasswordChange) {
+          setPostLoginRoute(nextRoute);
+          setForcePasswordError('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setForcePasswordOpen(true);
+          return;
         }
+
+        navigate(nextRoute);
 
         setSuccess(true);
       })
@@ -225,9 +239,70 @@ export default function LoginModal({ open, onClose, openResetPassword = false }:
       });
   };
 
+  const handleForcePasswordChange = async () => {
+    if (!newPassword || !confirmPassword) {
+      setForcePasswordError('Bitte beide Passwort-Felder ausfüllen.');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setForcePasswordError('Das neue Passwort muss mindestens 8 Zeichen lang sein.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setForcePasswordError('Die Passwörter stimmen nicht überein.');
+      return;
+    }
+
+    if (!auth.currentUser) {
+      setForcePasswordError('Sitzung nicht gefunden. Bitte erneut einloggen.');
+      return;
+    }
+
+    setForcePasswordLoading(true);
+    setForcePasswordError('');
+
+    try {
+      await updatePassword(auth.currentUser, newPassword);
+
+      await setDoc(
+        doc(db, 'users', auth.currentUser.uid),
+        {
+          forcePasswordChange: false,
+          forcePasswordChangeSetAt: null,
+        },
+        { merge: true }
+      );
+
+      setForcePasswordOpen(false);
+      navigate(postLoginRoute);
+      setSuccess(true);
+    } catch (err: any) {
+      if (err?.code === 'auth/requires-recent-login') {
+        setForcePasswordError('Bitte neu einloggen und das Passwort sofort ändern.');
+      } else {
+        setForcePasswordError('Passwort konnte nicht geändert werden: ' + (err?.message || 'Unbekannter Fehler'));
+      }
+    } finally {
+      setForcePasswordLoading(false);
+    }
+  };
+
   return (
     <>
-      <Modal open={open} onClose={onClose}>
+      <Modal
+        open={open}
+        onClose={(_event, reason) => {
+          if (forcePasswordOpen) return;
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            onClose();
+            return;
+          }
+          onClose();
+        }}
+        disableEscapeKeyDown={forcePasswordOpen}
+      >
         <Box
           sx={{
             position: 'absolute',
@@ -245,7 +320,73 @@ export default function LoginModal({ open, onClose, openResetPassword = false }:
             alignItems: 'center',
           }}
         >
-          {success ? (
+          {forcePasswordOpen ? (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Passwort ändern erforderlich
+              </Typography>
+
+              <Typography sx={{ textAlign: 'center', color: '#666', fontSize: '0.95rem' }}>
+                Bitte setze jetzt ein eigenes Passwort. Mit dem Startpasswort ist keine weitere Nutzung möglich.
+              </Typography>
+
+              <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  label="Neues Passwort"
+                  type="password"
+                  variant="outlined"
+                  fullWidth
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 3,
+                      backgroundColor: '#f5f5f5',
+                    },
+                  }}
+                />
+
+                <TextField
+                  label="Neues Passwort wiederholen"
+                  type="password"
+                  variant="outlined"
+                  fullWidth
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 3,
+                      backgroundColor: '#f5f5f5',
+                    },
+                  }}
+                />
+              </Box>
+
+              {forcePasswordError && (
+                <Typography sx={{ color: 'red', fontSize: '0.85rem', mt: 0.5, textAlign: 'center' }}>
+                  {forcePasswordError}
+                </Typography>
+              )}
+
+              <Button
+                fullWidth
+                disabled={forcePasswordLoading}
+                sx={{
+                  backgroundColor: '#4F46E5',
+                  color: 'white',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  padding: '0.9rem',
+                  borderRadius: 3,
+                  mt: 1,
+                  '&:hover': { backgroundColor: '#4338CA' },
+                }}
+                onClick={handleForcePasswordChange}
+              >
+                {forcePasswordLoading ? 'Speichere...' : 'Passwort jetzt ändern'}
+              </Button>
+            </>
+          ) : success ? (
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h5" sx={{ color: 'green', fontWeight: 700 }}>
                 Erfolgreich!

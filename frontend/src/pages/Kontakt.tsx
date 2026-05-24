@@ -16,7 +16,7 @@ export default function Kontakt() {
     // Meta Description setzen
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute('content', 'Kontaktieren Sie Gutscheinery für digitale Gutscheinlösungen. Telefon: 0176 72910739 | E-Mail: gutscheinfabrik@gmail.com. Kostenlose Beratung!');
+      metaDescription.setAttribute('content', 'Kontaktieren Sie Gutscheinery für digitale Gutscheinlösungen. Telefon: 015776394652 | E-Mail: gutscheinfabrik@gmail.com. Kostenlose Beratung!');
     }
   }, []);
 
@@ -53,7 +53,7 @@ export default function Kontakt() {
           </Typography>
 
           <Typography variant="body1" sx={{ mb: 2 }}>
-            Telefonnummer: 0176 72910739<br />
+            Telefonnummer: 015776394652<br />
             E-Mail: gutscheinfabrik@gmail.com
           </Typography>
 

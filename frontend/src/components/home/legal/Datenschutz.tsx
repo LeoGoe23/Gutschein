@@ -76,7 +76,7 @@ export default function Datenschutz() {
         Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:<br />
         Herrn Leonhard Götz, Stünzbach 4a, 84172 Buch am Erlbach<br />
         Herrn Konrad Blersch, Wahlenstraße 27, 93047 Regensburg<br />
-        Telefon: 17672910739<br />
+        Telefon: 015776394652<br />
         E-Mail: <Link href="mailto:gutscheinfabrik@gmail.com">gutscheinfabrik@gmail.com</Link>
       </Typography>
 
