@@ -153,6 +153,7 @@ function AppContent() {
       <Route path="/widget-demo" element={<WidgetDemo />} />
       <Route path="/widgetdemo/:slug" element={<WidgetDemoBySlug />} />
       <Route path="/embed/:slug" element={<EmbedWidget />} />
+      <Route path="/:extraSlug" element={<CheckoutExtra />} />
       <Route path="/extra/:extraSlug" element={<CheckoutExtra />} />
 
       {/* Admin Blog Routes */}

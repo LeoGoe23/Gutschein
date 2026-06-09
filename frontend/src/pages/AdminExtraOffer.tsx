@@ -55,7 +55,7 @@ const defaultConfig: ExtraOfferConfig = {
   externalLink: '',
   externalLinkLabel: 'Mehr erfahren',
   voucherType: 'wert',
-  voucherTitle: 'Extra Gutschein',
+  voucherTitle: 'Gutschein',
   voucherDescription: '',
   voucherAmount: 140,
 };
@@ -184,6 +184,16 @@ export default function AdminExtraOffer() {
       return;
     }
 
+    const reservedSlugs = new Set([
+      'admin', 'blog', 'kontakt', 'impressum', 'datenschutz', 'agb', 'profil',
+      'gutschein', 'checkoutdemo', 'checkout', 'checkoutadmin', 'success',
+      'widget-demo', 'widgetdemo', 'embed', 'demo', 'app-info', 'extra'
+    ]);
+    if (reservedSlugs.has(normalizedSlug)) {
+      setError('Dieser Slug ist reserviert. Bitte einen anderen waehlen.');
+      return;
+    }
+
     if (!config.voucherAmount || config.voucherAmount <= 0) {
       setError('Bitte einen gueltigen Gutscheinbetrag angeben.');
       return;
@@ -247,7 +257,7 @@ export default function AdminExtraOffer() {
       setImageFile(null);
       setImagePreviewURL(payload.imageURL || '');
 
-      setSuccess(`Gespeichert. Seite verfuegbar unter /extra/${payload.slug}`);
+      setSuccess(`Gespeichert. Seite verfuegbar unter /${payload.slug}`);
     } catch (err) {
       console.error('Fehler beim Speichern:', err);
       setError('Speichern fehlgeschlagen.');
@@ -329,7 +339,7 @@ export default function AdminExtraOffer() {
                     <TextField
                       fullWidth
                       label="Extra-Slug"
-                      helperText="Aufruf: /extra/dein-slug"
+                      helperText="Aufruf: /dein-slug"
                       value={config.slug}
                       onChange={(e) => setConfig((prev) => ({ ...prev, slug: e.target.value }))}
                       sx={{ mb: 2 }}

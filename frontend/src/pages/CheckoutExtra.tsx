@@ -609,7 +609,7 @@ export default function CheckoutExtra() {
                 />
 
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.8 }}>
-                  {data.extraOffer.voucherTitle || 'Extra Gutschein'}
+                  {data.extraOffer.voucherTitle || 'Gutschein'}
                 </Typography>
                 {!!data.extraOffer.voucherDescription && (
                   <Typography variant="body2" sx={{ mb: 1.4, color: '#4b5563' }}>
