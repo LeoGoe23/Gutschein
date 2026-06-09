@@ -81,6 +81,19 @@ export default function AdminExtraOffer() {
     [shops, selectedShopId]
   );
 
+  const activePages = useMemo(
+    () =>
+      shops
+        .map((shop) => ({
+          id: shop.id,
+          unternehmensname: shop.unternehmensname,
+          slug: String(shop.extraOffer?.slug || '').trim(),
+          enabled: !!shop.extraOffer?.enabled,
+        }))
+        .filter((item) => item.enabled && item.slug),
+    [shops]
+  );
+
   useEffect(() => {
     if (user === null) {
       setIsAdmin(null);
@@ -326,6 +339,47 @@ export default function AdminExtraOffer() {
                   </Select>
                 </FormControl>
 
+                <Paper variant="outlined" sx={{ p: 2, mb: 2.5, borderRadius: 2, backgroundColor: '#fafafa' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                    Aktive Seiten
+                  </Typography>
+                  {activePages.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Noch keine aktive Seite vorhanden.
+                    </Typography>
+                  ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {activePages.map((page) => (
+                        <Box
+                          key={page.id}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 1,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <Typography variant="body2">
+                            {page.unternehmensname}: /{page.slug}
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="text"
+                            component="a"
+                            href={`/${page.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ textTransform: 'none', px: 0.5 }}
+                          >
+                            Oeffnen
+                          </Button>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
+
                 {selectedShopId && (
                   <>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
@@ -344,6 +398,22 @@ export default function AdminExtraOffer() {
                       onChange={(e) => setConfig((prev) => ({ ...prev, slug: e.target.value }))}
                       sx={{ mb: 2 }}
                     />
+
+                    {config.slug.trim() && (
+                      <Box sx={{ mb: 2 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          component="a"
+                          href={`/${config.slug.trim().toLowerCase()}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Vorschau unter /{config.slug.trim().toLowerCase()} oeffnen
+                        </Button>
+                      </Box>
+                    )}
 
                     <TextField
                       fullWidth

@@ -530,6 +530,10 @@ export default function CheckoutExtra() {
   }
 
   const imageURL = data.extraOffer.imageURL || data.bildURL;
+  const normalizedVoucherTitle =
+    !data.extraOffer.voucherTitle || data.extraOffer.voucherTitle.trim().toLowerCase() === 'extra gutschein'
+      ? 'Gutschein'
+      : data.extraOffer.voucherTitle;
 
   return (
     <Box
@@ -550,7 +554,7 @@ export default function CheckoutExtra() {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          p: { xs: 4, md: 8 },
+          p: { xs: 3, md: 8 },
           zIndex: 2,
         }}
       >
@@ -559,7 +563,7 @@ export default function CheckoutExtra() {
             maxWidth: '560px',
             width: '100%',
             textAlign: { xs: 'center', md: 'left' },
-            mt: { xs: 12, md: 6 },
+            mt: { xs: 10, md: 5 },
           }}
         >
           {!showSuccess ? (
@@ -568,7 +572,7 @@ export default function CheckoutExtra() {
                 variant="h2"
                 sx={{
                   fontWeight: 900,
-                  mb: 2,
+                  mb: 2.5,
                   color: '#111827',
                   lineHeight: 1.08,
                   fontSize: { xs: '2rem', md: '3rem' },
@@ -579,7 +583,7 @@ export default function CheckoutExtra() {
               </Typography>
 
               {!!data.extraOffer.introText && (
-                <Typography variant="body1" sx={{ color: 'grey.700', mb: 2, lineHeight: 1.6 }}>
+                <Typography variant="body1" sx={{ color: 'grey.700', mb: 3, lineHeight: 1.6 }}>
                   {data.extraOffer.introText}
                 </Typography>
               )}
@@ -587,14 +591,14 @@ export default function CheckoutExtra() {
               <Box
                 sx={{
                   position: 'relative',
-                  p: 2.6,
+                  p: { xs: 2.4, md: 2.8 },
                   borderRadius: 4,
                   backgroundColor: '#ffffff',
                   color: '#1f2937',
                   boxShadow: '0 8px 20px rgba(0, 0, 0, 0.07)',
                   border: '1px solid #e5e7eb',
                   overflow: 'hidden',
-                  mb: 2,
+                  mb: 3,
                 }}
               >
                 <Box
@@ -609,7 +613,7 @@ export default function CheckoutExtra() {
                 />
 
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.8 }}>
-                  {data.extraOffer.voucherTitle || 'Gutschein'}
+                  {normalizedVoucherTitle}
                 </Typography>
                 {!!data.extraOffer.voucherDescription && (
                   <Typography variant="body2" sx={{ mb: 1.4, color: '#4b5563' }}>
@@ -617,7 +621,7 @@ export default function CheckoutExtra() {
                   </Typography>
                 )}
 
-                <Typography sx={{ fontSize: { xs: '2rem', md: '2.35rem' }, fontWeight: 900, lineHeight: 1.1, mb: 1.8, color: '#111827' }}>
+                <Typography sx={{ fontSize: { xs: '2rem', md: '2.35rem' }, fontWeight: 900, lineHeight: 1.1, mb: 2.1, color: '#111827' }}>
                   {voucherAmount} EUR
                 </Typography>
 
@@ -657,7 +661,7 @@ export default function CheckoutExtra() {
               )}
 
               {!!data.extraOffer.longDescription && (
-                <Typography variant="body2" sx={{ color: 'grey.700', mt: 2.5, mb: 1.5, lineHeight: 1.75 }}>
+                <Typography variant="body2" sx={{ color: 'grey.700', mt: 0.5, mb: 2, lineHeight: 1.8 }}>
                   {data.extraOffer.longDescription}
                 </Typography>
               )}
@@ -669,7 +673,7 @@ export default function CheckoutExtra() {
                   target="_blank"
                   rel="noopener noreferrer"
                   variant="text"
-                  sx={{ textTransform: 'none', px: 0, fontWeight: 600 }}
+                  sx={{ textTransform: 'none', px: 0, py: 0.5, fontWeight: 600 }}
                 >
                   {data.extraOffer.externalLinkLabel || 'Mehr erfahren'}
                 </Button>
@@ -731,7 +735,8 @@ export default function CheckoutExtra() {
           position: { xs: 'relative', md: 'fixed' },
           right: { md: 0 },
           top: { md: 0 },
-          height: { xs: '340px', md: '100vh' },
+          height: { xs: '52vh', md: '100vh' },
+          minHeight: { xs: 430, md: 0 },
           backgroundColor: '#ecebe7',
           display: 'flex',
           alignItems: 'center',
@@ -757,7 +762,7 @@ export default function CheckoutExtra() {
               inset: 0,
               backgroundImage: imageURL ? `url(${imageURL})` : 'none',
               backgroundSize: 'cover',
-              backgroundPosition: 'center',
+              backgroundPosition: { xs: 'center 20%', md: 'center' },
               transform: 'scale(1.01)',
             }}
           />
