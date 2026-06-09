@@ -695,6 +695,20 @@ export default function AdminPage() {
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button
                   variant="contained"
+                  color="secondary"
+                  onClick={() => navigate('/admin/extra')}
+                >
+                  Extra-Slug Seite
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={() => navigate('/admin/gutschein-erstellen')}
+                >
+                  Gutschein erstellen
+                </Button>
+                <Button
+                  variant="contained"
                   onClick={() => navigate('/admin/demos')}
                 >
                   Demo-Verwaltung
@@ -778,6 +792,30 @@ export default function AdminPage() {
                       sx={{ ml: 1 }}
                     >
                       Gutscheine verwalten
+                    </Button>
+
+                    <Button
+                      variant="outlined"
+                      color="success"
+                      size="small"
+                      onClick={() => {
+                        navigate('/admin/gutschein-erstellen', { state: { preselectedShopId: shop.id } });
+                      }}
+                      sx={{ ml: 1 }}
+                    >
+                      Gutschein erstellen
+                    </Button>
+
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      onClick={() => {
+                        navigate('/admin/extra', { state: { preselectedShopId: shop.id } });
+                      }}
+                      sx={{ ml: 1 }}
+                    >
+                      Extra-Slug
                     </Button>
                     
                     {shop.stripeAccountId && (

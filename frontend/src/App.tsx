@@ -21,10 +21,12 @@ import AGB from './components/home/legal/AGB';
 import Datenschutz from './components/home/legal/Datenschutz';
 import Impressum from './components/home/legal/Impressum';
 import AdminPage from './pages/Admin';
+import AdminExtraOffer from './pages/AdminExtraOffer';
 import Kontakt from './pages/Kontakt';
 import GutscheinDesignAdminEdit from './pages/GutscheinDesignAdminEdit';
 import CheckoutAdmin from './pages/checkoutadmin';
 import AdminGutscheinVerwaltung from './pages/AdminGutscheinVerwaltung';
+import AdminCreateGutschein from './pages/AdminCreateGutschein';
 import AdminDemosPage from './pages/AdminDemos';
 import DemoCheckoutPage from './pages/DemoCheckout';
 import Blog from './pages/Blog';
@@ -34,6 +36,7 @@ import AdminBlogEditor from './pages/admin/AdminBlogEditor';
 import WidgetDemo from './pages/WidgetDemo';
 import EmbedWidget from './pages/EmbedWidget';
 import WidgetDemoBySlug from './pages/WidgetDemoBySlug';
+import CheckoutExtra from './pages/CheckoutExtra';
 import GutscheinsystemFriseure from './pages/landingpages/GutscheinsystemFriseure';
 import GutscheinsystemFloristen from './pages/landingpages/GutscheinsystemFloristen';
 import GutscheinsystemMassageSalons from './pages/landingpages/GutscheinsystemMassageSalons';
@@ -123,10 +126,12 @@ function AppContent() {
       <Route path="/datenschutz" element={<Datenschutz />} />
       <Route path="/impressum" element={<Impressum />} />
       <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/extra" element={<AdminExtraOffer />} />
       <Route path="/kontakt" element={<Kontakt />} />
       <Route path="/admin/shop/:shopId/design" element={<GutscheinDesignAdminEdit />} />
       <Route path="/checkoutadmin/:slug" element={<CheckoutAdmin />} />
       <Route path="/admin/gutscheine" element={<AdminGutscheinVerwaltung />} />
+      <Route path="/admin/gutschein-erstellen" element={<AdminCreateGutschein />} />
       <Route path="/admin/demos" element={<AdminDemosPage />} />
       <Route path="/demo/:slug" element={<DemoCheckoutPage />} />
 
@@ -148,6 +153,7 @@ function AppContent() {
       <Route path="/widget-demo" element={<WidgetDemo />} />
       <Route path="/widgetdemo/:slug" element={<WidgetDemoBySlug />} />
       <Route path="/embed/:slug" element={<EmbedWidget />} />
+      <Route path="/extra/:extraSlug" element={<CheckoutExtra />} />
 
       {/* Admin Blog Routes */}
       <Route path="/admin/blog" element={<AdminBlog />} />
