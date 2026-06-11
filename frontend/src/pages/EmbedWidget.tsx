@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Typography, Card, CardContent, Divider, TextField } from '@mui/material';
 import { loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
@@ -15,6 +15,9 @@ const EmbedWidget: React.FC = () => {
   const [options, setOptions] = useState<GutscheinOption[]>([]);
   const [error, setError] = useState('');
   const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   // URL parameters für Customization
   const params = new URLSearchParams(window.location.search);
@@ -89,6 +92,30 @@ const EmbedWidget: React.FC = () => {
   }, [slug]);
 
   useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateScrollState = () => {
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      setCanScrollLeft(container.scrollLeft > 8);
+      setCanScrollRight(maxScrollLeft - container.scrollLeft > 8);
+    };
+
+    updateScrollState();
+    const rafId = window.requestAnimationFrame(updateScrollState);
+
+    const handleScroll = () => updateScrollState();
+    container.addEventListener('scroll', handleScroll);
+    window.addEventListener('resize', updateScrollState);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [options, loading]);
+
+  useEffect(() => {
     const updateHeight = () => {
       const height = document.body.scrollHeight;
       window.parent.postMessage({ type: 'gutschein-widget-resize', height }, parentOrigin);
@@ -102,7 +129,18 @@ const EmbedWidget: React.FC = () => {
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, [loading, options, backgroundColor, parentOrigin]);
+  }, [loading, options, backgroundColor, parentOrigin, canScrollLeft, canScrollRight]);
+
+  const scrollCards = (direction: 'left' | 'right') => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const amount = Math.max(220, Math.floor(container.clientWidth * 0.8));
+    container.scrollBy({
+      left: direction === 'left' ? -amount : amount,
+      behavior: 'smooth'
+    });
+  };
 
   const handleWeiterZurZahlung = (option: GutscheinOption, index: number) => {
     let betrag = option.betrag;
@@ -159,7 +197,7 @@ const EmbedWidget: React.FC = () => {
       fontFamily,
       pt: 3,
       pb: 1.5,
-      px: 2,
+      px: { xs: 0.75, md: 2 },
       position: 'relative',
       '& *': {
         fontFamily: `${fontFamily} !important`
@@ -204,15 +242,99 @@ const EmbedWidget: React.FC = () => {
         Jetzt kaufen und sofort per E-Mail erhalten
       </Typography>
 
+      {options.length > 1 && (
+        <Box
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            alignItems: 'center',
+            justifyContent: 'center',
+            mb: 2,
+            px: 0.5
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1,
+              p: 0.75,
+              borderRadius: '999px',
+              border: '1px solid #e2e8f0',
+              bgcolor: 'rgba(255,255,255,0.9)',
+              boxShadow: '0 6px 20px rgba(15, 23, 42, 0.08)',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
+            <Box
+              component="button"
+              onClick={() => scrollCards('left')}
+              disabled={!canScrollLeft}
+              sx={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '999px',
+                border: '1px solid #dbe2ea',
+                bgcolor: 'white',
+                color: '#1f2937',
+                cursor: canScrollLeft ? 'pointer' : 'not-allowed',
+                opacity: canScrollLeft ? 1 : 0.35,
+                fontSize: '1.1rem',
+                lineHeight: 1,
+                padding: 0,
+                boxShadow: canScrollLeft ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  transform: canScrollLeft ? 'translateY(-1px)' : 'none',
+                  boxShadow: canScrollLeft ? '0 4px 10px rgba(0,0,0,0.12)' : 'none',
+                  borderColor: canScrollLeft ? '#c8d2de' : '#dbe2ea'
+                }
+              }}
+            >
+              {'<'}
+            </Box>
+
+            <Box
+              component="button"
+              onClick={() => scrollCards('right')}
+              disabled={!canScrollRight}
+              sx={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '999px',
+                border: '1px solid #dbe2ea',
+                bgcolor: 'white',
+                color: '#1f2937',
+                cursor: canScrollRight ? 'pointer' : 'not-allowed',
+                opacity: canScrollRight ? 1 : 0.35,
+                fontSize: '1.1rem',
+                lineHeight: 1,
+                padding: 0,
+                boxShadow: canScrollRight ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  transform: canScrollRight ? 'translateY(-1px)' : 'none',
+                  boxShadow: canScrollRight ? '0 4px 10px rgba(0,0,0,0.12)' : 'none',
+                  borderColor: canScrollRight ? '#c8d2de' : '#dbe2ea'
+                }
+              }}
+            >
+              {'>'}
+            </Box>
+          </Box>
+        </Box>
+      )}
+
       <Box 
+        ref={scrollContainerRef}
         sx={{ 
           display: 'flex',
           overflowX: 'auto',
           gap: 3,
           pb: 2,
-          px: 1,
+          px: { xs: 0, md: 1 },
           alignItems: 'stretch',
           justifyContent: options.length <= 3 ? 'center' : 'flex-start',
+          scrollSnapType: { xs: 'x mandatory', md: 'none' },
+          WebkitOverflowScrolling: 'touch',
           '&::-webkit-scrollbar': {
             height: '10px',
           },
@@ -233,9 +355,10 @@ const EmbedWidget: React.FC = () => {
           <Card
             key={index}
             sx={{
-              minWidth: '260px',
+              minWidth: { xs: '86vw', sm: '260px' },
               flex: '1 1 280px',
               maxWidth: '360px',
+              scrollSnapAlign: { xs: 'start', md: 'none' },
               bgcolor: '#ffffff',
               boxShadow: 'none',
               borderRadius: '12px',
