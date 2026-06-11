@@ -1,5 +1,6 @@
 import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Alert, TextField, Dialog, DialogContent, DialogActions, CircularProgress } from '@mui/material';
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import KontaktModal from '../components/home/KontaktModal';
 import { collection, addDoc } from 'firebase/firestore';
@@ -15,6 +16,7 @@ const DEMO_DLS = [
 ];
 
 export default function GutscheinDemoPage() {
+  const location = useLocation();
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
   const [betrag, setBetrag] = useState<number | null>(null);
   const [selectedDienstleistung, setSelectedDienstleistung] = useState<typeof DEMO_DLS[0] | null>(null);
@@ -38,6 +40,37 @@ export default function GutscheinDemoPage() {
       metaDesc.setAttribute('content', 'Testen Sie unseren Gutschein-Checkout. Einfach, schnell und sicher digitale Gutscheine kaufen.');
     }
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const betragParam = params.get('betrag');
+    const titelParam = params.get('titel');
+    const shouldOpenPayment = params.get('openPayment') === '1';
+
+    if (titelParam) {
+      const matchedDienstleistung = DEMO_DLS.find((dl) =>
+        dl.shortDesc.toLowerCase() === titelParam.toLowerCase()
+      );
+
+      if (matchedDienstleistung) {
+        setGutscheinType('dienstleistung');
+        setSelectedDienstleistung(matchedDienstleistung);
+        setBetrag(Number(matchedDienstleistung.price));
+        setShowPaymentForm(shouldOpenPayment);
+        return;
+      }
+    }
+
+    if (betragParam) {
+      const parsedBetrag = Number(betragParam);
+      if (Number.isFinite(parsedBetrag) && parsedBetrag > 0) {
+        setGutscheinType('wert');
+        setBetrag(parsedBetrag);
+        setSelectedDienstleistung(null);
+        setShowPaymentForm(shouldOpenPayment);
+      }
+    }
+  }, [location.search]);
 
   const handleWeiter = () => {
     if (gutscheinType === 'wert' && (!betrag || betrag <= 0)) {

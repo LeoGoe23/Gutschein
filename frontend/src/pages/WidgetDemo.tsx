@@ -7,14 +7,54 @@ import { useEffect } from 'react';
  */
 export default function WidgetDemo() {
   useEffect(() => {
+    const currentOrigin = new URL(window.location.origin);
+    const isAllowedOrigin = (origin: string) => {
+      if (origin === window.location.origin) return true;
+      try {
+        const parsed = new URL(origin);
+        const isLocalVariant =
+          (currentOrigin.hostname === 'localhost' && parsed.hostname === '127.0.0.1') ||
+          (currentOrigin.hostname === '127.0.0.1' && parsed.hostname === 'localhost');
+        return (
+          isLocalVariant &&
+          parsed.protocol === currentOrigin.protocol &&
+          parsed.port === currentOrigin.port
+        );
+      } catch {
+        return false;
+      }
+    };
+
     // Höhen-Anpassung für iframe via postMessage
     const handleMessage = (event: MessageEvent) => {
+      if (!isAllowedOrigin(event.origin)) return;
       if (event.data.type === 'gutschein-widget-resize') {
-        const iframe = document.getElementById('gutschein-widget-iframe') as HTMLIFrameElement;
-        if (iframe && event.data.height) {
-          iframe.style.height = `${event.data.height}px`;
-          console.log('📏 Widget-Höhe angepasst:', event.data.height + 'px');
+        const iframes = document.querySelectorAll('iframe[data-gutschein-widget="true"]');
+        if (!event.data.height) return;
+        iframes.forEach((iframe) => {
+          (iframe as HTMLIFrameElement).style.height = `${event.data.height}px`;
+        });
+        console.log('Widget-Hoehe angepasst:', event.data.height + 'px');
+      }
+
+      if (event.data.type === 'gutscheinSelected') {
+        const betrag = Number(event.data.betrag);
+        if (!Number.isFinite(betrag) || betrag <= 0) return;
+        const targetSlug = typeof event.data.slug === 'string' && event.data.slug.trim()
+          ? event.data.slug.trim()
+          : 'JANKIP';
+
+        const params = new URLSearchParams({
+          betrag: String(betrag),
+          source: 'widget-demo',
+          openPayment: '1'
+        });
+
+        if (typeof event.data.titel === 'string' && event.data.titel.trim()) {
+          params.set('titel', event.data.titel.trim());
         }
+
+        window.location.href = `/demo/${encodeURIComponent(targetSlug)}?${params.toString()}`;
       }
     };
 
@@ -70,6 +110,7 @@ export default function WidgetDemo() {
           <Box sx={{ my: 5 }}>
             <iframe
               id="gutschein-widget-iframe"
+              data-gutschein-widget="true"
               src="/embed/RR2H80"
               style={{
                 width: '100%',
@@ -140,6 +181,7 @@ export default function WidgetDemo() {
           </Typography>
           <Box sx={{ my: 4, borderTop: '2px solid #e2e8f0' }} />
           <iframe
+            data-gutschein-widget="true"
             src="/embed/RR2H80"
             style={{
               width: '100%',

@@ -717,6 +717,7 @@ const trackWebsiteHit = async (userId: string) => {
 
 export default function GutscheinLandingPage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -729,7 +730,9 @@ export default function GutscheinLandingPage() {
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
   const [customerEmail, setCustomerEmail] = useState<string>('');
+  const [prefillTitel, setPrefillTitel] = useState<string>('');
   const hitTrackedRef = useRef(false);
+  const prefillAppliedRef = useRef(false);
 
   // Lade Daten basierend auf Slug
   useEffect(() => {
@@ -763,6 +766,73 @@ export default function GutscheinLandingPage() {
 
     loadData();
   }, [slug]);
+
+  useEffect(() => {
+    if (!checkoutData || prefillAppliedRef.current) return;
+
+    const params = new URLSearchParams(location.search);
+    const titelParam = params.get('titel')?.trim();
+    const betragParam = params.get('betrag');
+    const shouldOpenPayment = params.get('openPayment') === '1';
+    let hasPrefillSelection = false;
+
+    if (titelParam) {
+      const normalizedTitle = titelParam.toLowerCase();
+      setPrefillTitel(titelParam);
+
+      for (let i = 0; i < checkoutData.dienstleistungen.length; i++) {
+        const dienstleistung: any = checkoutData.dienstleistungen[i];
+
+        if (dienstleistung.varianten && dienstleistung.varianten.length > 0) {
+          const matchedVariante = dienstleistung.varianten.find((variante: any) =>
+            `${dienstleistung.shortDesc} - ${variante.name}`.toLowerCase() === normalizedTitle
+          );
+
+          if (matchedVariante) {
+            setGutscheinType('dienstleistung');
+            setExpandedAccordion(`panel${i}`);
+            setSelectedDienstleistung({
+              shortDesc: `${dienstleistung.shortDesc} - ${matchedVariante.name}`,
+              longDesc: matchedVariante.beschreibung || dienstleistung.longDesc,
+              price: matchedVariante.preis,
+              varianteName: matchedVariante.name
+            });
+            setBetrag(Number(matchedVariante.preis));
+            hasPrefillSelection = true;
+            break;
+          }
+        }
+
+        if ((dienstleistung.shortDesc || '').toLowerCase() === normalizedTitle) {
+          setGutscheinType('dienstleistung');
+          setSelectedDienstleistung({
+            shortDesc: dienstleistung.shortDesc,
+            longDesc: dienstleistung.longDesc,
+            price: dienstleistung.price
+          });
+          setBetrag(Number(dienstleistung.price));
+          hasPrefillSelection = true;
+          break;
+        }
+      }
+    }
+
+    if (!hasPrefillSelection && betragParam && checkoutData.customValue) {
+      const parsedBetrag = Number(betragParam);
+      if (Number.isFinite(parsedBetrag) && parsedBetrag > 0) {
+        setGutscheinType('wert');
+        setSelectedDienstleistung(null);
+        setBetrag(parsedBetrag);
+        hasPrefillSelection = true;
+      }
+    }
+
+    if (hasPrefillSelection && shouldOpenPayment) {
+      setShowPaymentForm(true);
+    }
+
+    prefillAppliedRef.current = true;
+  }, [checkoutData, location.search]);
 
   // ✅ NEU: Einfacher Payment Success Handler
   const handlePaymentSuccess = (betrag: number, email: string) => {
@@ -861,6 +931,9 @@ export default function GutscheinLandingPage() {
     }
   };
 
+  const selectedLabel = selectedDienstleistung?.shortDesc || prefillTitel;
+  const isWidgetFlow = (new URLSearchParams(location.search).get('source') || '').startsWith('widget-');
+
   return (
       <Box sx={{ minHeight: '100vh', overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: { xs: 'column', md: 'row' } }}>
         <TopLeftLogo />
@@ -885,12 +958,14 @@ export default function GutscheinLandingPage() {
                   {checkoutData.unternehmensname}
                 </Typography>
 
-                <Typography variant="body1" sx={{ color: 'grey.700', mb: 4, lineHeight: 1.6 }}>
-                  {getBeschreibung()}
-                </Typography>
+                {!isWidgetFlow && (
+                  <Typography variant="body1" sx={{ color: 'grey.700', mb: 4, lineHeight: 1.6 }}>
+                    {getBeschreibung()}
+                  </Typography>
+                )}
 
                 {/* Toggle für beide Optionen */}
-                {hasBoth && (
+                {!isWidgetFlow && hasBoth && (
                   <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
                     <ToggleButtonGroup
                       value={gutscheinType}
@@ -1092,12 +1167,34 @@ export default function GutscheinLandingPage() {
                 )}
 
                 {showPaymentForm && (
-                  <PaymentForm
-                    betrag={betrag}
-                    onPaymentSuccess={handlePaymentSuccess}
-                    stripeAccountId={checkoutData.StripeAccountId}
-                    provision={checkoutData.Provision || 0.08} // <--- NEU
-                  />
+                  <>
+                    <Box
+                      sx={{
+                        mb: 2,
+                        p: 2,
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 2,
+                        backgroundColor: '#f8f9fb'
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ color: 'grey.700', mb: 0.5 }}>
+                        Ausgewählter Gutschein
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'grey.900' }}>
+                        {selectedLabel || 'Wertgutschein'}
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                        {betrag ? `${betrag}€` : '-'}
+                      </Typography>
+                    </Box>
+
+                    <PaymentForm
+                      betrag={betrag}
+                      onPaymentSuccess={handlePaymentSuccess}
+                      stripeAccountId={checkoutData.StripeAccountId}
+                      provision={checkoutData.Provision || 0.08} // <--- NEU
+                    />
+                  </>
                 )}
               </>
             ) : (

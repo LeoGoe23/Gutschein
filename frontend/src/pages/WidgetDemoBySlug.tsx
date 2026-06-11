@@ -9,13 +9,52 @@ const WidgetDemoBySlug: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const currentOrigin = new URL(window.location.origin);
+    const isAllowedOrigin = (origin: string) => {
+      if (origin === window.location.origin) return true;
+      try {
+        const parsed = new URL(origin);
+        const isLocalVariant =
+          (currentOrigin.hostname === 'localhost' && parsed.hostname === '127.0.0.1') ||
+          (currentOrigin.hostname === '127.0.0.1' && parsed.hostname === 'localhost');
+        return (
+          isLocalVariant &&
+          parsed.protocol === currentOrigin.protocol &&
+          parsed.port === currentOrigin.port
+        );
+      } catch {
+        return false;
+      }
+    };
+
     // Handle iframe resize messages
     const handleMessage = (event: MessageEvent) => {
+      if (!isAllowedOrigin(event.origin)) return;
       if (event.data.type === 'gutschein-widget-resize') {
         const iframe = document.getElementById('gutschein-widget-iframe') as HTMLIFrameElement;
         if (iframe && event.data.height) {
           iframe.style.height = `${event.data.height}px`;
         }
+      }
+
+      if (event.data.type === 'gutscheinSelected') {
+        const betrag = Number(event.data.betrag);
+        if (!Number.isFinite(betrag) || betrag <= 0) return;
+        const targetSlug = typeof event.data.slug === 'string' && event.data.slug.trim()
+          ? event.data.slug.trim()
+          : (slug || 'JANKIP');
+
+        const params = new URLSearchParams({
+          betrag: String(betrag),
+          source: 'widget-demo-slug',
+          openPayment: '1'
+        });
+
+        if (typeof event.data.titel === 'string' && event.data.titel.trim()) {
+          params.set('titel', event.data.titel.trim());
+        }
+
+        window.location.href = `/demo/${encodeURIComponent(targetSlug)}?${params.toString()}`;
       }
     };
 
@@ -158,7 +197,6 @@ const WidgetDemoBySlug: React.FC = () => {
 
     <section class="titel_start">
         <div class="div-block-img">
-            <img loading="lazy" src="https://www.somaticvitality.com/images/66b9e4c0b7869ba7599b37e7_630f0dde08f9af97672ca084_5f4e2ee6806bd25f72b98a05_ornament_wei.webp" alt="Ornament" class="deko1 filter">
             <h2 class="subheading heading-2 filter">Pauline Zimnoch</h2>
             <h1 class="slogan1-title heading-1">
                 Somatic Vitality
@@ -202,7 +240,7 @@ const WidgetDemoBySlug: React.FC = () => {
                     src="/embed/JANKIP"
                     style="width: 100%; border: none; overflow: hidden; height: auto; background: white; display: block; min-height: 600px;"
                     title="Gutschein Widget"
-                />
+                  ></iframe>
             </div>
         </div>
     </section>

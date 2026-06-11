@@ -2,7 +2,7 @@ import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgr
 import LocalOfferOutlined from '@mui/icons-material/LocalOfferOutlined';
 import { useState, useEffect, useRef } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 
@@ -289,6 +289,7 @@ function DemoSuccessPage({
 
 export default function DemoCheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const [demoData, setDemoData] = useState<DemoData | null>(null);
   const [demoDocId, setDemoDocId] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -349,7 +350,9 @@ export default function DemoCheckoutPage() {
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-          setError('Demo nicht gefunden');
+          const search = location.search || '';
+          window.location.replace(`/checkout/${encodeURIComponent(slug)}${search}`);
+          return;
         } else {
           const demoDoc = querySnapshot.docs[0];
           const rawData = demoDoc.data() as any;
@@ -368,7 +371,40 @@ export default function DemoCheckoutPage() {
     };
 
     loadDemoData();
-  }, [slug]);
+  }, [slug, location.search]);
+
+  useEffect(() => {
+    if (!demoData) return;
+
+    const params = new URLSearchParams(location.search);
+    const betragParam = params.get('betrag');
+    const titelParam = params.get('titel');
+    const shouldOpenPayment = params.get('openPayment') === '1';
+
+    if (titelParam) {
+      const matchedDienstleistung = demoData.dienstleistungen.find((dl) =>
+        dl.shortDesc.toLowerCase() === titelParam.toLowerCase()
+      );
+
+      if (matchedDienstleistung) {
+        setGutscheinType('dienstleistung');
+        setSelectedDienstleistung(matchedDienstleistung);
+        setBetrag(Number(matchedDienstleistung.price));
+        setShowPaymentForm(shouldOpenPayment);
+        return;
+      }
+    }
+
+    if (betragParam) {
+      const parsedBetrag = Number(betragParam);
+      if (Number.isFinite(parsedBetrag) && parsedBetrag > 0) {
+        setGutscheinType('wert');
+        setBetrag(parsedBetrag);
+        setSelectedDienstleistung(null);
+        setShowPaymentForm(shouldOpenPayment);
+      }
+    }
+  }, [demoData, location.search]);
 
   // Voreinstellung: Ersten verfuegbaren Rabattcode automatisch anzeigen
   useEffect(() => {

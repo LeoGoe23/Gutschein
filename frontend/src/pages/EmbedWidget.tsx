@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, Typography, Button, Card, CardContent, Divider, TextField } from '@mui/material';
+import { Box, Typography, Card, CardContent, Divider, TextField } from '@mui/material';
 import { loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
 
 interface GutscheinOption {
@@ -13,17 +13,23 @@ const EmbedWidget: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState<GutscheinOption[]>([]);
-  const [unternehmenName, setUnternehmenName] = useState('');
   const [error, setError] = useState('');
   const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
 
   // URL parameters für Customization
   const params = new URLSearchParams(window.location.search);
   const primaryColor = params.get('primaryColor') || '#1976d2';
-  const fontFamily = params.get('fontFamily') || slug?.toUpperCase() === 'JANKIP' 
+  const fontFamily = params.get('fontFamily') || (slug?.toUpperCase() === 'JANKIP' 
     ? "'Cormorant Garamond', Georgia, serif" 
-    : "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    : "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
   const backgroundColor = params.get('backgroundColor') || 'transparent';
+  const parentOrigin = (() => {
+    try {
+      return document.referrer ? new URL(document.referrer).origin : '*';
+    } catch {
+      return '*';
+    }
+  })();
 
   useEffect(() => {
     const loadData = async () => {
@@ -33,8 +39,6 @@ const EmbedWidget: React.FC = () => {
         const data = await loadCheckoutDataBySlug(slug);
         
         if (data) {
-          setUnternehmenName(data.unternehmensname);
-          
           const loadedOptions: GutscheinOption[] = [];
           
           // Freier Betrag hinzufügen wenn aktiviert
@@ -87,7 +91,7 @@ const EmbedWidget: React.FC = () => {
   useEffect(() => {
     const updateHeight = () => {
       const height = document.body.scrollHeight;
-      window.parent.postMessage({ type: 'gutschein-widget-resize', height }, '*');
+      window.parent.postMessage({ type: 'gutschein-widget-resize', height }, parentOrigin);
     };
 
     // Setze body background auf transparent
@@ -98,7 +102,7 @@ const EmbedWidget: React.FC = () => {
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, [loading, options, backgroundColor]);
+  }, [loading, options, backgroundColor, parentOrigin]);
 
   const handleWeiterZurZahlung = (option: GutscheinOption, index: number) => {
     let betrag = option.betrag;
@@ -113,7 +117,7 @@ const EmbedWidget: React.FC = () => {
       slug, 
       betrag,
       titel: option.titel 
-    }, '*');
+    }, parentOrigin);
   };
 
   const handleCustomAmountChange = (index: number, value: string) => {
@@ -310,7 +314,7 @@ const EmbedWidget: React.FC = () => {
                           borderColor: '#cbd5e0',
                         },
                         '&.Mui-focused fieldset': {
-                          borderColor: '#1976d2',
+                          borderColor: primaryColor,
                         },
                       },
                       '& input': {
@@ -365,7 +369,7 @@ const EmbedWidget: React.FC = () => {
                 onClick={() => handleWeiterZurZahlung(option, index)}
                 sx={{
                   width: '100%',
-                  bgcolor: '#1976d2',
+                  bgcolor: primaryColor,
                   color: '#ffffff',
                   py: 1.25,
                   px: 3,
@@ -380,10 +384,10 @@ const EmbedWidget: React.FC = () => {
                   fontFamily: 'inherit',
                   mt: 'auto',
                   '&:hover': {
-                    bgcolor: '#1565c0',
+                    opacity: 0.92,
                   },
                   '&:active': {
-                    bgcolor: '#0d47a1',
+                    opacity: 0.85,
                   }
                 }}
               >
