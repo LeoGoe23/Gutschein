@@ -13,7 +13,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
@@ -31,6 +31,8 @@ interface ExtraOfferConfig {
   introText: string;
   longDescription: string;
   imageURL: string;
+  imageURL2: string;
+  imageURL3: string;
   externalLink: string;
   externalLinkLabel: string;
   voucherType: GutscheinTyp;
@@ -52,6 +54,8 @@ const defaultConfig: ExtraOfferConfig = {
   introText: 'Entdecken Sie unser zusaetzliches Angebot.',
   longDescription: '',
   imageURL: '',
+  imageURL2: '',
+  imageURL3: '',
   externalLink: '',
   externalLinkLabel: 'Mehr erfahren',
   voucherType: 'wert',
@@ -73,13 +77,22 @@ export default function AdminExtraOffer() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewURL, setImagePreviewURL] = useState('');
+  const [imageFiles, setImageFiles] = useState<Array<File | null>>([null, null, null]);
+  const [imagePreviewURLs, setImagePreviewURLs] = useState<string[]>(['', '', '']);
+  const configSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedShop = useMemo(
     () => shops.find((shop) => shop.id === selectedShopId) || null,
     [shops, selectedShopId]
   );
+
+  const handleEditActivePage = (shopId: string) => {
+    setSelectedShopId(shopId);
+
+    window.requestAnimationFrame(() => {
+      configSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   const activePages = useMemo(
     () =>
@@ -157,28 +170,38 @@ export default function AdminExtraOffer() {
   useEffect(() => {
     if (!selectedShop) {
       setConfig(defaultConfig);
+      setImageFiles([null, null, null]);
+      setImagePreviewURLs(['', '', '']);
       return;
     }
 
-    setConfig({
+    const nextConfig = {
       ...defaultConfig,
       ...selectedShop.extraOffer,
+    };
+
+    setConfig({
+      ...nextConfig,
     });
-    setImageFile(null);
-    setImagePreviewURL(String(selectedShop.extraOffer?.imageURL || ''));
+    setImageFiles([null, null, null]);
+    setImagePreviewURLs([
+      String(nextConfig.imageURL || ''),
+      String(nextConfig.imageURL2 || ''),
+      String(nextConfig.imageURL3 || ''),
+    ]);
     setError('');
     setSuccess('');
   }, [selectedShopId, selectedShop]);
 
-  const setImageFromFile = (file: File) => {
+  const setImageFromFile = (slotIndex: number, file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('Bitte nur Bilddateien verwenden.');
       return;
     }
 
     const localURL = URL.createObjectURL(file);
-    setImageFile(file);
-    setImagePreviewURL(localURL);
+    setImageFiles((prev) => prev.map((item, index) => (index === slotIndex ? file : item)));
+    setImagePreviewURLs((prev) => prev.map((item, index) => (index === slotIndex ? localURL : item)));
     setError('');
   };
 
@@ -228,17 +251,21 @@ export default function AdminExtraOffer() {
     setSuccess('');
 
     try {
-      let finalImageURL = config.imageURL.trim();
+      const selectedImageURLs = [config.imageURL.trim(), config.imageURL2.trim(), config.imageURL3.trim()];
+      const finalImageURLs = [...selectedImageURLs];
 
-      if (imageFile) {
-        const ext = imageFile.name.split('.').pop() || 'png';
+      for (let index = 0; index < imageFiles.length; index += 1) {
+        const file = imageFiles[index];
+        if (!file) continue;
+
+        const ext = file.name.split('.').pop() || 'png';
         const cleanSlug = normalizedSlug || 'extra';
         const storageRef = ref(
           storage,
-          `seiten/${selectedShopId}/extra-offer-${cleanSlug}.${ext}`
+          `seiten/${selectedShopId}/extra-offer-${cleanSlug}-${index + 1}.${ext}`
         );
-        await uploadBytes(storageRef, imageFile);
-        finalImageURL = await getDownloadURL(storageRef);
+        await uploadBytes(storageRef, file);
+        finalImageURLs[index] = await getDownloadURL(storageRef);
       }
 
       const payload: ExtraOfferConfig = {
@@ -249,7 +276,9 @@ export default function AdminExtraOffer() {
         pageTitle: config.pageTitle.trim(),
         introText: config.introText.trim(),
         longDescription: config.longDescription.trim(),
-        imageURL: finalImageURL,
+        imageURL: finalImageURLs[0] || '',
+        imageURL2: finalImageURLs[1] || '',
+        imageURL3: finalImageURLs[2] || '',
         voucherTitle: config.voucherTitle.trim(),
         voucherDescription: config.voucherDescription.trim(),
       };
@@ -258,6 +287,8 @@ export default function AdminExtraOffer() {
         'Checkout.ExtraOffer': payload,
       });
 
+      setImageFiles([null, null, null]);
+      setImagePreviewURLs([payload.imageURL || '', payload.imageURL2 || '', payload.imageURL3 || '']);
       setShops((prev) =>
         prev.map((shop) =>
           shop.id === selectedShopId
@@ -265,10 +296,7 @@ export default function AdminExtraOffer() {
             : shop
         )
       );
-
       setConfig(payload);
-      setImageFile(null);
-      setImagePreviewURL(payload.imageURL || '');
 
       setSuccess(`Gespeichert. Seite verfuegbar unter /${payload.slug}`);
     } catch (err) {
@@ -374,6 +402,14 @@ export default function AdminExtraOffer() {
                           >
                             Oeffnen
                           </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleEditActivePage(page.id)}
+                            sx={{ textTransform: 'none', px: 1 }}
+                          >
+                            Bearbeiten
+                          </Button>
                         </Box>
                       ))}
                     </Box>
@@ -382,7 +418,7 @@ export default function AdminExtraOffer() {
 
                 {selectedShopId && (
                   <>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
+                    <Box ref={configSectionRef} sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
                       <Typography sx={{ mr: 2 }}>Extra-Seite aktiv</Typography>
                       <Switch
                         checked={config.enabled}
@@ -444,105 +480,132 @@ export default function AdminExtraOffer() {
                     <Divider sx={{ mb: 2 }} />
 
                     <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                      Bild fuer Extra-Seite
+                      Bilder fuer die Collage
                     </Typography>
 
                     <Box
-                      tabIndex={0}
-                      onPaste={(e) => {
-                        const items = e.clipboardData?.items;
-                        if (!items) return;
-                        for (let i = 0; i < items.length; i += 1) {
-                          const item = items[i];
-                          if (item.type.startsWith('image/')) {
-                            const file = item.getAsFile();
-                            if (file) {
-                              setImageFromFile(file);
-                              e.preventDefault();
-                            }
-                            return;
-                          }
-                        }
-                      }}
                       sx={{
-                        border: '1px dashed #bbb',
-                        borderRadius: 2,
-                        p: 2,
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+                        gap: 2,
                         mb: 2,
-                        outline: 'none',
-                        '&:focus': {
-                          borderColor: '#1976d2',
-                          boxShadow: '0 0 0 2px rgba(25,118,210,0.15)',
-                        },
                       }}
                     >
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        Bild hier hochladen oder diesen Bereich anklicken und mit Strg+V einfuegen.
-                      </Typography>
-
-                      <Button
-                        variant="outlined"
-                        component="label"
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Bild waehlen
-                        <input
-                          hidden
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) setImageFromFile(file);
-                          }}
-                        />
-                      </Button>
-
-                      {!!imageFile && (
-                        <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
-                          Neues Bild ausgewaehlt: {imageFile.name}
-                        </Typography>
-                      )}
-                    </Box>
-
-                    {!!imagePreviewURL && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
-                          Vorschau (ohne Zuschnitt)
-                        </Typography>
+                      {[0, 1, 2].map((slotIndex) => (
                         <Box
+                          key={slotIndex}
+                          tabIndex={0}
+                          onPaste={(e) => {
+                            const items = e.clipboardData?.items;
+                            if (!items) return;
+
+                            for (let i = 0; i < items.length; i += 1) {
+                              const item = items[i];
+                              if (item.type.startsWith('image/')) {
+                                const file = item.getAsFile();
+                                if (file) {
+                                  setImageFromFile(slotIndex, file);
+                                  e.preventDefault();
+                                }
+                                return;
+                              }
+                            }
+                          }}
                           sx={{
-                            width: '100%',
-                            maxHeight: 420,
+                            border: '1px dashed #bbb',
                             borderRadius: 2,
-                            border: '1px solid #ddd',
-                            backgroundColor: '#f5f5f5',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            overflow: 'hidden',
+                            p: 2,
+                            backgroundColor: '#fcfcfc',
+                            outline: 'none',
+                            '&:focus': {
+                              borderColor: '#1976d2',
+                              boxShadow: '0 0 0 2px rgba(25,118,210,0.15)',
+                            },
                           }}
                         >
-                          <Box
-                            component="img"
-                            src={imagePreviewURL}
-                            alt="Extra Seite Bild Vorschau"
-                            sx={{
-                              width: '100%',
-                              maxHeight: 420,
-                              objectFit: 'contain',
-                              display: 'block',
-                            }}
-                          />
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                            Bild {slotIndex + 1}
+                          </Typography>
+
+                          <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
+                            Bild hier einfuegen mit Strg+V oder per Button auswaehlen.
+                          </Typography>
+
+                          <Button variant="outlined" component="label" sx={{ textTransform: 'none', mb: 1.5 }}>
+                            Bild waehlen
+                            <input
+                              hidden
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) setImageFromFile(slotIndex, file);
+                              }}
+                            />
+                          </Button>
+
+                          {!!imageFiles[slotIndex] && (
+                            <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
+                              Neues Bild ausgewaehlt: {imageFiles[slotIndex]?.name}
+                            </Typography>
+                          )}
+
+                          {!!imagePreviewURLs[slotIndex] && (
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: 160,
+                                borderRadius: 2,
+                                border: '1px solid #ddd',
+                                backgroundColor: '#f5f5f5',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <Box
+                                component="img"
+                                src={imagePreviewURLs[slotIndex]}
+                                alt={`Extra Seite Bild ${slotIndex + 1} Vorschau`}
+                                sx={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                }}
+                              />
+                            </Box>
+                          )}
+
+                          {!imagePreviewURLs[slotIndex] && (
+                            <Typography variant="body2" color="text.secondary">
+                              Kein Bild hinterlegt.
+                            </Typography>
+                          )}
                         </Box>
-                      </Box>
-                    )}
+                      ))}
+                    </Box>
 
                     <TextField
                       fullWidth
-                      label="Anderes Bild (URL)"
-                      helperText="Optional: Direkte Bild-URL. Wenn ein Upload/Paste-Bild gewaehlt ist, wird dieses verwendet."
+                      label="Bild 1 URL (optional)"
+                      helperText="Optional: Direkte Bild-URL. Wenn ein Upload gewaehlt ist, wird dieser verwendet."
                       value={config.imageURL}
                       onChange={(e) => setConfig((prev) => ({ ...prev, imageURL: e.target.value }))}
+                      sx={{ mb: 2 }}
+                    />
+
+                    <TextField
+                      fullWidth
+                      label="Bild 2 URL (optional)"
+                      value={config.imageURL2}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, imageURL2: e.target.value }))}
+                      sx={{ mb: 2 }}
+                    />
+
+                    <TextField
+                      fullWidth
+                      label="Bild 3 URL (optional)"
+                      value={config.imageURL3}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, imageURL3: e.target.value }))}
                       sx={{ mb: 2 }}
                     />
 

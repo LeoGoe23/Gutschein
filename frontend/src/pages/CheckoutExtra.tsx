@@ -25,6 +25,8 @@ interface ExtraOfferConfig {
   introText: string;
   longDescription: string;
   imageURL: string;
+  imageURL2: string;
+  imageURL3: string;
   externalLink: string;
   externalLinkLabel: string;
   voucherType: 'wert' | 'dienstleistung';
@@ -47,6 +49,80 @@ interface ExtraCheckoutData {
     code: { x: number; y: number; size: number; width?: number };
   };
   extraOffer: ExtraOfferConfig;
+}
+
+const URL_REGEX = /https?:\/\/[^\s<]+/g;
+const TRAILING_URL_PUNCTUATION_REGEX = /[.,;:!?)]*$/;
+
+function renderTextWithLinks(text: string, keyPrefix: string) {
+  const lines = text.split(/\n/);
+
+  return lines.map((line, lineIndex) => {
+    const parts: Array<{ text: string; href?: string }> = [];
+    let lastIndex = 0;
+
+    Array.from(line.matchAll(URL_REGEX)).forEach((match) => {
+      const rawUrl = match[0];
+      const matchIndex = match.index || 0;
+      const trailingPunctuation = rawUrl.match(TRAILING_URL_PUNCTUATION_REGEX)?.[0] || '';
+      const href = rawUrl.slice(0, rawUrl.length - trailingPunctuation.length);
+
+      if (matchIndex > lastIndex) {
+        parts.push({ text: line.slice(lastIndex, matchIndex) });
+      }
+
+      if (href) {
+        parts.push({ text: href, href });
+      }
+
+      if (trailingPunctuation) {
+        parts.push({ text: trailingPunctuation });
+      }
+
+      lastIndex = matchIndex + rawUrl.length;
+    });
+
+    if (lastIndex < line.length) {
+      parts.push({ text: line.slice(lastIndex) });
+    }
+
+    if (parts.length === 0) {
+      parts.push({ text: line });
+    }
+
+    return (
+      <span key={`${keyPrefix}-line-${lineIndex}`}>
+        {parts.map((part, partIndex) => {
+          if (part.href) {
+            return (
+              <Box
+                key={`${keyPrefix}-line-${lineIndex}-part-${partIndex}`}
+                component="a"
+                href={part.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  color: '#1d4ed8 !important',
+                  display: 'inline',
+                  fontWeight: 600,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '2px',
+                  wordBreak: 'break-word',
+                  '&:visited': { color: '#1d4ed8' },
+                  '&:hover': { color: '#1e40af' },
+                }}
+              >
+                {part.text}
+              </Box>
+            );
+          }
+
+          return <span key={`${keyPrefix}-line-${lineIndex}-part-${partIndex}`}>{part.text}</span>;
+        })}
+        {lineIndex < lines.length - 1 ? <br /> : null}
+      </span>
+    );
+  });
 }
 
 function generateCode() {
@@ -529,7 +605,12 @@ export default function CheckoutExtra() {
     );
   }
 
-  const imageURL = data.extraOffer.imageURL || data.bildURL;
+  const primaryImageURL = data.extraOffer.imageURL || data.bildURL;
+  const collageImageURLs = [
+    primaryImageURL,
+    data.extraOffer.imageURL2,
+    data.extraOffer.imageURL3,
+  ].filter(Boolean) as string[];
   const normalizedVoucherTitle =
     !data.extraOffer.voucherTitle || data.extraOffer.voucherTitle.trim().toLowerCase() === 'extra gutschein'
       ? 'Gutschein'
@@ -584,7 +665,7 @@ export default function CheckoutExtra() {
 
               {!!data.extraOffer.introText && (
                 <Typography variant="body1" sx={{ color: 'grey.700', mb: 3, lineHeight: 1.6 }}>
-                  {data.extraOffer.introText}
+                  {renderTextWithLinks(data.extraOffer.introText, 'extra-intro')}
                 </Typography>
               )}
 
@@ -617,7 +698,7 @@ export default function CheckoutExtra() {
                 </Typography>
                 {!!data.extraOffer.voucherDescription && (
                   <Typography variant="body2" sx={{ mb: 1.4, color: '#4b5563' }}>
-                    {data.extraOffer.voucherDescription}
+                    {renderTextWithLinks(data.extraOffer.voucherDescription, 'extra-voucher-description')}
                   </Typography>
                 )}
 
@@ -662,7 +743,7 @@ export default function CheckoutExtra() {
 
               {!!data.extraOffer.longDescription && (
                 <Typography variant="body2" sx={{ color: 'grey.700', mt: 0.5, mb: 2, lineHeight: 1.8 }}>
-                  {data.extraOffer.longDescription}
+                  {renderTextWithLinks(data.extraOffer.longDescription, 'extra-long-description')}
                 </Typography>
               )}
 
@@ -750,26 +831,134 @@ export default function CheckoutExtra() {
             position: 'relative',
             width: '100%',
             height: { xs: '100%', md: '92%' },
-            borderRadius: { xs: 3, md: 5 },
-            overflow: 'hidden',
-            boxShadow: '0 20px 45px rgba(17, 24, 39, 0.15)',
-            border: '1px solid rgba(255,255,255,0.55)',
+            borderRadius: { xs: 3, md: 0 },
+            overflow: { xs: 'hidden', md: 'visible' },
+            boxShadow: { xs: '0 20px 45px rgba(17, 24, 39, 0.15)', md: 'none' },
+            border: { xs: '1px solid rgba(255,255,255,0.55)', md: 'none' },
+            backgroundColor: { xs: '#ecebe7', md: 'transparent' },
           }}
         >
+          {collageImageURLs.length <= 1 ? (
+            <Box
+              component="img"
+              src={primaryImageURL || undefined}
+              alt={data.extraOffer.pageTitle || data.unternehmensname || 'Extra Angebot'}
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: { xs: 'center 20%', md: 'center' },
+                borderRadius: { xs: 0, md: 4 },
+                boxShadow: { xs: 'none', md: '0 24px 48px rgba(17,24,39,0.2)' },
+              }}
+            />
+          ) : (
+            <>
+              <Box
+                sx={{
+                  display: { xs: 'block', md: 'none' },
+                  position: 'absolute',
+                  inset: 0,
+                }}
+              >
+                <Box
+                  component="img"
+                  src={collageImageURLs[0]}
+                  alt={data.extraOffer.pageTitle || data.unternehmensname || 'Extra Angebot'}
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center 20%',
+                  }}
+                />
+              </Box>
+
+              <Box
+                sx={{
+                  display: { xs: 'none', md: 'block' },
+                  position: 'absolute',
+                  inset: 0,
+                  p: 1,
+                }}
+              >
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  {!!collageImageURLs[0] && (
+                    <Box
+                      component="img"
+                      src={collageImageURLs[0]}
+                      alt={data.extraOffer.pageTitle || data.unternehmensname || 'Extra Angebot'}
+                      sx={{
+                        position: 'absolute',
+                        width: '67%',
+                        height: '78%',
+                        objectFit: 'cover',
+                        borderRadius: 4,
+                        top: '11%',
+                        left: '4%',
+                        boxShadow: '0 22px 42px rgba(17,24,39,0.22)',
+                        zIndex: 2,
+                        transform: 'rotate(-1.5deg)',
+                        border: '5px solid rgba(255,255,255,0.92)',
+                      }}
+                    />
+                  )}
+                  {!!collageImageURLs[1] && (
+                    <Box
+                      component="img"
+                      src={collageImageURLs[1]}
+                      alt={`${data.extraOffer.pageTitle || data.unternehmensname || 'Extra Angebot'} 2`}
+                      sx={{
+                        position: 'absolute',
+                        width: '43%',
+                        height: '43%',
+                        objectFit: 'cover',
+                        borderRadius: 4,
+                        top: '7%',
+                        right: '4%',
+                        boxShadow: '0 16px 32px rgba(17,24,39,0.16)',
+                        transform: 'rotate(1.5deg)',
+                        border: '5px solid rgba(255,255,255,0.9)',
+                      }}
+                    />
+                  )}
+                  {!!collageImageURLs[2] && (
+                    <Box
+                      component="img"
+                      src={collageImageURLs[2]}
+                      alt={`${data.extraOffer.pageTitle || data.unternehmensname || 'Extra Angebot'} 3`}
+                      sx={{
+                        position: 'absolute',
+                        width: '39%',
+                        height: '38%',
+                        objectFit: 'cover',
+                        borderRadius: 4,
+                        bottom: '12%',
+                        right: '8%',
+                        boxShadow: '0 18px 34px rgba(17,24,39,0.2)',
+                        zIndex: 3,
+                        transform: 'rotate(2.5deg)',
+                        border: '5px solid rgba(255,255,255,0.92)',
+                      }}
+                    />
+                  )}
+                </Box>
+              </Box>
+            </>
+          )}
           <Box
             sx={{
               position: 'absolute',
               inset: 0,
-              backgroundImage: imageURL ? `url(${imageURL})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: { xs: 'center 20%', md: 'center' },
-              transform: 'scale(1.01)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
+              display: { xs: 'block', md: 'none' },
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 15%, rgba(17,24,39,0.18) 100%)',
             }}
           />
