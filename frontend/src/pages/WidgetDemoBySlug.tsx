@@ -147,6 +147,15 @@ const WidgetDemoBySlug: React.FC = () => {
         margin-bottom: 40px;
         text-align: center;
     }
+
+    @media (max-width: 768px) {
+      .gutschein-section {
+        padding: 24px 0 36px 0;
+      }
+      .gutschein-container {
+        padding: 0 12px;
+      }
+    }
     </style>
     <link href="https://www.somaticvitality.com/css/26visu8056.min.css" rel="stylesheet" type="text/css">
 

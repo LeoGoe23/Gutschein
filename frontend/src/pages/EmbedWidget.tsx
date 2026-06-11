@@ -135,9 +135,26 @@ const EmbedWidget: React.FC = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const amount = Math.max(220, Math.floor(container.clientWidth * 0.8));
-    container.scrollBy({
-      left: direction === 'left' ? -amount : amount,
+    const cards = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-widget-card="true"]')
+    );
+    if (cards.length === 0) return;
+
+    const currentLeft = container.scrollLeft;
+    let targetIndex = 0;
+
+    if (direction === 'right') {
+      const nextIndex = cards.findIndex((card) => card.offsetLeft > currentLeft + 8);
+      targetIndex = nextIndex === -1 ? cards.length - 1 : nextIndex;
+    } else {
+      const prevCandidates = cards
+        .map((card, index) => ({ index, left: card.offsetLeft }))
+        .filter((item) => item.left < currentLeft - 8);
+      targetIndex = prevCandidates.length > 0 ? prevCandidates[prevCandidates.length - 1].index : 0;
+    }
+
+    container.scrollTo({
+      left: cards[targetIndex].offsetLeft,
       behavior: 'smooth'
     });
   };
@@ -197,7 +214,7 @@ const EmbedWidget: React.FC = () => {
       fontFamily,
       pt: 3,
       pb: 1.5,
-      px: { xs: 0.75, md: 2 },
+      px: { xs: 0, md: 2 },
       position: 'relative',
       '& *': {
         fontFamily: `${fontFamily} !important`
@@ -328,7 +345,7 @@ const EmbedWidget: React.FC = () => {
         sx={{ 
           display: 'flex',
           overflowX: 'auto',
-          gap: 3,
+          gap: { xs: 1.5, md: 3 },
           pb: 2,
           px: { xs: 0, md: 1 },
           alignItems: 'stretch',
@@ -354,8 +371,9 @@ const EmbedWidget: React.FC = () => {
         {options.map((option, index) => (
           <Card
             key={index}
+            data-widget-card="true"
             sx={{
-              minWidth: { xs: '86vw', sm: '260px' },
+              minWidth: { xs: '92vw', sm: '260px' },
               flex: '1 1 280px',
               maxWidth: '360px',
               scrollSnapAlign: { xs: 'start', md: 'none' },
