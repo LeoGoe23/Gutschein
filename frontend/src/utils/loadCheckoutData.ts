@@ -15,6 +15,25 @@ export interface Dienstleistung {
   varianten?: DienstleistungVariante[]; // Optional: Für Dienstleistungen mit Varianten
 }
 
+export interface WidgetVoucherOption {
+  id: string;
+  type: 'gutschein' | 'contact';
+  titel: string;
+  betrag: number;
+  abPreis?: boolean;
+  inhalt?: string;
+  beschreibung?: string;
+  contactUrl?: string;
+  buttonLabel?: string;
+}
+
+export interface WidgetConfig {
+  enabled: boolean;
+  source: 'checkout' | 'custom';
+  customValue: boolean;
+  customVouchers: WidgetVoucherOption[];
+}
+
 export interface CheckoutData {
   unternehmensname: string;
   bildURL: string;
@@ -33,7 +52,38 @@ export interface CheckoutData {
     betrag: { x: number; y: number; size: number }; // x,y = Pixel (absolut)
     code: { x: number; y: number; size: number };   // x,y = Pixel (absolut)
   };
+  widgetConfig: WidgetConfig;
 }
+
+const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
+  const raw = (value || {}) as Partial<WidgetConfig>;
+  const source: 'checkout' | 'custom' = raw.source === 'custom' ? 'custom' : 'checkout';
+  const vouchers: WidgetVoucherOption[] = (Array.isArray(raw.customVouchers) ? raw.customVouchers : [])
+    .map((entry, index) => {
+      const voucher = entry as Partial<WidgetVoucherOption>;
+      const voucherType: 'gutschein' | 'contact' = voucher.type === 'contact' ? 'contact' : 'gutschein';
+      const betrag = Number(voucher.betrag);
+      return {
+        id: typeof voucher.id === 'string' && voucher.id.trim() ? voucher.id : `voucher-${index + 1}`,
+        type: voucherType,
+        titel: typeof voucher.titel === 'string' ? voucher.titel : '',
+        betrag: Number.isFinite(betrag) ? betrag : 0,
+        abPreis: Boolean(voucher.abPreis),
+        inhalt: typeof voucher.inhalt === 'string' ? voucher.inhalt : '',
+        beschreibung: typeof voucher.beschreibung === 'string' ? voucher.beschreibung : '',
+        contactUrl: typeof voucher.contactUrl === 'string' ? voucher.contactUrl : '',
+        buttonLabel: typeof voucher.buttonLabel === 'string' ? voucher.buttonLabel : '',
+      };
+    })
+    .filter((voucher) => voucher.titel.trim().length > 0 && (voucher.type === 'contact' || voucher.betrag > 0));
+
+  return {
+    enabled: raw.enabled === undefined ? true : Boolean(raw.enabled),
+    source,
+    customValue: Boolean(raw.customValue),
+    customVouchers: vouchers,
+  };
+};
 
 export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData | null> => {
   try {
@@ -65,7 +115,8 @@ export const loadCheckoutDataBySlug = async (slug: string): Promise<CheckoutData
       userId: userDoc.id,
       Provision: userData.Provision || 0,
       // NEU:
-      designConfig: userData.Checkout?.DesignConfig || undefined
+      designConfig: userData.Checkout?.DesignConfig || undefined,
+      widgetConfig: normalizeWidgetConfig(userData.Checkout?.WidgetConfig),
     };
 
     console.log('📦 Processed checkout data:', checkoutData);

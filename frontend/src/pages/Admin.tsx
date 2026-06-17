@@ -1,3 +1,4 @@
+import { signOut } from "firebase/auth";
 import { Box, CircularProgress, Typography, Paper, List, ListItem, ListItemText, Select, MenuItem, FormControl, InputLabel, Button, Chip, IconButton, TextField } from '@mui/material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
@@ -5,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../auth/useAuth';
 import { doc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
-import { db } from '../auth/firebase';
+import { db, auth } from '../auth/firebase';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import LocalActivityIcon from '@mui/icons-material/LocalActivity';
 import StorefrontIcon from '@mui/icons-material/Storefront';
@@ -63,7 +64,6 @@ type StartPasswordResponse = {
 export default function AdminPage() {
   const user = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [stats, setStats] = useState<any>(null);
   const [monatStats, setMonatStats] = useState<any[]>([]);
   const [selectedMonat, setSelectedMonat] = useState<string>('');
   const [tagStats, setTagStats] = useState<any[]>([]);
@@ -83,6 +83,8 @@ export default function AdminPage() {
   const customerShopsWithEmail = shops.filter(
     (shop) => typeof shop.email === 'string' && shop.email.trim().length > 0
   );
+  const stripeLinkedShops = shops.filter((shop) => Boolean(shop.stripeAccountId));
+  const stripeUnlinkedShops = shops.filter((shop) => !shop.stripeAccountId);
 
   const copyToClipboard = async (value: string, successMessage: string) => {
     try {
@@ -202,10 +204,6 @@ export default function AdminPage() {
   // Admin Stats laden
   useEffect(() => {
     const fetchStats = async () => {
-      const statsDoc = await getDoc(doc(db, 'admin_stats', 'globalAdmin'));
-      if (statsDoc.exists()) {
-        setStats(statsDoc.data());
-      }
       // Monatsstatistiken laden
       const monatCol = collection(doc(db, 'admin_stats', 'globalAdmin'), 'Details');
       const monatSnaps = await getDocs(monatCol);
@@ -311,171 +309,373 @@ export default function AdminPage() {
     );
   }
 
-  return (
-    <Box sx={{ width: '100%', minHeight: '100vh', background: '#f4f4f4', position: 'relative' }}>
-      <TopLeftLogo />
-      <Box sx={{ position: 'absolute', top: { xs: '0.5rem', md: '1.5rem' }, right: { xs: '1rem', md: '4rem' }, zIndex: 3 }}>
-        <TopBar />
+return (
+    <Box sx={{ width: "100%", minHeight: "100vh", background: "#f8fafc" }}>
+      {/* Sleek Compact Admin-Header */}
+      <Box sx={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1000,
+        backgroundColor: "#ffffff",
+        borderBottom: "1px solid #e2e8f0",
+        width: "100%",
+        py: 1,
+        px: { xs: 2, md: 4 },
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.03)"
+      }}>
+        {/* Left: compact Logo/Title */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer" }} onClick={() => navigate("/")}>
+          <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 32, height: 32 }} />
+          <Box>
+            <Typography variant="subtitle2" fontWeight={850} color="text.primary" sx={{ lineHeight: 1.1 }}>
+              GutscheinFabrik
+            </Typography>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.625rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Admin-Bereich
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Center: Desktop Navigation tabs */}
+        <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 0.5 }}>
+          <Button
+             onClick={() => navigate("/admin")}
+             size="small"
+             sx={{
+               color: "#2563eb",
+               fontWeight: 700,
+               fontSize: "0.775rem",
+               px: 1.5,
+               py: 0.5,
+               borderRadius: 2,
+               backgroundColor: "#f0f7ff",
+               textTransform: "none",
+               "&:hover": { backgroundColor: "#e0f2fe" }
+             }}
+          >
+            Übersicht
+          </Button>
+          <Button
+             onClick={() => navigate("/admin/demos")}
+             size="small"
+             sx={{
+               color: "#475569",
+               fontWeight: 600,
+               fontSize: "0.775rem",
+               px: 1.5,
+               py: 0.5,
+               borderRadius: 2,
+               textTransform: "none",
+               "&:hover": { backgroundColor: "#f1f5f9", color: "#1e293b" }
+             }}
+          >
+            Demos
+          </Button>
+          <Button
+             onClick={() => navigate("/admin/gutschein-erstellen")}
+             size="small"
+             sx={{
+               color: "#475569",
+               fontWeight: 600,
+               fontSize: "0.775rem",
+               px: 1.5,
+               py: 0.5,
+               borderRadius: 2,
+               textTransform: "none",
+               "&:hover": { backgroundColor: "#f1f5f9", color: "#1e293b" }
+             }}
+          >
+            Gutschein erstellen
+          </Button>
+          <Button
+             onClick={() => navigate("/admin/blog")}
+             size="small"
+             sx={{
+               color: "#475569",
+               fontWeight: 600,
+               fontSize: "0.775rem",
+               px: 1.5,
+               py: 0.5,
+               borderRadius: 2,
+               textTransform: "none",
+               "&:hover": { backgroundColor: "#f1f5f9", color: "#1e293b" }
+             }}
+          >
+            Blog
+          </Button>
+          <Button
+             onClick={() => navigate("/admin/extra")}
+             size="small"
+             sx={{
+               color: "#475569",
+               fontWeight: 600,
+               fontSize: "0.775rem",
+               px: 1.5,
+               py: 0.5,
+               borderRadius: 2,
+               textTransform: "none",
+               "&:hover": { backgroundColor: "#f1f5f9", color: "#1e293b" }
+             }}
+          >
+            Extraslug
+          </Button>
+          <Button
+             onClick={() => navigate("/admin/marketing")}
+             size="small"
+             sx={{
+               color: "#475569",
+               fontWeight: 600,
+               fontSize: "0.775rem",
+               px: 1.5,
+               py: 0.5,
+               borderRadius: 2,
+               textTransform: "none",
+               "&:hover": { backgroundColor: "#f1f5f9", color: "#1e293b" }
+             }}
+          >
+            Marketing
+          </Button>
+        </Box>
+
+        {/* Right: Actions */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => navigate('/admin/marketing')}
+            sx={{
+              display: { xs: 'inline-flex', md: 'none' },
+              borderColor: '#e2e8f0',
+              color: '#475569',
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '0.75rem',
+              borderRadius: 2,
+              py: 0.5,
+              '&:hover': { borderColor: '#cbd5e1', backgroundColor: '#f8fafc' }
+            }}
+          >
+            Marketing
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => navigate("/")}
+            sx={{
+              borderColor: "#e2e8f0",
+              color: "#475569",
+              fontWeight: 600,
+              textTransform: "none",
+              fontSize: "0.75rem",
+              borderRadius: 2,
+              py: 0.5,
+              "&:hover": { borderColor: "#cbd5e1", backgroundColor: "#f8fafc" }
+            }}
+          >
+            Zur Website
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            onClick={() => {
+              if (window.confirm("Wirklich abmelden?")) {
+                signOut(auth).then(() => navigate("/"));
+              }
+            }}
+            sx={{
+              fontWeight: 650,
+              textTransform: "none",
+              fontSize: "0.75rem",
+              borderRadius: 2,
+              py: 0.5,
+              boxShadow: "none",
+              "&:hover": { boxShadow: "none" }
+            }}
+          >
+            Abmelden
+          </Button>
+        </Box>
       </Box>
+
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'flex-start',
-          alignItems: 'flex-start',
-          width: '100%',
-          minHeight: 'calc(100vh - 80px)',
-          pt: { xs: 8, md: 12 },
-          pl: { xs: 0, md: 8 },
-          pr: { xs: 0, md: 8 }, // rechter Abstand
+          display: "flex",
+          justifyContent: "flex-start",
+          alignItems: "flex-start",
+          width: "100%",
+          minHeight: "calc(100vh - 60px)",
+          pt: { xs: 3, md: 4 },
+          pb: { xs: 4, md: 6 },
+          pl: { xs: 2, md: 4 },
+          pr: { xs: 2, md: 4 },
         }}
       >
-        <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto' }}>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 5, mt: 3 }}>
-            <StatCard
-              label="Gesamtumsatz"
-              value={`${stats?.gesamtUmsatz ?? 0} €`}
-              icon={<MonetizationOnIcon />}
-              color="#3b82f6"
-            />
-            <StatCard
-              label="Gesamtgutscheine"
-              value={stats?.gesamtGutscheine ?? 0}
-              icon={<LocalActivityIcon />}
-              color="#10b981"
-            />
-            <StatCard
-              label="Gesamtshops"
-              value={stats?.gesamtShops ?? 0}
-              icon={<StorefrontIcon />}
-              color="#f59e0b"
-            />
-          </Box>
+        <Box sx={{ width: "100%", maxWidth: 1200, mx: "auto" }}>
 
           {/* Kontaktanfragen & Demo-Mails */}
-          <Box sx={{ display: 'flex', gap: 3, mb: 5, flexWrap: 'wrap' }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3, mb: 5 }}>
             {/* Kontaktanfragen */}
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, flex: '1 1 400px', minWidth: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <ContactMailIcon sx={{ color: '#1976d2' }} />
-                <Typography variant="h6" fontWeight={600}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #e2e8f0", background: "white" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                <ContactMailIcon sx={{ color: "#2563eb" }} />
+                <Typography variant="subtitle1" fontWeight={750} color="text.primary">
                   Kontaktanfragen (letzte 10)
                 </Typography>
               </Box>
               {kontaktanfragen.length > 0 ? (
-                <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                <List sx={{ maxHeight: 350, overflow: "auto", py: 0 }}>
                   {kontaktanfragen.map((anfrage) => (
                     <ListItem
                       key={anfrage.id}
+                      disableGutters
                       sx={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        borderBottom: '1px solid #e0e0e0',
-                        '&:last-child': { borderBottom: 'none' }
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        borderBottom: "1px solid #f1f5f9",
+                        py: 1,
+                        "&:last-child": { borderBottom: "none", pb: 0 },
+                        "&:first-of-type": { pt: 0 }
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, width: '100%', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, width: "100%", justifyContent: "space-between" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <Chip
-                            label={anfrage.quelle || 'Unbekannt'}
+                            label={anfrage.source || anfrage.quelle || "Kontakt"}
                             size="small"
-                            color="primary"
-                            sx={{ fontSize: '0.7rem' }}
+                            sx={{
+                              fontSize: "0.65rem",
+                              height: "18px",
+                              fontWeight: 650,
+                              bgcolor: "#eff6ff",
+                              color: "#1d4ed8"
+                            }}
                           />
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(anfrage.erstelltAm).toLocaleString('de-DE')}
+                          <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                            {(() => {
+                              const dt = anfrage.timestamp || anfrage.erstelltAm;
+                              if (!dt) return "Keine Zeit";
+                              if (typeof dt.toDate === "function") {
+                                return dt.toDate().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+                              }
+                              const parsed = new Date(dt);
+                              return isNaN(parsed.getTime()) ? String(dt) : parsed.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+                            })()}
                           </Typography>
                         </Box>
                         <IconButton
                           size="small"
                           color="error"
                           onClick={async () => {
-                            if (!window.confirm('Kontaktanfrage wirklich löschen?')) return;
+                            if (!window.confirm("Kontaktanfrage wirklich löschen?")) return;
                             try {
-                              await deleteDoc(doc(db, 'kontaktanfragen', anfrage.id));
+                              await deleteDoc(doc(db, "kontaktanfragen", anfrage.id));
                               setKontaktanfragen(prev => prev.filter(k => k.id !== anfrage.id));
                             } catch (error) {
-                              console.error('Fehler beim Löschen:', error);
-                              alert('Fehler beim Löschen der Kontaktanfrage');
+                              console.error("Fehler beim Löschen:", error);
+                              alert("Fehler beim Löschen der Kontaktanfrage");
                             }
                           }}
+                          sx={{ p: 0.25 }}
                         >
-                          <DeleteIcon fontSize="small" />
+                          <DeleteIcon fontSize="small" sx={{ fontSize: "1rem" }} />
                         </IconButton>
                       </Box>
-                      <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
-                        {anfrage.kontakt}
+                      <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ wordBreak: "break-word", fontSize: "0.85rem" }}>
+                        {anfrage.name || anfrage.kontakt || "Kein Name"}
+                        {(anfrage.email || anfrage.telefon) && (
+                          <Box component="span" sx={{ fontWeight: 400, color: "text.secondary", display: "block", mt: 0.25, fontSize: "0.75rem" }}>
+                            {anfrage.email && <span>{anfrage.email}</span>}
+                            {anfrage.email && anfrage.telefon && <span> | </span>}
+                            {anfrage.telefon && <span>Tel: {anfrage.telefon}</span>}
+                          </Box>
+                        )}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: 'break-word' }}>
-                        {anfrage.nachricht}
-                      </Typography>
+                      {(anfrage.nachricht || anfrage.message) && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: "break-word", whiteSpace: "pre-line", fontSize: "0.8rem", lineHeight: 1.4 }}>
+                          {anfrage.nachricht || anfrage.message}
+                        </Typography>
+                      )}
                     </ListItem>
                   ))}
                 </List>
               ) : (
-                <Typography color="text.secondary">Keine Kontaktanfragen vorhanden.</Typography>
+                <Typography color="text.secondary" variant="body2">Keine Kontaktanfragen vorhanden.</Typography>
               )}
             </Paper>
 
             {/* Demo-Gutscheine */}
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, flex: '1 1 400px', minWidth: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <EmailIcon sx={{ color: '#10b981' }} />
-                <Typography variant="h6" fontWeight={600}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #e2e8f0", background: "white" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                <EmailIcon sx={{ color: "#059669" }} />
+                <Typography variant="subtitle1" fontWeight={750} color="text.primary">
                   Demo-Mails (letzte 10)
                 </Typography>
               </Box>
               {demoGutscheine.length > 0 ? (
-                <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                <List sx={{ maxHeight: 350, overflow: "auto", py: 0 }}>
                   {demoGutscheine.map((demo) => (
                     <ListItem
                       key={demo.id}
+                      disableGutters
                       sx={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        borderBottom: '1px solid #e0e0e0',
-                        '&:last-child': { borderBottom: 'none' }
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        borderBottom: "1px solid #f1f5f9",
+                        py: 1,
+                        "&:last-child": { borderBottom: "none", pb: 0 },
+                        "&:first-of-type": { pt: 0 }
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, width: '100%', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(demo.kaufdatum || demo.erstelltAm).toLocaleString('de-DE')}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, width: "100%", justifyContent: "space-between" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                            {new Date(demo.kaufdatum || demo.erstelltAm).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}
                           </Typography>
                           <Chip
-                            label={`${demo.betrag} €`}
+                            label={`${demo.betrag || 0} €`}
                             size="small"
-                            color="success"
-                            sx={{ fontSize: '0.7rem' }}
+                            sx={{
+                              fontSize: "0.65rem",
+                              height: "18px",
+                              fontWeight: 700,
+                              bgcolor: "#dcfce7",
+                              color: "#15803d"
+                            }}
                           />
                         </Box>
                         <IconButton
                           size="small"
                           color="error"
                           onClick={async () => {
-                            if (!window.confirm('Demo-Mail wirklich löschen?')) return;
+                            if (!window.confirm("Demo-Mail wirklich löschen?")) return;
                             try {
-                              await deleteDoc(doc(db, 'demo-gutscheine', demo.id));
+                              await deleteDoc(doc(db, "demo-gutscheine", demo.id));
                               setDemoGutscheine(prev => prev.filter(d => d.id !== demo.id));
                             } catch (error) {
-                              console.error('Fehler beim Löschen:', error);
-                              alert('Fehler beim Löschen der Demo-Mail');
+                              console.error("Fehler beim Löschen:", error);
+                              alert("Fehler beim Löschen der Demo-Mail");
                             }
                           }}
+                          sx={{ p: 0.25 }}
                         >
-                          <DeleteIcon fontSize="small" />
+                          <DeleteIcon fontSize="small" sx={{ fontSize: "1rem" }} />
                         </IconButton>
                       </Box>
-                      <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                      <Typography variant="body2" fontWeight={710} color="text.primary" sx={{ wordBreak: "break-word", fontSize: "0.85rem" }}>
                         {demo.customerEmail || demo.empfaengerEmail}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Code: {demo.gutscheinCode}
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25, fontSize: "0.75rem" }}>
+                        Code: <Box component="span" sx={{ fontFamily: "monospace", bgcolor: "#f8fafc", px: 0.5, py: 0.25, borderRadius: 0.5, border: "1px solid #f1f5f9" }}>{demo.gutscheinCode}</Box>
                       </Typography>
                     </ListItem>
                   ))}
                 </List>
               ) : (
-                <Typography color="text.secondary">Keine Demo-Mails vorhanden.</Typography>
+                <Typography color="text.secondary" variant="body2">Keine Demo-Mails vorhanden.</Typography>
               )}
             </Paper>
           </Box>
@@ -719,6 +919,13 @@ export default function AdminPage() {
                 >
                   Blog verwalten
                 </Button>
+                <Button
+                  variant="contained"
+                  color="info"
+                  onClick={() => navigate('/admin/marketing')}
+                >
+                  Marketing
+                </Button>
               </Box>
             </Box>
 
@@ -760,87 +967,56 @@ export default function AdminPage() {
                 </Box>
               </Paper>
             )}
-
             <Paper elevation={2} sx={{ p: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
+                Stripe verknuepfte Shops
+              </Typography>
               <List>
-                {shops.map(shop => (
+                {stripeLinkedShops.length === 0 && (
+                  <ListItem>
+                    <ListItemText primary="Keine Stripe-verknuepften Shops gefunden." />
+                  </ListItem>
+                )}
+                {stripeLinkedShops.map(shop => (
                   <ListItem key={shop.id} divider>
                     <ListItemText
                       primary={shop.unternehmensname || shop.email || shop.id}
-                      secondary={
-                        shop.stripeAccountId
-                          ? `StripeAccountId: ${shop.stripeAccountId}`
-                          : 'Kein Stripe-Konto verknüpft'
-                      }
+                      secondary={`StripeAccountId: ${shop.stripeAccountId}`}
                     />
                     <Button
-                      variant="outlined"
+                      variant="contained"
                       size="small"
                       sx={{ ml: 2 }}
-                      onClick={() => navigate(`/admin/shop/${shop.id}/design`)}
+                      onClick={() => navigate(`/admin/shop/${shop.id}/manage`)}
                     >
-                      Design bearbeiten
-                    </Button>
-                    
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      size="small"
-                      onClick={() => {
-                        navigate('/admin/gutscheine', { state: { preselectedShopId: shop.id } });
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      Gutscheine verwalten
-                    </Button>
+                      Bearbeiten
+                    </Button>                  </ListItem>
+                ))}
+              </List>
 
-                    <Button
-                      variant="outlined"
-                      color="success"
-                      size="small"
-                      onClick={() => {
-                        navigate('/admin/gutschein-erstellen', { state: { preselectedShopId: shop.id } });
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      Gutschein erstellen
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      size="small"
-                      onClick={() => {
-                        navigate('/admin/extra', { state: { preselectedShopId: shop.id } });
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      Extra-Slug
-                    </Button>
-                    
-                    {shop.stripeAccountId && (
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        size="small"
-                        onClick={async () => {
-                          if (!window.confirm('Stripe-Konto wirklich löschen?')) return;
-                          try {
-                            await axios.post(`${API_URL}/api/stripeconnect/delete-stripe-account`, { // <--- HIER geändert
-                              stripeAccountId: shop.stripeAccountId,
-                            });
-                            alert('Stripe-Konto gelöscht!');
-                            window.location.reload();
-                          } catch (err: any) {
-                            alert('Fehler beim Löschen: ' + (err.response?.data?.error || err.message));
-                          }
-                        }}
-                        sx={{ ml: 2 }}
-                      >
-                        Stripe-Konto löschen
-                      </Button>
-                    )}
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 2.5, mb: 1.5 }}>
+                Nicht verknuepfte Shops
+              </Typography>
+              <List>
+                {stripeUnlinkedShops.length === 0 && (
+                  <ListItem>
+                    <ListItemText primary="Alle Shops sind mit Stripe verknuepft." />
                   </ListItem>
+                )}
+                {stripeUnlinkedShops.map(shop => (
+                  <ListItem key={shop.id} divider>
+                    <ListItemText
+                      primary={shop.unternehmensname || shop.email || shop.id}
+                      secondary="Kein Stripe-Konto verknuepft"
+                    />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ ml: 2 }}
+                      onClick={() => navigate(`/admin/shop/${shop.id}/manage`)}
+                    >
+                      Bearbeiten
+                    </Button>                  </ListItem>
                 ))}
               </List>
             </Paper>

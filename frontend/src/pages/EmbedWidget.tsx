@@ -1,13 +1,108 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Typography, Card, CardContent, Divider, TextField } from '@mui/material';
-import { loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
+import { CheckoutData, WidgetVoucherOption, loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
 
 interface GutscheinOption {
   titel: string;
   betrag: number;
+  abPreis?: boolean;
+  inhalt?: string;
   beschreibung?: string;
+  type?: 'gutschein' | 'contact';
+  contactUrl?: string;
+  buttonLabel?: string;
 }
+
+const toAmount = (value: string | number | undefined): number => {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const buildOptionsFromCheckout = (data: CheckoutData, includeCustomValue: boolean): GutscheinOption[] => {
+  const loadedOptions: GutscheinOption[] = [];
+
+  if (includeCustomValue) {
+    loadedOptions.push({
+      titel: 'Freier Betrag',
+      betrag: 0,
+      beschreibung: 'Sie bestimmen den Wert',
+    });
+  }
+
+  if (data.dienstleistungen && data.dienstleistungen.length > 0) {
+    data.dienstleistungen.forEach((dienstleistung) => {
+      if (dienstleistung.varianten && dienstleistung.varianten.length > 0) {
+        dienstleistung.varianten.forEach((variant) => {
+          const amount = toAmount(variant.preis);
+          if (amount <= 0) return;
+          loadedOptions.push({
+            titel: `${dienstleistung.shortDesc} - ${variant.name}`,
+            betrag: amount,
+            beschreibung: variant.beschreibung || dienstleistung.longDesc,
+          });
+        });
+      } else {
+        const amount = toAmount(dienstleistung.price);
+        if (amount <= 0) return;
+        loadedOptions.push({
+          titel: dienstleistung.shortDesc,
+          betrag: amount,
+          beschreibung: dienstleistung.longDesc !== dienstleistung.shortDesc ? dienstleistung.longDesc : undefined,
+        });
+      }
+    });
+  }
+
+  return loadedOptions;
+};
+
+const buildOptionsFromCustom = (
+  customVouchers: WidgetVoucherOption[],
+  includeCustomValue: boolean
+): GutscheinOption[] => {
+  const loadedOptions: GutscheinOption[] = [];
+
+  if (includeCustomValue) {
+    loadedOptions.push({
+      titel: 'Freier Betrag',
+      betrag: 0,
+      beschreibung: 'Sie bestimmen den Wert',
+    });
+  }
+
+  customVouchers.forEach((voucher) => {
+    if (!voucher.titel?.trim()) return;
+    if (voucher.type === 'contact') {
+      const url = typeof voucher.contactUrl === 'string' ? voucher.contactUrl.trim() : '';
+      if (!url) return;
+      const amount = toAmount(voucher.betrag);
+      loadedOptions.push({
+        titel: voucher.titel.trim(),
+        betrag: amount,
+        abPreis: Boolean((voucher as any).abPreis),
+        inhalt: (voucher as any).inhalt?.trim() || undefined,
+        beschreibung: (voucher as any).beschreibung?.trim() || undefined,
+        type: 'contact',
+        contactUrl: url,
+        buttonLabel: (voucher as any).buttonLabel?.trim() || undefined,
+      });
+    } else {
+      const amount = toAmount(voucher.betrag);
+      if (amount <= 0) return;
+      loadedOptions.push({
+        titel: voucher.titel.trim(),
+        betrag: amount,
+        abPreis: Boolean((voucher as any).abPreis),
+        inhalt: (voucher as any).inhalt?.trim() || undefined,
+        beschreibung: (voucher as any).beschreibung?.trim() || undefined,
+        type: 'gutschein',
+      });
+    }
+  });
+
+  return loadedOptions;
+};
 
 const EmbedWidget: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -15,6 +110,7 @@ const EmbedWidget: React.FC = () => {
   const [options, setOptions] = useState<GutscheinOption[]>([]);
   const [error, setError] = useState('');
   const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
+  const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: number]: boolean }>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -39,41 +135,27 @@ const EmbedWidget: React.FC = () => {
       if (!slug) return;
 
       try {
+        setError('');
         const data = await loadCheckoutDataBySlug(slug);
         
         if (data) {
-          const loadedOptions: GutscheinOption[] = [];
-          
-          // Freier Betrag hinzufügen wenn aktiviert
-          if (data.customValue) {
-            loadedOptions.push({
-              titel: 'Freier Betrag',
-              betrag: 0,
-              beschreibung: 'Sie bestimmen den Wert'
-            });
+          if (!data.widgetConfig.enabled) {
+            setOptions([]);
+            setError('Das Widget ist für diesen Shop aktuell deaktiviert.');
+            return;
           }
 
-          if (data.dienstleistungen && data.dienstleistungen.length > 0) {
-            data.dienstleistungen.forEach((dl: any) => {
-              // Check if it has variants
-              if (dl.varianten && dl.varianten.length > 0) {
-                // Add each variant as a separate option
-                dl.varianten.forEach((variant: any) => {
-                  loadedOptions.push({
-                    titel: `${dl.shortDesc} - ${variant.name}`,
-                    betrag: parseInt(variant.preis),
-                    beschreibung: variant.beschreibung || dl.longDesc
-                  });
-                });
-              } else {
-                // Regular service without variants
-                loadedOptions.push({
-                  titel: dl.shortDesc,
-                  betrag: parseInt(dl.price),
-                  beschreibung: dl.longDesc !== dl.shortDesc ? dl.longDesc : undefined
-                });
-              }
-            });
+          const useCustomVouchers = data.widgetConfig.source === 'custom';
+          const includeCustomValue = useCustomVouchers ? data.widgetConfig.customValue : data.customValue;
+
+          const loadedOptions = useCustomVouchers
+            ? buildOptionsFromCustom(data.widgetConfig.customVouchers, includeCustomValue)
+            : buildOptionsFromCheckout(data, includeCustomValue);
+
+          if (loadedOptions.length === 0) {
+            setError('Keine Widget-Gutscheine verfügbar.');
+            setOptions([]);
+            return;
           }
 
           setOptions(loadedOptions);
@@ -129,7 +211,7 @@ const EmbedWidget: React.FC = () => {
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, [loading, options, backgroundColor, parentOrigin, canScrollLeft, canScrollRight]);
+  }, [loading, options, backgroundColor, parentOrigin, canScrollLeft, canScrollRight, expandedDescriptions]);
 
   const scrollCards = (direction: 'left' | 'right') => {
     const container = scrollContainerRef.current;
@@ -160,6 +242,11 @@ const EmbedWidget: React.FC = () => {
   };
 
   const handleWeiterZurZahlung = (option: GutscheinOption, index: number) => {
+    if (option.type === 'contact' && option.contactUrl) {
+      window.open(option.contactUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     let betrag = option.betrag;
     
     // Wenn Freier Betrag, nutze den eingegebenen Wert
@@ -179,6 +266,13 @@ const EmbedWidget: React.FC = () => {
     setCustomAmounts(prev => ({
       ...prev,
       [index]: value
+    }));
+  };
+
+  const toggleDescription = (index: number) => {
+    setExpandedDescriptions((prev) => ({
+      ...prev,
+      [index]: !prev[index],
     }));
   };
 
@@ -398,37 +492,88 @@ const EmbedWidget: React.FC = () => {
               {/* Titel - feste Höhe für 2 Zeilen */}
               <Typography 
                 variant="h6" 
+                title={option.titel}
                 sx={{ 
                   mb: 1,
                   fontWeight: 600,
                   color: '#2d3748',
                   fontSize: '1.15rem',
                   minHeight: '40px',
-                  display: 'flex',
-                  alignItems: 'center'
+                  lineHeight: 1.25,
+                  whiteSpace: 'normal',
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word'
                 }}
               >
                 {option.titel}
               </Typography>
 
-              {/* Beschreibung - feste Höhe */}
+              {/* Inhalt / Beschreibung */}
               <Typography 
                 variant="body2" 
+                title={option.inhalt || option.beschreibung || ''}
                 sx={{ 
-                  mb: 1.5,
+                  mb: (option.inhalt && option.beschreibung) ? 0.75 : 1.5,
                   color: '#718096',
                   fontSize: '0.85rem',
                   lineHeight: 1.4,
-                  minHeight: '24px'
+                  minHeight: '24px',
+                  whiteSpace: 'normal',
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word'
                 }}
               >
-                {option.beschreibung || '\u00A0'}
+                {option.inhalt || option.beschreibung || '\u00A0'}
               </Typography>
+
+              {option.inhalt && option.beschreibung && (
+                <Box sx={{ mb: 1.5 }}>
+                  <Box
+                    component="button"
+                    onClick={() => toggleDescription(index)}
+                    sx={{
+                      border: 'none',
+                      background: 'transparent',
+                      p: 0,
+                      color: primaryColor,
+                      fontWeight: 600,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      '&:hover': {
+                        textDecoration: 'underline',
+                      },
+                    }}
+                  >
+                    {expandedDescriptions[index] ? 'Weniger anzeigen' : 'Mehr erfahren'}
+                  </Box>
+                  {expandedDescriptions[index] && (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        mt: 0.75,
+                        color: '#5f6f86',
+                        fontSize: '0.84rem',
+                        lineHeight: 1.45,
+                        whiteSpace: 'normal',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {option.beschreibung}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              <Box sx={{ flex: 1, minHeight: 12 }} />
 
               <Divider sx={{ mb: 1.5, borderColor: '#e2e8f0' }} />
 
               {/* Preis - zentriert */}
-              {option.betrag === 0 ? (
+              {option.type === 'contact' && option.betrag <= 0 ? (
+                <Box sx={{ minHeight: '60px' }} />
+              ) : option.betrag === 0 ? (
                 <Box sx={{ 
                   mb: 1.5, 
                   display: 'flex', 
@@ -497,13 +642,13 @@ const EmbedWidget: React.FC = () => {
                       fontSize: '2rem'
                     }}
                   >
+                    {option.abPreis && (
+                      <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 500, color: '#718096', mr: 0.5 }}>ab</Box>
+                    )}
                     {option.betrag}€
                   </Typography>
                 </Box>
               )}
-
-              {/* Spacer */}
-              <Box sx={{ flex: 1 }} />
 
               <Box
                 component="button"
@@ -532,7 +677,9 @@ const EmbedWidget: React.FC = () => {
                   }
                 }}
               >
-                Zum Gutschein
+                {option.type === 'contact'
+                  ? (option.buttonLabel || 'Jetzt anfragen')
+                  : 'Zum Gutschein'}
               </Box>
             </CardContent>
           </Card>

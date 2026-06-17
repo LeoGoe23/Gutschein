@@ -22,6 +22,7 @@ import Datenschutz from './components/home/legal/Datenschutz';
 import Impressum from './components/home/legal/Impressum';
 import AdminPage from './pages/Admin';
 import AdminExtraOffer from './pages/AdminExtraOffer';
+import AdminShopManage from './pages/AdminShopManage';
 import Kontakt from './pages/Kontakt';
 import GutscheinDesignAdminEdit from './pages/GutscheinDesignAdminEdit';
 import CheckoutAdmin from './pages/checkoutadmin';
@@ -43,6 +44,7 @@ import GutscheinsystemMassageSalons from './pages/landingpages/GutscheinsystemMa
 import GutscheinsystemWellnessClubs from './pages/landingpages/GutscheinsystemWellnessClubs';
 import GutscheinsystemYogaStudios from './pages/landingpages/GutscheinsystemYogaStudios';
 import AppInfo from './pages/AppInfo';
+import Marketing from './pages/Marketing';
 
 // Google Analytics Tracking
 const GOOGLE_ANALYTICS_ID = 'G-YQ4CHJ8FVG';
@@ -126,6 +128,7 @@ function AppContent() {
       <Route path="/datenschutz" element={<Datenschutz />} />
       <Route path="/impressum" element={<Impressum />} />
       <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/shop/:shopId/manage" element={<AdminShopManage />} />
       <Route path="/admin/extra" element={<AdminExtraOffer />} />
       <Route path="/kontakt" element={<Kontakt />} />
       <Route path="/admin/shop/:shopId/design" element={<GutscheinDesignAdminEdit />} />
@@ -133,6 +136,7 @@ function AppContent() {
       <Route path="/admin/gutscheine" element={<AdminGutscheinVerwaltung />} />
       <Route path="/admin/gutschein-erstellen" element={<AdminCreateGutschein />} />
       <Route path="/admin/demos" element={<AdminDemosPage />} />
+      <Route path="/admin/marketing" element={<Marketing />} />
       <Route path="/demo/:slug" element={<DemoCheckoutPage />} />
 
       {/* Blog Routes */}

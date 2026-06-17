@@ -518,6 +518,19 @@ export default function AdminGutscheinVerwaltung() {
                             {gutschein.beschreibung}
                           </Typography>
                         )}
+                        {gutschein.varianten && gutschein.varianten.length > 0 && (
+                          <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {gutschein.varianten.map((v, vIdx) => (
+                              <Chip 
+                                key={vIdx}
+                                label={`${v.name}: ${v.preis} €`} 
+                                size="small"
+                                variant="outlined"
+                                sx={{ bgcolor: '#eff6ff', borderColor: '#bfdbfe', color: '#1e40af', fontWeight: 500 }}
+                              />
+                            ))}
+                          </Box>
+                        )}
                       </Box>
 
                       <Box sx={{ display: 'flex', gap: 1 }}>
@@ -655,28 +668,55 @@ export default function AdminGutscheinVerwaltung() {
                   <Box sx={{ mt: 2 }}>
                     {/* Bestehende Varianten */}
                     {editGutschein.varianten && editGutschein.varianten.length > 0 && (
-                      <Box sx={{ mb: 2 }}>
+                      <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         {editGutschein.varianten.map((variante, idx) => (
-                          <Paper key={idx} sx={{ p: 1.5, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="body2" fontWeight={600}>{variante.name}</Typography>
-                              <Typography variant="caption" color="text.secondary">{variante.preis}€</Typography>
-                              {variante.beschreibung && (
-                                <Typography variant="caption" sx={{ display: 'block' }} color="text.secondary">
-                                  {variante.beschreibung}
-                                </Typography>
-                              )}
+                          <Paper key={idx} variant="outlined" sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1, backgroundColor: 'white' }}>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              <TextField
+                                size="small"
+                                label="Varianten-Name"
+                                value={variante.name || ''}
+                                onChange={(e) => {
+                                  const selectV = [...editGutschein.varianten!];
+                                  selectV[idx] = { ...selectV[idx], name: e.target.value };
+                                  setEditGutschein({ ...editGutschein, varianten: selectV });
+                                }}
+                                fullWidth
+                              />
+                              <TextField
+                                size="small"
+                                label="Preis (€)"
+                                type="number"
+                                value={variante.preis || 0}
+                                onChange={(e) => {
+                                  const selectV = [...editGutschein.varianten!];
+                                  selectV[idx] = { ...selectV[idx], preis: parseFloat(e.target.value) || 0 };
+                                  setEditGutschein({ ...editGutschein, varianten: selectV });
+                                }}
+                                style={{ width: '120px' }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                color="error"
+                                onClick={() => {
+                                  const newVarianten = editGutschein.varianten!.filter((_, i) => i !== idx);
+                                  setEditGutschein({...editGutschein, varianten: newVarianten});
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
                             </Box>
-                            <IconButton 
-                              size="small" 
-                              color="error"
-                              onClick={() => {
-                                const newVarianten = editGutschein.varianten!.filter((_, i) => i !== idx);
-                                setEditGutschein({...editGutschein, varianten: newVarianten});
+                            <TextField
+                              size="small"
+                              label="Zusatz-Beschreibung (optional)"
+                              value={variante.beschreibung || ''}
+                              onChange={(e) => {
+                                const selectV = [...editGutschein.varianten!];
+                                selectV[idx] = { ...selectV[idx], beschreibung: e.target.value };
+                                setEditGutschein({ ...editGutschein, varianten: selectV });
                               }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                              fullWidth
+                            />
                           </Paper>
                         ))}
                       </Box>
