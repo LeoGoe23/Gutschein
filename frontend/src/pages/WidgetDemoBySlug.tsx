@@ -104,6 +104,7 @@ const WidgetDemoBySlug: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [editAction, setEditAction] = useState<EditAction>('remove');
   const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [selectedNodeInfo, setSelectedNodeInfo] = useState('');
   const [showSelectableElements, setShowSelectableElements] = useState(true);
   const [widgetCount, setWidgetCount] = useState(0);
   const [selectedWidgetIndex, setSelectedWidgetIndex] = useState<number | null>(null);
@@ -133,7 +134,7 @@ const WidgetDemoBySlug: React.FC = () => {
       .forEach((node) => addWrapper(node));
 
     container
-      .querySelectorAll<HTMLIFrameElement>('#gutschein-widget-iframe, iframe[data-widget-iframe="1"], iframe[src*="/embed/"]')
+      .querySelectorAll<HTMLIFrameElement>('#gutschein-widget-iframe, iframe[data-widget-iframe="1"], iframe[data-gutschein-widget="1"], iframe[src*="/embed/"], iframe[src*="embed/"]')
       .forEach((iframe) => {
         const closestMarked = iframe.closest<HTMLElement>('[data-widget-root="1"], #gutschein-widget-wrapper');
         if (closestMarked) {
@@ -174,9 +175,11 @@ const WidgetDemoBySlug: React.FC = () => {
       if (!isAllowedOrigin(event.origin)) return;
 
       const openInNewTab = (targetUrl: string) => {
+        // Do not fallback to same-tab navigation here: some browsers return null
+        // with noopener/noreferrer even when the new tab was opened successfully.
         const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
         if (!popup) {
-          window.location.href = targetUrl;
+          setStatusText('Neuer Tab wurde blockiert. Bitte Popups fuer diese Seite erlauben.');
         }
       };
 
@@ -308,12 +311,35 @@ const WidgetDemoBySlug: React.FC = () => {
     <div data-widget-root="1" style="width: 100%;">
       <iframe
         data-widget-iframe="1"
+        data-gutschein-widget="1"
         src="${embedSrc}"
         style="width: 100%; border: none; overflow: hidden; height: auto; background: white; display: block; min-height: 600px;"
         title="Gutschein Widget"
       ></iframe>
     </div>
   `;
+
+  const createWidgetWrapperNode = (): HTMLDivElement => {
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('data-widget-root', '1');
+    wrapper.style.width = '100%';
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('data-widget-iframe', '1');
+    iframe.setAttribute('data-gutschein-widget', '1');
+    iframe.setAttribute('src', embedSrc);
+    iframe.setAttribute('title', 'Gutschein Widget');
+    iframe.style.width = '100%';
+    iframe.style.border = 'none';
+    iframe.style.overflow = 'hidden';
+    iframe.style.height = 'auto';
+    iframe.style.background = 'white';
+    iframe.style.display = 'block';
+    iframe.style.minHeight = '600px';
+
+    wrapper.appendChild(iframe);
+    return wrapper;
+  };
 
   const buildFingerprint = (value: string) => {
     let checksum = 0;
@@ -645,6 +671,15 @@ const WidgetDemoBySlug: React.FC = () => {
         return widgetOverlay.closest<HTMLElement>('[data-widget-root="1"]');
       }
 
+      // Clicking the iframe itself should still select a parent container.
+      if (from.tagName.toLowerCase() === 'iframe') {
+        const iframeElement = from as HTMLIFrameElement;
+        const widgetWrapper = iframeElement.closest<HTMLElement>('[data-widget-root="1"], #gutschein-widget-wrapper');
+        if (widgetWrapper) return widgetWrapper;
+        const parentContainer = iframeElement.parentElement?.closest<HTMLElement>('section, div, main, article');
+        if (parentContainer) return parentContainer;
+      }
+
       const target = from.closest<HTMLElement>('section, div, header, nav, main, footer, article');
       if (!target) return null;
       if (target.closest('[data-layout-toolbar="true"]')) return null;
@@ -747,16 +782,27 @@ const WidgetDemoBySlug: React.FC = () => {
       const firstElementFromPath = path.find((node) => node instanceof HTMLElement) as HTMLElement | undefined;
       if (!firstElementFromPath) return;
       if (!root.contains(firstElementFromPath)) return;
-      if (firstElementFromPath.getAttribute('data-widget-iframe') === '1') return;
 
-      const candidate = resolveEditableTarget(firstElementFromPath);
+      let candidate = resolveEditableTarget(firstElementFromPath);
       if (!candidate || !root.contains(candidate)) return;
+
+      // Repeated click on same node climbs up to a bigger parent container.
+      const currentNodeId = candidate.dataset.layoutNodeId || '';
+      if (currentNodeId && currentNodeId === selectedNodeId) {
+        const parentCandidate = candidate.parentElement?.closest<HTMLElement>('[data-layout-node-id]');
+        if (parentCandidate && root.contains(parentCandidate)) {
+          candidate = parentCandidate;
+        }
+      }
 
       event.preventDefault();
       event.stopPropagation();
 
       const nodeId = candidate.dataset.layoutNodeId || '';
       setSelectedNodeId(nodeId);
+      const tagName = candidate.tagName.toLowerCase();
+      const className = (candidate.className || '').toString().trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+      setSelectedNodeInfo(className ? `${tagName}.${className}` : tagName);
       setStatusText('Element ausgewaehlt');
     };
 
@@ -785,7 +831,7 @@ const WidgetDemoBySlug: React.FC = () => {
     }
 
     const beforeHtml = root.innerHTML;
-    const widgetWrapper = findWidgetWrappers(root)[0] || null;
+    const existingWidgetWrapper = findWidgetWrappers(root)[0] || null;
 
     if (editAction === 'remove') {
       candidate.remove();
@@ -810,33 +856,70 @@ const WidgetDemoBySlug: React.FC = () => {
         return;
       }
     } else if (editAction === 'placeWidgetBefore') {
-      if (!widgetWrapper || !candidate.parentElement) {
-        setStatusText('Widget-Container nicht gefunden');
+      if (!candidate.parentElement) {
+        setStatusText('Ziel-Container ungueltig');
         return;
       }
+
+      const widgetWrapper = existingWidgetWrapper || createWidgetWrapperNode();
       if (widgetWrapper.contains(candidate)) {
         setStatusText('Ziel liegt im Widget-Container und ist ungueltig');
         return;
       }
       candidate.parentElement.insertBefore(widgetWrapper, candidate);
-      setStatusText('Widget vor der Auswahl platziert');
+      setStatusText(existingWidgetWrapper ? 'Widget vor der Auswahl platziert' : 'Neues Widget vor der Auswahl eingefuegt');
     } else if (editAction === 'placeWidgetInside') {
-      if (!widgetWrapper) {
-        setStatusText('Widget-Container nicht gefunden');
-        return;
-      }
+      const widgetWrapper = existingWidgetWrapper || createWidgetWrapperNode();
       if (widgetWrapper.contains(candidate)) {
         setStatusText('Ziel liegt im Widget-Container und ist ungueltig');
         return;
       }
       candidate.appendChild(widgetWrapper);
-      setStatusText('Widget in die Auswahl verschoben');
+      setStatusText(existingWidgetWrapper ? 'Widget in die Auswahl verschoben' : 'Neues Widget in die Auswahl eingefuegt');
     }
 
     setHistory((prev) => [...prev, beforeHtml]);
     const nextHtml = root.innerHTML;
     setWorkingHtml(nextHtml);
     setExportHtml(nextHtml);
+  };
+
+  const selectParentNode = () => {
+    const root = rootRef.current;
+    if (!root || !selectedNodeId) return;
+
+    const current = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
+    const parent = current?.parentElement?.closest<HTMLElement>('[data-layout-node-id]');
+    if (!parent || !root.contains(parent)) {
+      setStatusText('Kein uebergeordneter Container gefunden');
+      return;
+    }
+
+    const nodeId = parent.dataset.layoutNodeId || '';
+    setSelectedNodeId(nodeId);
+    const tagName = parent.tagName.toLowerCase();
+    const className = (parent.className || '').toString().trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+    setSelectedNodeInfo(className ? `${tagName}.${className}` : tagName);
+    setStatusText('Auswahl auf uebergeordneten Container gesetzt');
+  };
+
+  const selectChildNode = () => {
+    const root = rootRef.current;
+    if (!root || !selectedNodeId) return;
+
+    const current = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
+    const child = current?.querySelector<HTMLElement>('[data-layout-node-id]');
+    if (!child || child === current || !root.contains(child)) {
+      setStatusText('Kein untergeordneter Container gefunden');
+      return;
+    }
+
+    const nodeId = child.dataset.layoutNodeId || '';
+    setSelectedNodeId(nodeId);
+    const tagName = child.tagName.toLowerCase();
+    const className = (child.className || '').toString().trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+    setSelectedNodeInfo(className ? `${tagName}.${className}` : tagName);
+    setStatusText('Auswahl auf Unter-Container gesetzt');
   };
 
   const selectNextWidget = () => {
@@ -941,6 +1024,7 @@ const WidgetDemoBySlug: React.FC = () => {
     setWorkingHtml(previous);
     setExportHtml(previous);
     setSelectedNodeId('');
+    setSelectedNodeInfo('');
     setStatusText('Letzte Aenderung rueckgaengig gemacht');
   };
 
@@ -949,6 +1033,7 @@ const WidgetDemoBySlug: React.FC = () => {
     setHistory([]);
     setExportHtml(originalHTML);
     setSelectedNodeId('');
+    setSelectedNodeInfo('');
     setStatusText('Layout zurueckgesetzt');
     localStorage.removeItem(layoutStorageKey);
   };
@@ -1051,6 +1136,11 @@ const WidgetDemoBySlug: React.FC = () => {
               <div style={{ fontSize: 12, opacity: 0.95, marginBottom: 8 }}>
                 Auswahl: {selectedNodeId || 'keine'}
               </div>
+              {selectedNodeInfo && (
+                <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 8 }}>
+                  Ziel: {selectedNodeInfo}
+                </div>
+              )}
               <div style={{ fontSize: 12, opacity: 0.95, marginBottom: 8 }}>
                 Widgets: {widgetCount} {selectedWidgetIndex !== null ? `(aktiv: ${selectedWidgetIndex + 1})` : ''}
               </div>
@@ -1081,6 +1171,8 @@ const WidgetDemoBySlug: React.FC = () => {
                 <button style={{ background: '#b91c1c', color: '#fff', border: '1px solid #7f1d1d', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={removeSelectedWidget}>Widget entfernen</button>
                 <button style={{ background: '#7f1d1d', color: '#fff', border: '1px solid #63171b', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={removeBottomMostWidget}>Unterstes Widget entfernen</button>
                 <button style={{ background: '#991b1b', color: '#fff', border: '1px solid #7f1d1d', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={removeDuplicateWidgetsKeepFirst}>Duplikate entfernen</button>
+                <button style={{ background: '#334155', color: '#fff', border: '1px solid #475569', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={selectParentNode}>Auswahl nach oben</button>
+                <button style={{ background: '#334155', color: '#fff', border: '1px solid #475569', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={selectChildNode}>Auswahl nach unten</button>
               </div>
               <div style={{ fontSize: 12, opacity: 0.9 }}>
                 Aktiv: {editAction}

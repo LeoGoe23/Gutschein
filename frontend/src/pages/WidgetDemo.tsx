@@ -30,9 +30,10 @@ export default function WidgetDemo() {
       if (!isAllowedOrigin(event.origin)) return;
 
       const openInNewTab = (targetUrl: string) => {
+        // Keep current page unchanged; browsers may return null with noopener.
         const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
         if (!popup) {
-          window.location.href = targetUrl;
+          console.warn('Popup blockiert. Bitte Popups fuer diese Seite erlauben.');
         }
       };
 
