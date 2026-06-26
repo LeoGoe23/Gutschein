@@ -300,6 +300,7 @@ export default function DemoCheckoutPage() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
+  const [isPresetSelection, setIsPresetSelection] = useState(false);
   
   // Neue States für echten Versand
   const [customerEmail, setCustomerEmail] = useState('');
@@ -379,17 +380,24 @@ export default function DemoCheckoutPage() {
     const params = new URLSearchParams(location.search);
     const betragParam = params.get('betrag');
     const titelParam = params.get('titel');
+    const sourceParam = params.get('source') || '';
+    const fromWidgetPreset = sourceParam.startsWith('widget-demo');
     const shouldOpenPayment = params.get('openPayment') === '1';
 
     if (titelParam) {
-      const matchedDienstleistung = demoData.dienstleistungen.find((dl) =>
-        dl.shortDesc.toLowerCase() === titelParam.toLowerCase()
-      );
+      const normalizedTitel = titelParam.trim().toLowerCase();
+      const matchedDienstleistung = demoData.dienstleistungen.find((dl) => {
+        const shortDesc = (dl.shortDesc || '').trim().toLowerCase();
+        return shortDesc === normalizedTitel
+          || shortDesc.includes(normalizedTitel)
+          || normalizedTitel.includes(shortDesc);
+      });
 
       if (matchedDienstleistung) {
         setGutscheinType('dienstleistung');
         setSelectedDienstleistung(matchedDienstleistung);
         setBetrag(Number(matchedDienstleistung.price));
+        setIsPresetSelection(fromWidgetPreset);
         setShowPaymentForm(shouldOpenPayment);
         return;
       }
@@ -401,9 +409,13 @@ export default function DemoCheckoutPage() {
         setGutscheinType('wert');
         setBetrag(parsedBetrag);
         setSelectedDienstleistung(null);
+        setIsPresetSelection(fromWidgetPreset);
         setShowPaymentForm(shouldOpenPayment);
+        return;
       }
     }
+
+    setIsPresetSelection(false);
   }, [demoData, location.search]);
 
   // Voreinstellung: Ersten verfuegbaren Rabattcode automatisch anzeigen
@@ -473,6 +485,7 @@ export default function DemoCheckoutPage() {
   };
 
   const handleToggleChange = (event: React.MouseEvent<HTMLElement>, newType: 'wert' | 'dienstleistung') => {
+    if (isPresetSelection) return;
     if (newType) {
       setGutscheinType(newType);
       setBetrag(null);
@@ -684,7 +697,7 @@ export default function DemoCheckoutPage() {
 
       console.log('📧 Sende Demo-Email...');
       
-      const response = await fetch(`${API_URL}/api/gutscheine/demo/send-gutschein`, {
+      const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData),
@@ -781,7 +794,7 @@ export default function DemoCheckoutPage() {
               {/* Rabattcode-Einlösung nur im Zahlungsformular */}
 
               {/* Toggle für beide Optionen - identisch zu checkoutc */}
-              {hasBoth && (
+              {hasBoth && !isPresetSelection && (
                 <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
                   <ToggleButtonGroup
                     value={gutscheinType}
@@ -804,7 +817,7 @@ export default function DemoCheckoutPage() {
                 </Box>
               )}
 
-              {!showPaymentForm && (
+              {!showPaymentForm && !isPresetSelection && (
                 <Box sx={{ minHeight: '200px', mb: 4 }}>
                   {/* Wertgutschein - identisch zu checkoutc */}
                   {gutscheinType === 'wert' && hasWertGutschein && (
@@ -946,20 +959,67 @@ export default function DemoCheckoutPage() {
                 </Box>
               )}
 
+              {!showPaymentForm && isPresetSelection && (
+                <Box sx={{ minHeight: '120px', mb: 4 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 700, mb: 1.25 }}>
+                    Der ausgewählte Gutschein
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: 'text.secondary', mb: 2 }}>
+                    {selectedDienstleistung
+                      ? `${selectedDienstleistung.shortDesc} - ${Number(selectedDienstleistung.price).toFixed(2)}€`
+                      : `Wertgutschein über ${(betrag || 0).toFixed(2)}€`}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    sx={{
+                      borderRadius: 2,
+                      px: 4,
+                      py: 1.5,
+                      fontWeight: 600,
+                      boxShadow: 2,
+                      textTransform: 'none',
+                      backgroundColor: '#1976d2',
+                      '&:hover': { backgroundColor: '#1565c0' },
+                    }}
+                    onClick={handleWeiterZurBestellung}
+                    disabled={!finalBetrag || finalBetrag <= 0}
+                  >
+                    Jetzt zahlen
+                  </Button>
+                </Box>
+              )}
+
               {/* Payment Form */}
               {showPaymentForm && (
-                <DemoPaymentForm
-                  finalBetrag={finalBetrag}
-                  selectedDienstleistung={selectedDienstleistung}
-                  onPaymentComplete={handlePaymentComplete}
-                  rabattCodeInput={rabattCodeInput}
-                  setRabattCodeInput={setRabattCodeInput}
-                  aktiveRabattcodes={aktiveRabattcodes}
-                  applyRabattCode={applyRabattCode}
-                  removeRabattCode={removeRabattCode}
-                  appliedRabatt={appliedRabatt}
-                  rabattMessage={rabattMessage}
-                />
+                <>
+                  {isPresetSelection && (
+                    <Box sx={{ mb: 2.5, p: 1.75, borderRadius: 2, backgroundColor: '#f8fafc', border: '1px solid #dbe7f8' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.4, color: '#0f172a' }}>
+                        Der ausgewählte Gutschein
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#475569' }}>
+                        {selectedDienstleistung
+                          ? `${selectedDienstleistung.shortDesc} - ${Number(selectedDienstleistung.price).toFixed(2)}€`
+                          : `Wertgutschein über ${(betrag || 0).toFixed(2)}€`}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <DemoPaymentForm
+                    finalBetrag={finalBetrag}
+                    selectedDienstleistung={selectedDienstleistung}
+                    onPaymentComplete={handlePaymentComplete}
+                    rabattCodeInput={rabattCodeInput}
+                    setRabattCodeInput={setRabattCodeInput}
+                    aktiveRabattcodes={aktiveRabattcodes}
+                    applyRabattCode={applyRabattCode}
+                    removeRabattCode={removeRabattCode}
+                    appliedRabatt={appliedRabatt}
+                    rabattMessage={rabattMessage}
+                  />
+                </>
               )}
             </>
           ) : (

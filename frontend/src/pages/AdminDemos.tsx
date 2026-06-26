@@ -1,8 +1,8 @@
 import { Box, Typography, Paper, Button, TextField, Switch, FormControlLabel, List, ListItem, ListItemText, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Alert, LinearProgress, MenuItem } from '@mui/material';
-import { Add, Edit, Delete, CloudUpload, Image } from '@mui/icons-material';
+import { Add, Edit, Delete, CloudUpload, Image, ContentCopy, OpenInNew } from '@mui/icons-material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../auth/useAuth';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
@@ -13,6 +13,7 @@ interface DemoData {
   id?: string;
   name: string;
   bildURL: string;
+  demoHtml?: string;
   customValue: boolean;
   rabattcodes: RabattCode[];
   dienstleistungen: Array<{
@@ -85,14 +86,20 @@ export default function AdminDemosPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [imagePasteInfo, setImagePasteInfo] = useState<string>('');
+  const [isPasteArmed, setIsPasteArmed] = useState(false);
+  const pasteInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [copySourceSlug, setCopySourceSlug] = useState('');
   const [isImportingCheckout, setIsImportingCheckout] = useState(false);
   const [importInfo, setImportInfo] = useState<string>('');
+  const [prospectSlugInput, setProspectSlugInput] = useState('');
+  const [prospectCopyInfo, setProspectCopyInfo] = useState('');
   
   // Formular States
   const [formData, setFormData] = useState<DemoData>({
     name: '',
     bildURL: '',
+    demoHtml: '',
     customValue: false,
     rabattcodes: [],
     dienstleistungen: [],
@@ -149,6 +156,7 @@ export default function AdminDemosPage() {
           id: doc.id,
           name: rawData.name || '',
           bildURL: rawData.bildURL || '',
+          demoHtml: rawData.demoHtml || '',
           customValue: Boolean(rawData.customValue),
           rabattcodes: Array.isArray(rawData.rabattcodes) ? rawData.rabattcodes : [],
           dienstleistungen: Array.isArray(rawData.dienstleistungen) ? rawData.dienstleistungen : [],
@@ -213,6 +221,11 @@ export default function AdminDemosPage() {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
   };
+
+  const normalizedProspectSlug = generateSlug(prospectSlugInput.trim());
+  const prospectDemoUrl = normalizedProspectSlug
+    ? `${window.location.origin}/widgetdemo/${encodeURIComponent(normalizedProspectSlug)}`
+    : '';
 
   const ensureUniqueDemoSlug = (baseSlug: string) => {
     let slug = generateSlug(baseSlug);
@@ -320,6 +333,18 @@ export default function AdminDemosPage() {
     }
   };
 
+  const copyProspectDemoLink = async () => {
+    if (!prospectDemoUrl) return;
+    try {
+      await navigator.clipboard.writeText(prospectDemoUrl);
+      setProspectCopyInfo('Demo-Link kopiert.');
+      window.setTimeout(() => setProspectCopyInfo(''), 2400);
+    } catch (error) {
+      console.error('Kopieren fehlgeschlagen:', error);
+      alert('Kopieren fehlgeschlagen. Bitte Link manuell kopieren.');
+    }
+  };
+
   // Auto-Slug generieren wenn Name sich ändert
   const handleNameChange = (name: string) => {
     setFormData(prev => ({
@@ -334,6 +359,7 @@ export default function AdminDemosPage() {
     setFormData({
       name: '',
       bildURL: '',
+      demoHtml: '',
       customValue: false,
       rabattcodes: [],
       dienstleistungen: [],
@@ -363,7 +389,10 @@ export default function AdminDemosPage() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    applyImageFromFile(file, 'upload');
+  };
 
+  const applyImageFromFile = (file: File, source: 'upload' | 'paste') => {
     // Validierung
     if (!file.type.startsWith('image/')) {
       alert('Bitte wählen Sie eine Bilddatei aus.');
@@ -376,14 +405,63 @@ export default function AdminDemosPage() {
     }
 
     setSelectedFile(file);
-    
+
     // Preview erstellen
     const reader = new FileReader();
     reader.onload = (e) => {
       setPreviewUrl(e.target?.result as string);
     };
     reader.readAsDataURL(file);
+
+    if (source === 'paste') {
+      setImagePasteInfo('Bild aus Zwischenablage eingefügt.');
+      setIsPasteArmed(false);
+      window.setTimeout(() => setImagePasteInfo(''), 2600);
+    } else {
+      setImagePasteInfo('');
+      setIsPasteArmed(false);
+    }
   };
+
+  const activatePasteMode = () => {
+    setIsPasteArmed(true);
+    setImagePasteInfo('Paste-Modus aktiv: Jetzt Strg+V drücken.');
+    window.setTimeout(() => {
+      pasteInputRef.current?.focus();
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (!openDialog) return;
+
+    const handlePaste = (event: ClipboardEvent) => {
+      if (!isPasteArmed) return;
+
+      const items = event.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      const imageItem = Array.from(items).find((item) => item.type.startsWith('image/'));
+      if (!imageItem) return;
+
+      const file = imageItem.getAsFile();
+      if (!file) return;
+
+      event.preventDefault();
+      applyImageFromFile(file, 'paste');
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [openDialog, isPasteArmed]);
+
+  useEffect(() => {
+    if (!openDialog) {
+      setIsPasteArmed(false);
+      setImagePasteInfo('');
+    }
+  }, [openDialog]);
 
   // Bild zu Firebase Storage hochladen
   const uploadImage = async (file: File): Promise<{ url: string; fileName: string }> => {
@@ -613,6 +691,67 @@ export default function AdminDemosPage() {
             </Button>
           </Box>
 
+          <Paper elevation={2} sx={{ borderRadius: 3, p: { xs: 2, md: 3 }, mb: 3, border: '1px solid #e2e8f0' }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
+              Neukunden-DemoSystem
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Erzeugt sofort einen Demo-Link fuer Kunden, die noch keinen Account haben.
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField
+                label="Kundenname oder Wunsch-Slug"
+                placeholder="z.B. Wellness Oase Hamburg"
+                value={prospectSlugInput}
+                onChange={(e) => {
+                  setProspectSlugInput(e.target.value);
+                  if (prospectCopyInfo) setProspectCopyInfo('');
+                }}
+                size="small"
+                sx={{ flex: '1 1 280px' }}
+              />
+
+              <TextField
+                label="Demo-Link"
+                value={prospectDemoUrl}
+                size="small"
+                InputProps={{ readOnly: true }}
+                sx={{ flex: '2 1 420px' }}
+              />
+
+              <Button
+                variant="outlined"
+                startIcon={<OpenInNew />}
+                disabled={!prospectDemoUrl}
+                onClick={() => window.open(prospectDemoUrl, '_blank', 'noopener,noreferrer')}
+              >
+                Oeffnen
+              </Button>
+
+              <Button
+                variant="contained"
+                startIcon={<ContentCopy />}
+                disabled={!prospectDemoUrl}
+                onClick={copyProspectDemoLink}
+              >
+                Link kopieren
+              </Button>
+            </Box>
+
+            {normalizedProspectSlug && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.25 }}>
+                Verwendeter Slug: {normalizedProspectSlug}
+              </Typography>
+            )}
+
+            {prospectCopyInfo && (
+              <Alert severity="success" sx={{ mt: 1.5 }}>
+                {prospectCopyInfo}
+              </Alert>
+            )}
+          </Paper>
+
           {demos.length === 0 ? (
             <Paper elevation={2} sx={{ borderRadius: 3, p: 4, textAlign: 'center' }}>
               <Typography variant="h6" color="text.secondary">
@@ -677,10 +816,18 @@ export default function AdminDemosPage() {
                       <Button
                         variant="outlined"
                         size="small"
-                        onClick={() => window.open(`/demo/${demo.slug}`, '_blank')}
+                        onClick={() => window.open(`/widgetdemo/${demo.slug}`, '_blank')}
                         sx={{ borderRadius: 2 }}
                       >
-                        Ansehen
+                        Kunden-Seite
+                      </Button>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => window.open(`/widgetdemo/${demo.slug}?layoutEdit=1`, '_blank')}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Layout-Modus
                       </Button>
                       <IconButton onClick={() => openEditDialog(demo)} color="primary">
                         <Edit />
@@ -771,6 +918,17 @@ export default function AdminDemosPage() {
               }}
             />
 
+            <TextField
+              label="HTML-Code der grossen Seite (optional)"
+              value={formData.demoHtml || ''}
+              onChange={(e) => setFormData({ ...formData, demoHtml: e.target.value })}
+              multiline
+              minRows={8}
+              maxRows={18}
+              placeholder={'Fuegen Sie hier Ihre komplette HTML-Seite ein.\nNutzen Sie {{WIDGET_IFRAME}} als Platzhalter fuer das Widget.'}
+              helperText="Wenn kein Platzhalter gesetzt ist, wird das Widget automatisch unter dem HTML eingefuegt."
+            />
+
             {/* Bild-Upload Sektion */}
             <Box>
               <Typography variant="h6" gutterBottom>Hintergrundbild</Typography>
@@ -809,6 +967,65 @@ export default function AdminDemosPage() {
                   onChange={handleFileSelect}
                 />
               </Button>
+
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                Tipp: Auf die Box klicken und dann Strg+V druecken.
+              </Typography>
+
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={activatePasteMode}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    activatePasteMode();
+                  }
+                }}
+                sx={{
+                  mt: 1,
+                  mb: 1,
+                  p: 2,
+                  borderRadius: 2,
+                  border: isPasteArmed ? '2px solid #1976d2' : '2px dashed #90caf9',
+                  backgroundColor: isPasteArmed ? '#e3f2fd' : '#f8fbff',
+                  color: '#0d47a1',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    backgroundColor: '#eef6ff',
+                  },
+                  '&:focus-visible': {
+                    outline: '3px solid #1976d2',
+                    outlineOffset: 2,
+                  },
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {isPasteArmed ? 'Bereit: Jetzt Strg+V einfuegen' : 'Hier klicken und Strg+V fuer Bild'}
+                </Typography>
+              </Box>
+
+              <textarea
+                ref={pasteInputRef}
+                aria-hidden="true"
+                tabIndex={-1}
+                value=""
+                onChange={() => {}}
+                style={{
+                  position: 'absolute',
+                  width: 1,
+                  height: 1,
+                  opacity: 0,
+                  pointerEvents: 'none'
+                }}
+              />
+
+              {imagePasteInfo && (
+                <Alert severity="success" sx={{ mt: 1, mb: 1 }}>
+                  {imagePasteInfo}
+                </Alert>
+              )}
 
               {/* Upload Progress */}
               {uploading && (
@@ -993,7 +1210,14 @@ export default function AdminDemosPage() {
 
             {formData.slug && (
               <Alert severity="info">
-                Demo wird verfügbar unter: <strong>/demo/{formData.slug}</strong>
+                <Box>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    Kunden-Seite: <strong>/widgetdemo/{formData.slug}</strong>
+                  </Typography>
+                  <Typography variant="body2">
+                    Verkaufsseite: <strong>/demo/{formData.slug}</strong>
+                  </Typography>
+                </Box>
               </Alert>
             )}
           </Box>

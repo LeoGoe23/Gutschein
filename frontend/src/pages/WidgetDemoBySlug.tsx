@@ -1,12 +1,154 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { Helmet } from 'react-helmet';
+
+interface DemoTemplateData {
+  slug: string;
+  name?: string;
+  demoHtml?: string;
+  bildURL?: string;
+}
+
+type EditAction =
+  | 'remove'
+  | 'swapUp'
+  | 'swapDown'
+  | 'placeWidgetBefore'
+  | 'placeWidgetInside';
+
+interface StoredLayoutPayload {
+  baseFingerprint: string;
+  workingHtml: string;
+}
+
+const stripLayoutEditorArtifacts = (html: string): string => {
+  try {
+    // Keep original HTML structure untouched (including style/link tags),
+    // and only remove editor-specific markers and inline style fragments.
+    let cleaned = html;
+
+    cleaned = cleaned.replace(/\sdata-layout-editable=("[^"]*"|'[^']*')/gi, '');
+    cleaned = cleaned.replace(/\sdata-layout-node-id=("[^"]*"|'[^']*')/gi, '');
+    cleaned = cleaned.replace(/\sdata-layout-ignore=("[^"]*"|'[^']*')/gi, '');
+
+    // Remove temporary widget overlay helper nodes injected by layout editor.
+    cleaned = cleaned.replace(/<div[^>]*data-widget-overlay=("[^"]*"|'[^']*')[^>]*><\/div>/gi, '');
+
+    cleaned = cleaned.replace(/style=("[^"]*"|'[^']*')/gi, (fullMatch, styleValueWithQuotes) => {
+      const quote = styleValueWithQuotes[0];
+      const styleBody = styleValueWithQuotes.slice(1, -1);
+
+      const parts = styleBody
+        .split(';')
+        .map((part: string) => part.trim())
+        .filter(Boolean)
+        .filter((part: string) => {
+          const normalized = part.toLowerCase();
+          return !normalized.startsWith('outline:')
+            && !normalized.startsWith('outline-offset:')
+            && !normalized.startsWith('cursor:');
+        });
+
+      if (parts.length === 0) return '';
+      return `style=${quote}${parts.join('; ')}${quote}`;
+    });
+
+    return cleaned;
+  } catch (error) {
+    console.warn('Konnte Layout-Artefakte nicht bereinigen:', error);
+    return html;
+  }
+};
+
+const normalizeRelativeAssetUrls = (html: string): string => {
+  // Make relative src/href paths root-absolute so routes like /widgetdemo/:slug
+  // do not rewrite assets to /widgetdemo/media/... in dev/prod.
+  let normalized = html.replace(
+    /(\b(?:src|href)\s*=\s*["'])(?!https?:\/\/|\/\/|\/|#|data:|mailto:|tel:)([^"']+)(["'])/gi,
+    (_match, prefix, path, suffix) => `${prefix}/${path}${suffix}`
+  );
+
+  // In local CRA dev, /media/* requests go through the proxy (:8080). If backend is
+  // not running, use production origin as a fallback so partner/footer logos still load.
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    normalized = normalized.replace(
+      /(\b(?:src|href)\s*=\s*["'])\/media\//gi,
+      '$1https://gutscheinery.de/media/'
+    );
+    normalized = normalized.replace(
+      /url\((['"]?)\/media\//gi,
+      'url($1https://gutscheinery.de/media/'
+    );
+  }
+
+  return normalized;
+};
+
+const containsWidgetMarkup = (html: string): boolean => {
+  return /<iframe[^>]+(data-widget-iframe\s*=|id\s*=\s*["']gutschein-widget-iframe["']|src\s*=\s*["'][^"']*\/embed\/[^"']*["'])/i.test(html)
+    || /data-widget-root\s*=\s*["']1["']/i.test(html)
+    || /id\s*=\s*["']gutschein-widget-wrapper["']/i.test(html);
+};
 
 const WidgetDemoBySlug: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [loading, setLoading] = useState(true);
+  const [resolvedSlug, setResolvedSlug] = useState<string>('');
+  const [shopFound, setShopFound] = useState(true);
+  const [demoTemplate, setDemoTemplate] = useState<DemoTemplateData | null>(null);
+  const [demoDocId, setDemoDocId] = useState('');
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [workingHtml, setWorkingHtml] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+  const [editAction, setEditAction] = useState<EditAction>('remove');
+  const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [showSelectableElements, setShowSelectableElements] = useState(true);
+  const [widgetCount, setWidgetCount] = useState(0);
+  const [selectedWidgetIndex, setSelectedWidgetIndex] = useState<number | null>(null);
+  const [statusText, setStatusText] = useState('');
+  const [exportHtml, setExportHtml] = useState('');
+  const [copyState, setCopyState] = useState('');
+  const [isSavingHtml, setIsSavingHtml] = useState(false);
+  const hasDemoTemplate = Boolean(demoTemplate?.slug);
+  const displaySlug = resolvedSlug || (slug ? slug.toUpperCase() : 'NEUKUNDE');
+  const isRealShop = shopFound && Boolean(resolvedSlug) && !hasDemoTemplate;
+  const isProspectDemo = !isRealShop;
+  const isLayoutEditMode = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('layoutEdit') === '1';
+  }, []);
+
+  const findWidgetWrappers = (container: ParentNode): HTMLElement[] => {
+    const wrappers = new Set<HTMLElement>();
+
+    const addWrapper = (node: HTMLElement | null) => {
+      if (!node) return;
+      wrappers.add(node);
+    };
+
+    container
+      .querySelectorAll<HTMLElement>('[data-widget-root="1"], #gutschein-widget-wrapper')
+      .forEach((node) => addWrapper(node));
+
+    container
+      .querySelectorAll<HTMLIFrameElement>('#gutschein-widget-iframe, iframe[data-widget-iframe="1"], iframe[src*="/embed/"]')
+      .forEach((iframe) => {
+        const closestMarked = iframe.closest<HTMLElement>('[data-widget-root="1"], #gutschein-widget-wrapper');
+        if (closestMarked) {
+          addWrapper(closestMarked);
+          return;
+        }
+
+        const parent = iframe.parentElement;
+        if (parent) {
+          addWrapper(parent);
+        }
+      });
+
+    return Array.from(wrappers);
+  };
 
   useEffect(() => {
     const currentOrigin = new URL(window.location.origin);
@@ -30,11 +172,22 @@ const WidgetDemoBySlug: React.FC = () => {
     // Handle iframe resize messages
     const handleMessage = (event: MessageEvent) => {
       if (!isAllowedOrigin(event.origin)) return;
-      if (event.data.type === 'gutschein-widget-resize') {
-        const iframe = document.getElementById('gutschein-widget-iframe') as HTMLIFrameElement;
-        if (iframe && event.data.height) {
-          iframe.style.height = `${event.data.height}px`;
+
+      const openInNewTab = (targetUrl: string) => {
+        const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        if (!popup) {
+          window.location.href = targetUrl;
         }
+      };
+
+      if (event.data.type === 'gutschein-widget-resize') {
+        const iframes = Array.from(
+          document.querySelectorAll<HTMLIFrameElement>('#gutschein-widget-iframe, iframe[data-widget-iframe="1"], iframe[src*="/embed/"]')
+        );
+        if (!event.data.height) return;
+        iframes.forEach((iframe) => {
+          iframe.style.height = `${event.data.height}px`;
+        });
       }
 
       if (event.data.type === 'gutscheinSelected') {
@@ -42,7 +195,7 @@ const WidgetDemoBySlug: React.FC = () => {
         if (!Number.isFinite(betrag) || betrag <= 0) return;
         const targetSlug = typeof event.data.slug === 'string' && event.data.slug.trim()
           ? event.data.slug.trim()
-          : (slug || 'JANKIP');
+          : (resolvedSlug || demoTemplate?.slug || slug || 'DEMO');
 
         const params = new URLSearchParams({
           betrag: String(betrag),
@@ -54,7 +207,18 @@ const WidgetDemoBySlug: React.FC = () => {
           params.set('titel', event.data.titel.trim());
         }
 
-        window.location.href = `/demo/${encodeURIComponent(targetSlug)}?${params.toString()}`;
+        if (demoTemplate?.slug) {
+          openInNewTab(`/demo/${encodeURIComponent(demoTemplate.slug)}?${params.toString()}`);
+          return;
+        }
+
+        if (isProspectDemo) {
+          params.set('slug', targetSlug);
+          openInNewTab(`/checkoutdemo?${params.toString()}`);
+          return;
+        }
+
+        openInNewTab(`/demo/${encodeURIComponent(targetSlug)}?${params.toString()}`);
       }
     };
 
@@ -63,23 +227,60 @@ const WidgetDemoBySlug: React.FC = () => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
+  }, [slug, resolvedSlug, demoTemplate, isProspectDemo]);
 
   useEffect(() => {
     const loadShopData = async () => {
-      if (!slug) return;
+      if (!slug) {
+        setShopFound(false);
+        setLoading(false);
+        return;
+      }
 
       try {
-        // Try uppercase slug first (JANKIP)
+        const normalizedSlug = slug.toLowerCase();
+
+        // Prioritaet 1: gespeichertes Demo-Template mit eigener HTML-Kundenseite
+        const demosRef = collection(db, 'demos');
+        const qDemo = query(demosRef, where('slug', '==', normalizedSlug));
+        const demoSnap = await getDocs(qDemo);
+        if (!demoSnap.empty) {
+          const demoDoc = demoSnap.docs[0];
+          const rawDemo = demoDoc.data() as DemoTemplateData;
+          setDemoDocId(demoDoc.id);
+          setDemoTemplate({
+            slug: (rawDemo.slug || slug).toLowerCase(),
+            name: rawDemo.name,
+            demoHtml: rawDemo.demoHtml,
+            bildURL: rawDemo.bildURL,
+          });
+        } else {
+          setDemoDocId('');
+          setDemoTemplate(null);
+        }
+
+        // Try uppercase slug first
         let shopDoc = await getDoc(doc(db, 'users', slug.toUpperCase()));
         if (shopDoc.exists()) {
-          // Shop data loaded
+          setResolvedSlug(shopDoc.id);
+          setShopFound(true);
         } else {
           // Try lowercase slug
-          shopDoc = await getDoc(doc(db, 'users', slug.toLowerCase()));
+          shopDoc = await getDoc(doc(db, 'users', normalizedSlug));
+          if (shopDoc.exists()) {
+            setResolvedSlug(shopDoc.id);
+            setShopFound(true);
+          } else {
+            setShopFound(false);
+            setResolvedSlug('');
+          }
         }
       } catch (error) {
         console.error('Error loading shop data:', error);
+        setShopFound(false);
+        setResolvedSlug('');
+        setDemoDocId('');
+        setDemoTemplate(null);
       } finally {
         setLoading(false);
       }
@@ -90,26 +291,40 @@ const WidgetDemoBySlug: React.FC = () => {
 
   // No need for widget script - iframe handles everything
 
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p>Laden...</p>
-      </div>
-    );
-  }
+  const embedSourceSlug = isRealShop
+    ? resolvedSlug
+    : (demoTemplate?.slug || slug || 'DEMO');
 
-  // Only show for JANKIP demo
-  if (slug?.toUpperCase() !== 'JANKIP') {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <h1>Demo nicht gefunden</h1>
-        <p>Diese Demo-Seite existiert nur für JANKIP.</p>
-      </div>
-    );
-  }
+  const layoutStorageKey = useMemo(
+    () => `demo-layout-edit:${embedSourceSlug.toLowerCase()}:html`,
+    [embedSourceSlug]
+  );
+
+  const embedSrc = isProspectDemo
+    ? `/embed/${encodeURIComponent(embedSourceSlug)}?demoMode=1&demoLabel=${encodeURIComponent(displaySlug)}`
+    : `/embed/${encodeURIComponent(resolvedSlug)}`;
+
+  const widgetIframeMarkup = `
+    <div data-widget-root="1" style="width: 100%;">
+      <iframe
+        data-widget-iframe="1"
+        src="${embedSrc}"
+        style="width: 100%; border: none; overflow: hidden; height: auto; background: white; display: block; min-height: 600px;"
+        title="Gutschein Widget"
+      ></iframe>
+    </div>
+  `;
+
+  const buildFingerprint = (value: string) => {
+    let checksum = 0;
+    for (let i = 0; i < value.length; i += 1) {
+      checksum = (checksum + value.charCodeAt(i) * (i + 1)) % 1000000007;
+    }
+    return `${value.length}:${checksum}`;
+  };
 
   // Original HTML structure with widget integration
-  const originalHTML = `
+  const defaultHTML = `
     <style>
     /* Scrollbar styling */
     ::-webkit-scrollbar {
@@ -243,14 +458,7 @@ const WidgetDemoBySlug: React.FC = () => {
             </h2>
             
             <!-- WIDGET INTEGRATION -->
-            <div style="width: 100%;">
-                <iframe
-                    id="gutschein-widget-iframe"
-                    src="/embed/JANKIP"
-                    style="width: 100%; border: none; overflow: hidden; height: auto; background: white; display: block; min-height: 600px;"
-                    title="Gutschein Widget"
-                  ></iframe>
-            </div>
+            ${widgetIframeMarkup}
         </div>
     </section>
 
@@ -283,14 +491,616 @@ const WidgetDemoBySlug: React.FC = () => {
     </div>
   `;
 
+  const generatedDemoHtml = `
+    <style>
+      body { margin: 0; padding: 0; }
+      .demo-hero {
+        min-height: 62vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        background: #0f172a;
+      }
+      .demo-hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(15,23,42,0.35), rgba(15,23,42,0.65));
+        z-index: 1;
+      }
+      .demo-hero-bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .demo-hero-inner {
+        position: relative;
+        z-index: 2;
+        padding: 24px;
+      }
+      .demo-title {
+        font-size: clamp(2rem, 5vw, 4rem);
+        font-weight: 700;
+        margin: 0 0 12px 0;
+      }
+      .demo-subtitle {
+        font-size: clamp(1rem, 2.5vw, 1.4rem);
+        margin: 0;
+        opacity: 0.95;
+      }
+      .gutschein-section {
+        background-color: white;
+        padding: 40px 0 60px 0;
+      }
+      .gutschein-container {
+        max-width: 1160px;
+        margin: 0 auto;
+        width: 100%;
+        padding: 0 24px;
+      }
+      .gutschein-title {
+        color: #0f172a;
+        margin-bottom: 28px;
+        text-align: center;
+        font-size: clamp(1.6rem, 2vw, 2.2rem);
+      }
+    </style>
+
+    <section class="demo-hero">
+      ${demoTemplate?.bildURL ? `<img class="demo-hero-bg" src="${demoTemplate.bildURL}" alt="${demoTemplate?.name || 'Demo'}">` : ''}
+      <div class="demo-hero-inner">
+        <h1 class="demo-title">${demoTemplate?.name || displaySlug}</h1>
+        <p class="demo-subtitle">Digitale Gutschein-Demo</p>
+      </div>
+    </section>
+
+    <section id="gutscheine" class="gutschein-section">
+      <div class="gutschein-container">
+        <h2 class="gutschein-title">Gutschein kaufen</h2>
+        ${widgetIframeMarkup}
+      </div>
+    </section>
+  `;
+
+  const originalHTML = (() => {
+    if (demoTemplate?.demoHtml) {
+      const cleanedTemplate = stripLayoutEditorArtifacts(demoTemplate.demoHtml);
+      const normalizedTemplate = normalizeRelativeAssetUrls(cleanedTemplate);
+      const withImage = normalizedTemplate.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
+      if (withImage.includes('{{WIDGET_IFRAME}}')) {
+        return withImage.replaceAll('{{WIDGET_IFRAME}}', widgetIframeMarkup);
+      }
+
+      if (containsWidgetMarkup(withImage)) {
+        return withImage;
+      }
+
+      return `${withImage}\n<section class="gutschein-section"><div class="gutschein-container">${widgetIframeMarkup}</div></section>`;
+    }
+
+    if (demoTemplate) {
+      return generatedDemoHtml;
+    }
+
+    return defaultHTML;
+  })();
+
+  const renderedHtml = isLayoutEditMode
+    ? (workingHtml || originalHTML)
+    : originalHTML;
+
+  useEffect(() => {
+    if (!isLayoutEditMode) return;
+
+    try {
+      const storedRaw = localStorage.getItem(layoutStorageKey);
+      if (storedRaw) {
+        const parsed = JSON.parse(storedRaw) as StoredLayoutPayload;
+        const expectedFingerprint = buildFingerprint(originalHTML);
+        if (parsed && parsed.workingHtml && parsed.baseFingerprint === expectedFingerprint) {
+          setWorkingHtml(parsed.workingHtml);
+          setExportHtml(parsed.workingHtml);
+          return;
+        }
+        localStorage.removeItem(layoutStorageKey);
+      }
+      setWorkingHtml(originalHTML);
+      setExportHtml(originalHTML);
+    } catch (error) {
+      console.warn('Konnte Layout-Edit-Status nicht laden:', error);
+      localStorage.removeItem(layoutStorageKey);
+      setWorkingHtml(originalHTML);
+      setExportHtml(originalHTML);
+    }
+  }, [isLayoutEditMode, layoutStorageKey, originalHTML]);
+
+  useEffect(() => {
+    if (!isLayoutEditMode) return;
+
+    const payload: StoredLayoutPayload = {
+      baseFingerprint: buildFingerprint(originalHTML),
+      workingHtml: renderedHtml,
+    };
+    localStorage.setItem(layoutStorageKey, JSON.stringify(payload));
+    setExportHtml(renderedHtml);
+  }, [isLayoutEditMode, layoutStorageKey, renderedHtml, originalHTML]);
+
+  useEffect(() => {
+    if (!isLayoutEditMode) return;
+
+    const root = rootRef.current;
+    if (!root) return;
+
+    const getWidgetWrappers = () => findWidgetWrappers(root);
+
+    const resolveEditableTarget = (from: HTMLElement): HTMLElement | null => {
+      const widgetOverlay = from.closest<HTMLElement>('[data-widget-overlay="1"]');
+      if (widgetOverlay) {
+        return widgetOverlay.closest<HTMLElement>('[data-widget-root="1"]');
+      }
+
+      const target = from.closest<HTMLElement>('section, div, header, nav, main, footer, article');
+      if (!target) return null;
+      if (target.closest('[data-layout-toolbar="true"]')) return null;
+      if (target.getAttribute('data-layout-ignore') === '1') return null;
+      if (target.getAttribute('data-widget-root') === '1') return target;
+      if (target.getAttribute('data-widget-iframe') === '1') {
+        return target.closest<HTMLElement>('[data-widget-root="1"]');
+      }
+      return target;
+    };
+
+    const assignEditableMarkers = () => {
+      const candidates = Array.from(root.querySelectorAll<HTMLElement>('section, div, header, nav, main, footer, article, aside'));
+      let maxId = 0;
+      candidates.forEach((node) => {
+        const current = Number(node.dataset.layoutNodeId || '0');
+        if (Number.isFinite(current) && current > maxId) {
+          maxId = current;
+        }
+      });
+
+      let changed = false;
+      candidates.forEach((node) => {
+        node.dataset.layoutEditable = '1';
+        if (!node.dataset.layoutNodeId) {
+          maxId += 1;
+          node.dataset.layoutNodeId = String(maxId);
+          changed = true;
+        }
+        node.style.cursor = 'pointer';
+        if (showSelectableElements) {
+          node.style.outline = '1px dashed rgba(59,130,246,0.45)';
+          node.style.outlineOffset = '1px';
+        } else {
+          node.style.outline = '';
+          node.style.outlineOffset = '';
+        }
+      });
+
+      // Persist generated ids once so selection remains stable across rerenders.
+      if (changed) {
+        setWorkingHtml(root.innerHTML);
+      }
+
+      if (selectedNodeId) {
+        const selectedNode = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
+        if (selectedNode) {
+          selectedNode.style.outline = '2px solid #2563eb';
+          selectedNode.style.outlineOffset = '2px';
+        }
+      }
+
+      const widgetWrappers = getWidgetWrappers();
+      widgetWrappers.forEach((widgetWrapper) => {
+        widgetWrapper.style.position = 'relative';
+        widgetWrapper.style.outline = '2px dashed #16a34a';
+        widgetWrapper.style.outlineOffset = '3px';
+
+        let overlay = widgetWrapper.querySelector<HTMLElement>('[data-widget-overlay="1"]');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.setAttribute('data-widget-overlay', '1');
+          overlay.setAttribute('data-layout-ignore', '1');
+          widgetWrapper.appendChild(overlay);
+        }
+
+        overlay.style.position = 'absolute';
+        overlay.style.inset = '0';
+        overlay.style.cursor = 'pointer';
+        overlay.style.background = 'transparent';
+        overlay.style.zIndex = '8';
+      });
+
+      setWidgetCount(widgetWrappers.length);
+
+      if (selectedNodeId) {
+        const index = widgetWrappers.findIndex((node) => node.dataset.layoutNodeId === selectedNodeId);
+        setSelectedWidgetIndex(index >= 0 ? index : null);
+      } else {
+        setSelectedWidgetIndex(null);
+      }
+
+      // Prevent accidental navigation/click handlers inside customer page while editing.
+      const interactives = Array.from(root.querySelectorAll<HTMLElement>('a, button, input, textarea, select, label, summary'));
+      interactives.forEach((node) => {
+        node.style.pointerEvents = 'none';
+      });
+    };
+
+    assignEditableMarkers();
+
+    const clickHandler = (event: MouseEvent) => {
+      const path = event.composedPath();
+
+      const toolbarNode = path.find(
+        (node) => node instanceof HTMLElement && node.closest('[data-layout-toolbar="true"]')
+      );
+      if (toolbarNode) return;
+
+      const firstElementFromPath = path.find((node) => node instanceof HTMLElement) as HTMLElement | undefined;
+      if (!firstElementFromPath) return;
+      if (!root.contains(firstElementFromPath)) return;
+      if (firstElementFromPath.getAttribute('data-widget-iframe') === '1') return;
+
+      const candidate = resolveEditableTarget(firstElementFromPath);
+      if (!candidate || !root.contains(candidate)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const nodeId = candidate.dataset.layoutNodeId || '';
+      setSelectedNodeId(nodeId);
+      setStatusText('Element ausgewaehlt');
+    };
+
+    document.addEventListener('click', clickHandler, true);
+    return () => {
+      document.removeEventListener('click', clickHandler, true);
+    };
+  }, [isLayoutEditMode, selectedNodeId, showSelectableElements, renderedHtml]);
+
+  const applyActionToSelection = () => {
+    if (!isLayoutEditMode) return;
+    const root = rootRef.current;
+    if (!root) return;
+    if (!selectedNodeId) {
+      setStatusText('Bitte zuerst ein Element auswaehlen');
+      return;
+    }
+
+    setStatusText(`Aktion wird ausgefuehrt fuer Auswahl ${selectedNodeId}`);
+
+    const candidate = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
+    if (!candidate) {
+      setStatusText('Auswahl nicht mehr gueltig, bitte erneut klicken');
+      setSelectedNodeId('');
+      return;
+    }
+
+    const beforeHtml = root.innerHTML;
+    const widgetWrapper = findWidgetWrappers(root)[0] || null;
+
+    if (editAction === 'remove') {
+      candidate.remove();
+      setStatusText('Auswahl entfernt');
+      setSelectedNodeId('');
+    } else if (editAction === 'swapUp') {
+      const previous = candidate.previousElementSibling;
+      if (previous && candidate.parentElement) {
+        candidate.parentElement.insertBefore(candidate, previous);
+        setStatusText('Auswahl nach oben getauscht');
+      } else {
+        setStatusText('Kein Element oberhalb zum Tauschen');
+        return;
+      }
+    } else if (editAction === 'swapDown') {
+      const next = candidate.nextElementSibling;
+      if (next && candidate.parentElement) {
+        candidate.parentElement.insertBefore(next, candidate);
+        setStatusText('Auswahl nach unten getauscht');
+      } else {
+        setStatusText('Kein Element unterhalb zum Tauschen');
+        return;
+      }
+    } else if (editAction === 'placeWidgetBefore') {
+      if (!widgetWrapper || !candidate.parentElement) {
+        setStatusText('Widget-Container nicht gefunden');
+        return;
+      }
+      if (widgetWrapper.contains(candidate)) {
+        setStatusText('Ziel liegt im Widget-Container und ist ungueltig');
+        return;
+      }
+      candidate.parentElement.insertBefore(widgetWrapper, candidate);
+      setStatusText('Widget vor der Auswahl platziert');
+    } else if (editAction === 'placeWidgetInside') {
+      if (!widgetWrapper) {
+        setStatusText('Widget-Container nicht gefunden');
+        return;
+      }
+      if (widgetWrapper.contains(candidate)) {
+        setStatusText('Ziel liegt im Widget-Container und ist ungueltig');
+        return;
+      }
+      candidate.appendChild(widgetWrapper);
+      setStatusText('Widget in die Auswahl verschoben');
+    }
+
+    setHistory((prev) => [...prev, beforeHtml]);
+    const nextHtml = root.innerHTML;
+    setWorkingHtml(nextHtml);
+    setExportHtml(nextHtml);
+  };
+
+  const selectNextWidget = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const widgets = findWidgetWrappers(root);
+    if (widgets.length === 0) {
+      setStatusText('Kein Widget gefunden');
+      return;
+    }
+
+    const nextIndex = selectedWidgetIndex === null
+      ? 0
+      : (selectedWidgetIndex + 1) % widgets.length;
+
+    const nodeId = widgets[nextIndex].dataset.layoutNodeId || '';
+    setSelectedNodeId(nodeId);
+    setSelectedWidgetIndex(nextIndex);
+    setStatusText(`Widget ${nextIndex + 1} von ${widgets.length} ausgewaehlt`);
+  };
+
+  const removeSelectedWidget = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const widgets = findWidgetWrappers(root);
+    if (widgets.length === 0) {
+      setStatusText('Kein Widget vorhanden');
+      return;
+    }
+
+    const target = selectedWidgetIndex !== null && widgets[selectedWidgetIndex]
+      ? widgets[selectedWidgetIndex]
+      : widgets[0];
+
+    const beforeHtml = root.innerHTML;
+    target.remove();
+
+    setHistory((prev) => [...prev, beforeHtml]);
+    const nextHtml = root.innerHTML;
+    setWorkingHtml(nextHtml);
+    setExportHtml(nextHtml);
+    setSelectedNodeId('');
+    setSelectedWidgetIndex(null);
+    setStatusText('Ausgewaehltes Widget entfernt');
+  };
+
+  const removeDuplicateWidgetsKeepFirst = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const widgets = findWidgetWrappers(root);
+    if (widgets.length <= 1) {
+      setStatusText('Keine doppelten Widgets gefunden');
+      return;
+    }
+
+    const beforeHtml = root.innerHTML;
+    widgets.slice(1).forEach((node) => node.remove());
+
+    setHistory((prev) => [...prev, beforeHtml]);
+    const nextHtml = root.innerHTML;
+    setWorkingHtml(nextHtml);
+    setExportHtml(nextHtml);
+    setSelectedNodeId('');
+    setSelectedWidgetIndex(null);
+    setStatusText(`${widgets.length - 1} Duplikat-Widget(s) entfernt`);
+  };
+
+  const removeBottomMostWidget = () => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const widgets = findWidgetWrappers(root);
+    if (widgets.length === 0) {
+      setStatusText('Kein Widget vorhanden');
+      return;
+    }
+
+    const withPosition = widgets.map((node) => ({
+      node,
+      y: node.getBoundingClientRect().top + window.scrollY,
+    }));
+
+    withPosition.sort((a, b) => a.y - b.y);
+    const target = withPosition[withPosition.length - 1].node;
+
+    const beforeHtml = root.innerHTML;
+    target.remove();
+
+    setHistory((prev) => [...prev, beforeHtml]);
+    const nextHtml = root.innerHTML;
+    setWorkingHtml(nextHtml);
+    setExportHtml(nextHtml);
+    setSelectedNodeId('');
+    setSelectedWidgetIndex(null);
+    setStatusText('Unterstes Widget entfernt');
+  };
+
+  const undoLastChange = () => {
+    if (history.length === 0) return;
+    const previous = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, -1));
+    setWorkingHtml(previous);
+    setExportHtml(previous);
+    setSelectedNodeId('');
+    setStatusText('Letzte Aenderung rueckgaengig gemacht');
+  };
+
+  const resetLayout = () => {
+    setWorkingHtml(originalHTML);
+    setHistory([]);
+    setExportHtml(originalHTML);
+    setSelectedNodeId('');
+    setStatusText('Layout zurueckgesetzt');
+    localStorage.removeItem(layoutStorageKey);
+  };
+
+  const copyEditedHtml = async () => {
+    if (!exportHtml) return;
+    try {
+      const cleanedHtml = stripLayoutEditorArtifacts(exportHtml);
+      const normalizedHtml = normalizeRelativeAssetUrls(cleanedHtml);
+      await navigator.clipboard.writeText(normalizedHtml);
+      setCopyState('HTML kopiert');
+      window.setTimeout(() => setCopyState(''), 1800);
+    } catch (error) {
+      console.error('Konnte HTML nicht kopieren:', error);
+      setCopyState('Kopieren fehlgeschlagen');
+      window.setTimeout(() => setCopyState(''), 1800);
+    }
+  };
+
+  const saveEditedHtmlToDemo = async () => {
+    if (!hasDemoTemplate || !demoDocId) {
+      setStatusText('Speichern nur fuer Demo-Seiten mit Demo-Dokument moeglich');
+      return;
+    }
+    if (!exportHtml?.trim()) {
+      setStatusText('Kein HTML zum Speichern vorhanden');
+      return;
+    }
+
+    try {
+      setIsSavingHtml(true);
+      const cleanedHtml = stripLayoutEditorArtifacts(exportHtml);
+      const normalizedHtml = normalizeRelativeAssetUrls(cleanedHtml);
+      await updateDoc(doc(db, 'demos', demoDocId), {
+        demoHtml: normalizedHtml,
+        updatedAt: new Date().toISOString(),
+      });
+      setStatusText('HTML erfolgreich in der Demo gespeichert');
+    } catch (error) {
+      console.error('Fehler beim Speichern des HTML:', error);
+      setStatusText('Speichern fehlgeschlagen');
+    } finally {
+      setIsSavingHtml(false);
+    }
+  };
+
   return (
     <>
       <Helmet>
-        <title>Somatic Vitality | Bodywork | Massage | Berlin - Widget Demo</title>
-        <meta name="description" content="Widget Demo für Somatic Vitality - Hier bist du eingeladen, anzukommen – bei dir selbst, in deinem Körper und in deiner inneren Weisheit." />
+        <title>{`Widget Demo | ${demoTemplate?.name || displaySlug}`}</title>
+        <meta name="description" content="Live Widget-Demo für den ausgewählten Kunden-Slug." />
       </Helmet>
 
-      <div dangerouslySetInnerHTML={{ __html: originalHTML }} />
+      {loading ? (
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <p>Laden...</p>
+        </div>
+      ) : (
+        <>
+          {isProspectDemo && !hasDemoTemplate && !isLayoutEditMode && (
+            <div style={{
+              maxWidth: '980px',
+              margin: '20px auto 0 auto',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: '1px solid #f4e2b8',
+              background: '#fff8e8',
+              color: '#725016',
+              fontSize: '14px',
+              fontWeight: 500,
+              textAlign: 'center'
+            }}>
+              Prospect-Demo aktiv fuer {displaySlug}: Es werden Beispielangebote angezeigt, ohne bestehenden Kundenshop.
+            </div>
+          )}
+
+          {isLayoutEditMode && (
+            <div
+              data-layout-toolbar="true"
+              style={{
+                position: 'fixed',
+                right: 16,
+                top: 16,
+                zIndex: 9999,
+                width: 'min(360px, calc(100vw - 32px))',
+                background: '#0f172a',
+                color: 'white',
+                borderRadius: 12,
+                padding: 12,
+                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.3)',
+                fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif'
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                Layout Edit Modus
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 10 }}>
+                1) Element anklicken, 2) Aktion waehlen, 3) Aktion ausfuehren.
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.95, marginBottom: 8 }}>
+                Auswahl: {selectedNodeId || 'keine'}
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.95, marginBottom: 8 }}>
+                Widgets: {widgetCount} {selectedWidgetIndex !== null ? `(aktiv: ${selectedWidgetIndex + 1})` : ''}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <button
+                  style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                  onClick={() => setShowSelectableElements((prev) => !prev)}
+                >
+                  {showSelectableElements ? 'Elemente ausblenden' : 'Alle Elemente anzeigen'}
+                </button>
+                <button style={{ background: editAction === 'remove' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('remove')}>Entfernen</button>
+                <button style={{ background: editAction === 'swapUp' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('swapUp')}>Tauschen hoch</button>
+                <button style={{ background: editAction === 'swapDown' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('swapDown')}>Tauschen runter</button>
+                <button style={{ background: editAction === 'placeWidgetBefore' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('placeWidgetBefore')}>Widget davor</button>
+                <button style={{ background: editAction === 'placeWidgetInside' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('placeWidgetInside')}>Widget hinein</button>
+                <button style={{ background: '#059669', color: '#fff', border: '1px solid #047857', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', fontWeight: 700 }} onClick={applyActionToSelection}>Aktion ausfuehren</button>
+                <button style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={undoLastChange}>Undo</button>
+                <button style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={resetLayout}>Reset</button>
+                <button style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={copyEditedHtml}>HTML kopieren</button>
+                <button
+                  style={{ background: hasDemoTemplate ? '#7c3aed' : '#334155', color: '#fff', border: '1px solid #4c1d95', borderRadius: 6, padding: '6px 8px', cursor: hasDemoTemplate ? 'pointer' : 'not-allowed', opacity: hasDemoTemplate ? 1 : 0.65 }}
+                  onClick={saveEditedHtmlToDemo}
+                  disabled={!hasDemoTemplate || isSavingHtml}
+                >
+                  {isSavingHtml ? 'Speichert...' : 'In Demo speichern'}
+                </button>
+                <button style={{ background: '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={selectNextWidget}>Naechstes Widget</button>
+                <button style={{ background: '#b91c1c', color: '#fff', border: '1px solid #7f1d1d', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={removeSelectedWidget}>Widget entfernen</button>
+                <button style={{ background: '#7f1d1d', color: '#fff', border: '1px solid #63171b', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={removeBottomMostWidget}>Unterstes Widget entfernen</button>
+                <button style={{ background: '#991b1b', color: '#fff', border: '1px solid #7f1d1d', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={removeDuplicateWidgetsKeepFirst}>Duplikate entfernen</button>
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>
+                Aktiv: {editAction}
+              </div>
+              {statusText && (
+                <div style={{ fontSize: 12, marginTop: 6, color: '#a7f3d0' }}>
+                  {statusText}
+                </div>
+              )}
+              {copyState && (
+                <div style={{ fontSize: 12, marginTop: 6, color: '#93c5fd' }}>
+                  {copyState}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div ref={rootRef} dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+        </>
+      )}
     </>
   );
 };

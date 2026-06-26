@@ -229,7 +229,7 @@ export default function GutscheinDemoPage() {
         pdfBufferLength: pdfBase64.length
       });
       
-      const response = await fetch(`${API_URL}/api/gutscheine/demo/send-gutschein`, {
+      const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData),

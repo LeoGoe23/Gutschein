@@ -1,5 +1,9 @@
 # Gutschein
 
+## OSM Self-Hosted Setup (No Overpass 429)
+
+See [gutschein-backend/osm/SELF_HOSTED_SETUP.md](gutschein-backend/osm/SELF_HOSTED_SETUP.md) to run PostGIS locally and query municipality leads without public Overpass rate limits.
+
 
 
 ## Getting started

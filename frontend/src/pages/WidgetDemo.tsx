@@ -28,6 +28,14 @@ export default function WidgetDemo() {
     // Höhen-Anpassung für iframe via postMessage
     const handleMessage = (event: MessageEvent) => {
       if (!isAllowedOrigin(event.origin)) return;
+
+      const openInNewTab = (targetUrl: string) => {
+        const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        if (!popup) {
+          window.location.href = targetUrl;
+        }
+      };
+
       if (event.data.type === 'gutschein-widget-resize') {
         const iframes = document.querySelectorAll('iframe[data-gutschein-widget="true"]');
         if (!event.data.height) return;
@@ -54,7 +62,7 @@ export default function WidgetDemo() {
           params.set('titel', event.data.titel.trim());
         }
 
-        window.location.href = `/demo/${encodeURIComponent(targetSlug)}?${params.toString()}`;
+        openInNewTab(`/demo/${encodeURIComponent(targetSlug)}?${params.toString()}`);
       }
     };
 

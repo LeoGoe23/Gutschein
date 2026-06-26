@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Typography, Card, CardContent, Divider, TextField } from '@mui/material';
 import { CheckoutData, WidgetVoucherOption, loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
+import { loadDemoDataBySlug } from '../utils/loadDemoData';
 
 interface GutscheinOption {
   titel: string;
@@ -13,6 +14,57 @@ interface GutscheinOption {
   contactUrl?: string;
   buttonLabel?: string;
 }
+
+const PROSPECT_DEMO_OPTIONS: GutscheinOption[] = [
+  {
+    titel: 'Klassische Massage 60 Min',
+    betrag: 79,
+    beschreibung: 'Beliebtes Beispielangebot fuer Neukunden-Demos.',
+    type: 'gutschein',
+  },
+  {
+    titel: 'Aroma Oel Massage 90 Min',
+    betrag: 109,
+    beschreibung: 'Ideal fuer Geschenk-Kampagnen in der Demo.',
+    type: 'gutschein',
+  },
+  {
+    titel: 'Freier Betrag',
+    betrag: 0,
+    beschreibung: 'Sie bestimmen den Wert',
+    type: 'gutschein',
+  }
+];
+
+const buildOptionsFromDemo = (
+  demoDienstleistungen: Array<{ shortDesc: string; longDesc: string; price: string }>,
+  includeCustomValue: boolean
+): GutscheinOption[] => {
+  const loadedOptions: GutscheinOption[] = [];
+
+  if (includeCustomValue) {
+    loadedOptions.push({
+      titel: 'Freier Betrag',
+      betrag: 0,
+      beschreibung: 'Sie bestimmen den Wert',
+      type: 'gutschein',
+    });
+  }
+
+  demoDienstleistungen.forEach((dienstleistung) => {
+    const amount = toAmount(dienstleistung.price);
+    if (amount <= 0) return;
+
+    loadedOptions.push({
+      titel: dienstleistung.shortDesc,
+      betrag: amount,
+      beschreibung: dienstleistung.longDesc || undefined,
+      type: 'gutschein',
+    });
+  });
+
+  return loadedOptions;
+};
 
 const toAmount = (value: string | number | undefined): number => {
   const amount = Number(value);
@@ -118,6 +170,7 @@ const EmbedWidget: React.FC = () => {
   // URL parameters für Customization
   const params = new URLSearchParams(window.location.search);
   const primaryColor = params.get('primaryColor') || '#1976d2';
+  const isProspectDemo = params.get('demoMode') === '1';
   const fontFamily = params.get('fontFamily') || (slug?.toUpperCase() === 'JANKIP' 
     ? "'Cormorant Garamond', Georgia, serif" 
     : "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
@@ -132,7 +185,11 @@ const EmbedWidget: React.FC = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!slug) return;
+      if (!slug) {
+        setError('Kein Slug angegeben.');
+        setLoading(false);
+        return;
+      }
 
       try {
         setError('');
@@ -160,18 +217,39 @@ const EmbedWidget: React.FC = () => {
 
           setOptions(loadedOptions);
         } else {
-          setError('Gutschein-Daten nicht gefunden');
+          if (isProspectDemo) {
+            const demoData = await loadDemoDataBySlug(slug.toLowerCase());
+            if (demoData) {
+              const demoOptions = buildOptionsFromDemo(demoData.dienstleistungen || [], demoData.customValue);
+              setOptions(demoOptions.length > 0 ? demoOptions : PROSPECT_DEMO_OPTIONS);
+            } else {
+              setOptions(PROSPECT_DEMO_OPTIONS);
+            }
+          } else {
+            setError('Gutschein-Daten nicht gefunden');
+          }
         }
       } catch (err) {
         console.error('Fehler beim Laden:', err);
-        setError('Fehler beim Laden der Daten');
+        if (isProspectDemo) {
+          const demoData = slug ? await loadDemoDataBySlug(slug.toLowerCase()) : null;
+          if (demoData) {
+            const demoOptions = buildOptionsFromDemo(demoData.dienstleistungen || [], demoData.customValue);
+            setOptions(demoOptions.length > 0 ? demoOptions : PROSPECT_DEMO_OPTIONS);
+          } else {
+            setOptions(PROSPECT_DEMO_OPTIONS);
+          }
+          setError('');
+        } else {
+          setError('Fehler beim Laden der Daten');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [slug]);
+  }, [slug, isProspectDemo]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -340,6 +418,20 @@ const EmbedWidget: React.FC = () => {
           powered by GutscheinFabrik
         </Typography>
       </Box>
+
+      <Typography
+        variant="h5"
+        sx={{
+          textAlign: 'center',
+          mb: 1,
+          color: '#1f2937',
+          fontSize: { xs: '1.35rem', md: '1.55rem' },
+          fontWeight: 700,
+          letterSpacing: '-0.01em'
+        }}
+      >
+        Gutschein kaufen
+      </Typography>
       
       <Typography 
         variant="body1" 
