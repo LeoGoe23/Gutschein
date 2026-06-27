@@ -35,6 +35,7 @@ const stripLayoutEditorArtifacts = (html: string): string => {
 
     // Remove temporary widget overlay helper nodes injected by layout editor.
     cleaned = cleaned.replace(/<div[^>]*data-widget-overlay=("[^"]*"|'[^']*')[^>]*><\/div>/gi, '');
+    cleaned = cleaned.replace(/<div[^>]*data-widget-drag-handle=("[^"]*"|'[^']*')[^>]*>.*?<\/div>/gi, '');
 
     cleaned = cleaned.replace(/style=("[^"]*"|'[^']*')/gi, (fullMatch, styleValueWithQuotes) => {
       const quote = styleValueWithQuotes[0];
@@ -63,11 +64,133 @@ const stripLayoutEditorArtifacts = (html: string): string => {
 };
 
 const normalizeRelativeAssetUrls = (html: string): string => {
-  // Make relative src/href paths root-absolute so routes like /widgetdemo/:slug
-  // do not rewrite assets to /widgetdemo/media/... in dev/prod.
+  const inferSourceOrigin = (value: string): string => {
+    const matcher = /(\b(?:src|href|action)\s*=\s*["'])(https?:\/\/[^"'\s>]+)(["'])/gi;
+    let match: RegExpExecArray | null = null;
+    const originCounts = new Map<string, number>();
+    const blockedHosts = [
+      'consent.cookiebot.com',
+      'consentcdn.cookiebot.com',
+      'use.typekit.net',
+      'fonts.googleapis.com',
+      'fonts.gstatic.com',
+      'www.googletagmanager.com',
+      'www.google-analytics.com',
+      'connect.facebook.net',
+      'static.doubleclick.net',
+    ];
+
+    const isBlockedHost = (hostname: string): boolean => {
+      const lower = hostname.toLowerCase();
+      return blockedHosts.some((blocked) => lower === blocked || lower.endsWith(`.${blocked}`));
+    };
+
+    while ((match = matcher.exec(value)) !== null) {
+      const rawUrl = match[2];
+      try {
+        const parsed = new URL(rawUrl);
+        if (!parsed.hostname) continue;
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') continue;
+        if (isBlockedHost(parsed.hostname)) continue;
+
+        const key = parsed.origin;
+        originCounts.set(key, (originCounts.get(key) || 0) + 1);
+      } catch {
+        // ignore malformed urls
+      }
+    }
+
+    if (originCounts.size > 0) {
+      const ranked = Array.from(originCounts.entries()).sort((a, b) => b[1] - a[1]);
+      return ranked[0][0];
+    }
+
+    // Fallback: if only third-party urls exist, use the first non-local absolute origin.
+    matcher.lastIndex = 0;
+    while ((match = matcher.exec(value)) !== null) {
+      const rawUrl = match[2];
+      try {
+        const parsed = new URL(rawUrl);
+        if (!parsed.hostname) continue;
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') continue;
+        return parsed.origin;
+      } catch {
+        // ignore malformed urls
+      }
+    }
+
+    return '';
+  };
+
+  const sourceOrigin = inferSourceOrigin(html);
+  const keepLocalPrefixes = ['/embed/', '/demo/', '/widgetdemo/', '/checkoutdemo/', '/api/'];
+  const shouldKeepLocalPath = (path: string): boolean => {
+    return keepLocalPrefixes.some((prefix) => path.startsWith(prefix));
+  };
+
+  const absolutizePath = (path: string): string => {
+    if (path.startsWith('/') && shouldKeepLocalPath(path)) {
+      return path;
+    }
+    if (sourceOrigin) {
+      try {
+        return new URL(path, `${sourceOrigin}/`).toString();
+      } catch {
+        // fallback below
+      }
+    }
+    return `/${path.replace(/^\/+/, '')}`;
+  };
+
+  // Rewrite relative src/href/action to absolute URLs.
   let normalized = html.replace(
-    /(\b(?:src|href)\s*=\s*["'])(?!https?:\/\/|\/\/|\/|#|data:|mailto:|tel:)([^"']+)(["'])/gi,
-    (_match, prefix, path, suffix) => `${prefix}/${path}${suffix}`
+    /(\b(?:src|href|action)\s*=\s*["'])(?!https?:\/\/|\/\/|\/|#|data:|mailto:|tel:|javascript:)([^"']+)(["'])/gi,
+    (_match, prefix, path, suffix) => `${prefix}${absolutizePath(path)}${suffix}`
+  );
+
+  // Rewrite root-absolute src/href/action paths as well (except local app routes).
+  normalized = normalized.replace(
+    /(\b(?:src|href|action)\s*=\s*["'])(\/[^"']+)(["'])/gi,
+    (_match, prefix, path, suffix) => `${prefix}${absolutizePath(path)}${suffix}`
+  );
+
+  // Rewrite additional media-bearing attributes used by many templates.
+  normalized = normalized.replace(
+    /(\b(?:data-sticky-logo|data-src|data-bg|poster)\s*=\s*["'])(?!https?:\/\/|\/\/|#|data:)([^"']+)(["'])/gi,
+    (_match, prefix, path, suffix) => `${prefix}${absolutizePath(path)}${suffix}`
+  );
+
+  // Rewrite relative URLs in srcset attributes.
+  normalized = normalized.replace(
+    /(\bsrcset\s*=\s*["'])([^"']+)(["'])/gi,
+    (_match, prefix, srcsetValue, suffix) => {
+      const rewritten = srcsetValue
+        .split(',')
+        .map((entry: string) => entry.trim())
+        .filter(Boolean)
+        .map((entry: string) => {
+          const [urlPart, descriptor] = entry.split(/\s+/, 2);
+          if (!urlPart) return entry;
+          if (/^(https?:\/\/|\/\/|data:|#)/i.test(urlPart)) return entry;
+          if (urlPart.startsWith('/') && shouldKeepLocalPath(urlPart)) return entry;
+          const absoluteUrl = absolutizePath(urlPart);
+          return descriptor ? `${absoluteUrl} ${descriptor}` : absoluteUrl;
+        })
+        .join(', ');
+      return `${prefix}${rewritten}${suffix}`;
+    }
+  );
+
+  // Rewrite CSS url(...) references in inline styles and style tags.
+  normalized = normalized.replace(
+    /url\((['"]?)(?!https?:\/\/|\/\/|data:|#)([^'"\)]+)\1\)/gi,
+    (_match, quote, path) => {
+      const trimmedPath = String(path || '').trim();
+      if (!trimmedPath) return _match;
+      if (trimmedPath.startsWith('/') && shouldKeepLocalPath(trimmedPath)) return _match;
+      const absoluteUrl = absolutizePath(trimmedPath);
+      return `url(${quote}${absoluteUrl}${quote})`;
+    }
   );
 
   // In local CRA dev, /media/* requests go through the proxy (:8080). If backend is
@@ -92,6 +215,12 @@ const containsWidgetMarkup = (html: string): boolean => {
     || /id\s*=\s*["']gutschein-widget-wrapper["']/i.test(html);
 };
 
+const hasMainHeroImage = (html: string): boolean => {
+  return /background-image\s*:\s*url\(/i.test(html)
+    || /<img[^>]+class\s*=\s*["'][^"']*(hero|slider|banner)[^"']*["'][^>]*>/i.test(html)
+    || /<section[^>]+id\s*=\s*["']slider["'][^>]*>/i.test(html);
+};
+
 const WidgetDemoBySlug: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [loading, setLoading] = useState(true);
@@ -112,6 +241,7 @@ const WidgetDemoBySlug: React.FC = () => {
   const [exportHtml, setExportHtml] = useState('');
   const [copyState, setCopyState] = useState('');
   const [isSavingHtml, setIsSavingHtml] = useState(false);
+  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
   const hasDemoTemplate = Boolean(demoTemplate?.slug);
   const displaySlug = resolvedSlug || (slug ? slug.toUpperCase() : 'NEUKUNDE');
   const isRealShop = shopFound && Boolean(resolvedSlug) && !hasDemoTemplate;
@@ -142,7 +272,7 @@ const WidgetDemoBySlug: React.FC = () => {
           return;
         }
 
-        const parent = iframe.parentElement;
+        const parent = iframe.closest<HTMLElement>('div, section, article, main, aside') || iframe.parentElement;
         if (parent) {
           addWrapper(parent);
         }
@@ -313,7 +443,7 @@ const WidgetDemoBySlug: React.FC = () => {
         data-widget-iframe="1"
         data-gutschein-widget="1"
         src="${embedSrc}"
-        style="width: 100%; border: none; overflow: hidden; height: auto; background: white; display: block; min-height: 600px;"
+        style="width: 100%; border: none; overflow: hidden; height: auto; background: transparent; display: block; min-height: 280px;"
         title="Gutschein Widget"
       ></iframe>
     </div>
@@ -333,12 +463,29 @@ const WidgetDemoBySlug: React.FC = () => {
     iframe.style.border = 'none';
     iframe.style.overflow = 'hidden';
     iframe.style.height = 'auto';
-    iframe.style.background = 'white';
+    iframe.style.background = 'transparent';
     iframe.style.display = 'block';
-    iframe.style.minHeight = '600px';
+    iframe.style.minHeight = '280px';
 
     wrapper.appendChild(iframe);
     return wrapper;
+  };
+
+  const ensureSingleWidget = (root: ParentNode, preferred?: HTMLElement | null): HTMLElement | null => {
+    const widgets = findWidgetWrappers(root);
+    if (widgets.length === 0) return null;
+
+    const keep = preferred && widgets.includes(preferred)
+      ? preferred
+      : widgets[0];
+
+    widgets.forEach((node) => {
+      if (node !== keep) {
+        node.remove();
+      }
+    });
+
+    return keep;
   };
 
   const buildFingerprint = (value: string) => {
@@ -599,15 +746,26 @@ const WidgetDemoBySlug: React.FC = () => {
       const cleanedTemplate = stripLayoutEditorArtifacts(demoTemplate.demoHtml);
       const normalizedTemplate = normalizeRelativeAssetUrls(cleanedTemplate);
       const withImage = normalizedTemplate.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
-      if (withImage.includes('{{WIDGET_IFRAME}}')) {
-        return withImage.replaceAll('{{WIDGET_IFRAME}}', widgetIframeMarkup);
+
+      let enhancedTemplate = withImage;
+      if (demoTemplate.bildURL && !hasMainHeroImage(withImage)) {
+        enhancedTemplate = `
+          <section class="demo-auto-hero" style="position: relative; min-height: 46vh; background-image: url('${demoTemplate.bildURL}'); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;">
+            <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.18), rgba(15,23,42,0.46));"></div>
+            <h1 style="position: relative; z-index: 1; color: #fff; margin: 0; padding: 24px; text-align: center; font-size: clamp(2rem, 5vw, 4rem); line-height: 1.08; text-shadow: 0 8px 24px rgba(0,0,0,0.38);">${demoTemplate?.name || displaySlug}</h1>
+          </section>
+        ${withImage}`;
       }
 
-      if (containsWidgetMarkup(withImage)) {
-        return withImage;
+      if (enhancedTemplate.includes('{{WIDGET_IFRAME}}')) {
+        return enhancedTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetIframeMarkup);
       }
 
-      return `${withImage}\n<section class="gutschein-section"><div class="gutschein-container">${widgetIframeMarkup}</div></section>`;
+      if (containsWidgetMarkup(enhancedTemplate)) {
+        return enhancedTemplate;
+      }
+
+      return `${enhancedTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetIframeMarkup}</div></section>`;
     }
 
     if (demoTemplate) {
@@ -664,6 +822,87 @@ const WidgetDemoBySlug: React.FC = () => {
     if (!root) return;
 
     const getWidgetWrappers = () => findWidgetWrappers(root);
+    let hoverRing: HTMLDivElement | null = null;
+    let selectedRing: HTMLDivElement | null = null;
+    let dropLine: HTMLDivElement | null = null;
+    let hoverRafId = 0;
+    let pendingHoverEvent: MouseEvent | null = null;
+    let lastHoverNodeId = '';
+    let draggingWidget: HTMLElement | null = null;
+    let dropTargetNode: HTMLElement | null = null;
+    let dropPlacement: 'before' | 'after' = 'before';
+
+    const createRing = (border: string, background: string, zIndex: number) => {
+      const ring = document.createElement('div');
+      ring.setAttribute('data-layout-ignore', '1');
+      ring.style.position = 'fixed';
+      ring.style.left = '0';
+      ring.style.top = '0';
+      ring.style.width = '0';
+      ring.style.height = '0';
+      ring.style.border = border;
+      ring.style.background = background;
+      ring.style.pointerEvents = 'none';
+      ring.style.zIndex = String(zIndex);
+      ring.style.borderRadius = '4px';
+      ring.style.boxSizing = 'border-box';
+      ring.style.display = 'none';
+      return ring;
+    };
+
+    const mountRings = () => {
+      hoverRing = createRing('2px dashed rgba(59,130,246,0.95)', 'rgba(59,130,246,0.08)', 9996);
+      selectedRing = createRing('2px solid #2563eb', 'rgba(37,99,235,0.08)', 9997);
+      dropLine = document.createElement('div');
+      dropLine.setAttribute('data-layout-ignore', '1');
+      dropLine.style.position = 'fixed';
+      dropLine.style.left = '0';
+      dropLine.style.top = '0';
+      dropLine.style.width = '0';
+      dropLine.style.height = '0';
+      dropLine.style.borderTop = '3px solid #10b981';
+      dropLine.style.boxShadow = '0 0 0 1px rgba(16,185,129,0.25)';
+      dropLine.style.pointerEvents = 'none';
+      dropLine.style.zIndex = '9998';
+      dropLine.style.display = 'none';
+      document.body.appendChild(hoverRing);
+      document.body.appendChild(selectedRing);
+      document.body.appendChild(dropLine);
+    };
+
+    const placeRing = (ring: HTMLDivElement | null, node: HTMLElement | null) => {
+      if (!ring) return;
+      if (!node) {
+        ring.style.display = 'none';
+        return;
+      }
+
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) {
+        ring.style.display = 'none';
+        return;
+      }
+
+      ring.style.display = 'block';
+      ring.style.left = `${Math.max(0, rect.left)}px`;
+      ring.style.top = `${Math.max(0, rect.top)}px`;
+      ring.style.width = `${rect.width}px`;
+      ring.style.height = `${rect.height}px`;
+    };
+
+    const placeDropLine = (node: HTMLElement | null, placement: 'before' | 'after') => {
+      if (!dropLine || !node) {
+        if (dropLine) dropLine.style.display = 'none';
+        return;
+      }
+
+      const rect = node.getBoundingClientRect();
+      dropLine.style.display = 'block';
+      dropLine.style.left = `${Math.max(0, rect.left)}px`;
+      dropLine.style.width = `${Math.max(0, rect.width)}px`;
+      dropLine.style.top = `${placement === 'before' ? rect.top - 1 : rect.bottom - 1}px`;
+      dropLine.style.height = '0';
+    };
 
     const resolveEditableTarget = (from: HTMLElement): HTMLElement | null => {
       const widgetOverlay = from.closest<HTMLElement>('[data-widget-overlay="1"]');
@@ -691,7 +930,75 @@ const WidgetDemoBySlug: React.FC = () => {
       return target;
     };
 
+    const pickBestNodeAtPoint = (clientX: number, clientY: number): HTMLElement | null => {
+      const allNodes = Array.from(root.querySelectorAll<HTMLElement>('[data-layout-node-id]'));
+      const matching: Array<{ node: HTMLElement; area: number }> = [];
+
+      allNodes.forEach((node) => {
+        if (node.closest('[data-layout-toolbar="true"]')) return;
+        if (node.getAttribute('data-layout-ignore') === '1') return;
+
+        const rect = node.getBoundingClientRect();
+        if (rect.width < 16 || rect.height < 16) return;
+
+        const inside = clientX >= rect.left
+          && clientX <= rect.right
+          && clientY >= rect.top
+          && clientY <= rect.bottom;
+
+        if (!inside) return;
+
+        matching.push({ node, area: rect.width * rect.height });
+      });
+
+      if (matching.length === 0) return null;
+
+      // Prefer the most specific visible container at cursor position.
+      matching.sort((a, b) => a.area - b.area);
+      return matching[0].node;
+    };
+
+    const normalizeCandidate = (node: HTMLElement | null): HTMLElement | null => {
+      if (!node) return null;
+      let current: HTMLElement | null = node;
+
+      while (current && root.contains(current)) {
+        if (!current.dataset.layoutNodeId) {
+          current = current.parentElement?.closest<HTMLElement>('[data-layout-node-id]') || null;
+          continue;
+        }
+
+        const rect = current.getBoundingClientRect();
+        if (rect.width >= 16 && rect.height >= 16) {
+          return current;
+        }
+
+        current = current.parentElement?.closest<HTMLElement>('[data-layout-node-id]') || null;
+      }
+
+      return null;
+    };
+
     const assignEditableMarkers = () => {
+      let changed = false;
+
+      // Normalize existing widget iframes so they are always manageable as one wrapper block.
+      const orphanWidgetIframes = Array.from(
+        root.querySelectorAll<HTMLIFrameElement>('#gutschein-widget-iframe, iframe[data-widget-iframe="1"], iframe[data-gutschein-widget="1"], iframe[src*="/embed/"], iframe[src*="embed/"]')
+      );
+      orphanWidgetIframes.forEach((iframe) => {
+        const alreadyWrapped = iframe.closest<HTMLElement>('[data-widget-root="1"], #gutschein-widget-wrapper');
+        if (alreadyWrapped) return;
+        if (!iframe.parentElement) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.setAttribute('data-widget-root', '1');
+        wrapper.style.width = '100%';
+        iframe.parentElement.insertBefore(wrapper, iframe);
+        wrapper.appendChild(iframe);
+        changed = true;
+      });
+
       const candidates = Array.from(root.querySelectorAll<HTMLElement>('section, div, header, nav, main, footer, article, aside'));
       let maxId = 0;
       candidates.forEach((node) => {
@@ -701,7 +1008,6 @@ const WidgetDemoBySlug: React.FC = () => {
         }
       });
 
-      let changed = false;
       candidates.forEach((node) => {
         node.dataset.layoutEditable = '1';
         if (!node.dataset.layoutNodeId) {
@@ -714,8 +1020,9 @@ const WidgetDemoBySlug: React.FC = () => {
           node.style.outline = '1px dashed rgba(59,130,246,0.45)';
           node.style.outlineOffset = '1px';
         } else {
-          node.style.outline = '';
-          node.style.outlineOffset = '';
+          // Keep a faint guide line so selection never feels "dead".
+          node.style.outline = '1px dashed rgba(59,130,246,0.15)';
+          node.style.outlineOffset = '1px';
         }
       });
 
@@ -726,10 +1033,9 @@ const WidgetDemoBySlug: React.FC = () => {
 
       if (selectedNodeId) {
         const selectedNode = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
-        if (selectedNode) {
-          selectedNode.style.outline = '2px solid #2563eb';
-          selectedNode.style.outlineOffset = '2px';
-        }
+        placeRing(selectedRing, selectedNode || null);
+      } else {
+        placeRing(selectedRing, null);
       }
 
       const widgetWrappers = getWidgetWrappers();
@@ -751,6 +1057,31 @@ const WidgetDemoBySlug: React.FC = () => {
         overlay.style.cursor = 'pointer';
         overlay.style.background = 'transparent';
         overlay.style.zIndex = '8';
+
+        let dragHandle = widgetWrapper.querySelector<HTMLElement>('[data-widget-drag-handle="1"]');
+        if (!dragHandle) {
+          dragHandle = document.createElement('div');
+          dragHandle.setAttribute('data-widget-drag-handle', '1');
+          dragHandle.setAttribute('data-layout-ignore', '1');
+          dragHandle.textContent = 'Widget ziehen';
+          widgetWrapper.appendChild(dragHandle);
+        }
+
+        dragHandle.style.position = 'absolute';
+        dragHandle.style.top = '8px';
+        dragHandle.style.right = '8px';
+        dragHandle.style.zIndex = '10';
+        dragHandle.style.padding = '4px 8px';
+        dragHandle.style.fontSize = '12px';
+        dragHandle.style.fontWeight = '700';
+        dragHandle.style.lineHeight = '1.2';
+        dragHandle.style.color = '#ffffff';
+        dragHandle.style.background = 'rgba(2,132,199,0.92)';
+        dragHandle.style.border = '1px solid rgba(3,105,161,0.95)';
+        dragHandle.style.borderRadius = '999px';
+        dragHandle.style.cursor = 'grab';
+        dragHandle.style.userSelect = 'none';
+        dragHandle.style.pointerEvents = 'auto';
       });
 
       setWidgetCount(widgetWrappers.length);
@@ -769,29 +1100,114 @@ const WidgetDemoBySlug: React.FC = () => {
       });
     };
 
+    mountRings();
     assignEditableMarkers();
 
-    const clickHandler = (event: MouseEvent) => {
+    const resolveFromEventPath = (event: MouseEvent): HTMLElement | null => {
       const path = event.composedPath();
 
       const toolbarNode = path.find(
         (node) => node instanceof HTMLElement && node.closest('[data-layout-toolbar="true"]')
       );
-      if (toolbarNode) return;
+      if (toolbarNode) return null;
 
       const firstElementFromPath = path.find((node) => node instanceof HTMLElement) as HTMLElement | undefined;
-      if (!firstElementFromPath) return;
-      if (!root.contains(firstElementFromPath)) return;
+      if (firstElementFromPath && root.contains(firstElementFromPath)) {
+        const resolved = resolveEditableTarget(firstElementFromPath);
+        const normalized = normalizeCandidate(resolved);
+        if (normalized) return normalized;
+      }
 
-      let candidate = resolveEditableTarget(firstElementFromPath);
-      if (!candidate || !root.contains(candidate)) return;
+      // Fallback for complex imported pages where composedPath may miss useful nodes.
+      const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+      if (elementAtPoint && root.contains(elementAtPoint)) {
+        const resolvedFromPoint = resolveEditableTarget(elementAtPoint);
+        const normalizedFromPoint = normalizeCandidate(resolvedFromPoint);
+        if (normalizedFromPoint) return normalizedFromPoint;
+      }
+
+      return pickBestNodeAtPoint(event.clientX, event.clientY);
+    };
+
+    const processHover = () => {
+      hoverRafId = 0;
+      if (!pendingHoverEvent) return;
+      if (draggingWidget) return;
+
+      const candidate = resolveFromEventPath(pendingHoverEvent);
+      pendingHoverEvent = null;
+
+      const nextId = candidate?.dataset.layoutNodeId || '';
+      if (nextId === lastHoverNodeId) return;
+      lastHoverNodeId = nextId;
+      placeRing(hoverRing, candidate);
+    };
+
+    const hoverHandler = (event: MouseEvent) => {
+      if (draggingWidget) return;
+      pendingHoverEvent = event;
+      if (hoverRafId) return;
+      hoverRafId = window.requestAnimationFrame(processHover);
+    };
+
+    const updateDropTargetFromPoint = (clientX: number, clientY: number) => {
+      if (!draggingWidget) return;
+
+      const rawElement = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+      if (!rawElement || !root.contains(rawElement)) {
+        dropTargetNode = null;
+        placeDropLine(null, 'before');
+        return;
+      }
+
+      const resolved = normalizeCandidate(resolveEditableTarget(rawElement));
+      if (!resolved) {
+        dropTargetNode = null;
+        placeDropLine(null, 'before');
+        return;
+      }
+
+      if (resolved === draggingWidget || draggingWidget.contains(resolved)) {
+        dropTargetNode = null;
+        placeDropLine(null, 'before');
+        return;
+      }
+
+      const rect = resolved.getBoundingClientRect();
+      dropPlacement = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+      dropTargetNode = resolved;
+      placeDropLine(dropTargetNode, dropPlacement);
+    };
+
+    const startWidgetDrag = (event: MouseEvent, widgetWrapper: HTMLElement) => {
+      if (event.button !== 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      draggingWidget = widgetWrapper;
+      dropTargetNode = null;
+      placeRing(hoverRing, null);
+      widgetWrapper.style.opacity = '0.72';
+      document.body.style.userSelect = 'none';
+      setStatusText('Widget ziehen: Ziel-Container anfahren und loslassen');
+      updateDropTargetFromPoint(event.clientX, event.clientY);
+    };
+
+    const clickHandler = (event: MouseEvent) => {
+      if (draggingWidget) return;
+      let candidate = resolveFromEventPath(event);
+      if (!candidate) {
+        setStatusText('Kein auswaehlbarer Container an dieser Stelle');
+        return;
+      }
 
       // Repeated click on same node climbs up to a bigger parent container.
       const currentNodeId = candidate.dataset.layoutNodeId || '';
       if (currentNodeId && currentNodeId === selectedNodeId) {
         const parentCandidate = candidate.parentElement?.closest<HTMLElement>('[data-layout-node-id]');
         if (parentCandidate && root.contains(parentCandidate)) {
-          candidate = parentCandidate;
+          candidate = normalizeCandidate(parentCandidate) || parentCandidate;
         }
       }
 
@@ -804,11 +1220,91 @@ const WidgetDemoBySlug: React.FC = () => {
       const className = (candidate.className || '').toString().trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.');
       setSelectedNodeInfo(className ? `${tagName}.${className}` : tagName);
       setStatusText('Element ausgewaehlt');
+      placeRing(selectedRing, candidate);
     };
 
+    const refreshSelectedRing = () => {
+      if (!selectedNodeId) {
+        placeRing(selectedRing, null);
+        return;
+      }
+      const selectedNode = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
+      placeRing(selectedRing, selectedNode || null);
+    };
+
+    const dragMouseDownHandler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      const handle = target.closest<HTMLElement>('[data-widget-drag-handle="1"]');
+      if (!handle) return;
+
+      const widgetWrapper = handle.closest<HTMLElement>('[data-widget-root="1"], #gutschein-widget-wrapper');
+      if (!widgetWrapper || !root.contains(widgetWrapper)) return;
+
+      startWidgetDrag(event, widgetWrapper);
+    };
+
+    const dragMouseMoveHandler = (event: MouseEvent) => {
+      if (!draggingWidget) return;
+      event.preventDefault();
+      updateDropTargetFromPoint(event.clientX, event.clientY);
+    };
+
+    const dragMouseUpHandler = () => {
+      if (!draggingWidget) return;
+
+      const beforeHtml = root.innerHTML;
+      const dragged = draggingWidget;
+
+      dragged.style.opacity = '';
+      document.body.style.userSelect = '';
+
+      if (dropTargetNode && dropTargetNode.parentElement) {
+        if (dropPlacement === 'before') {
+          dropTargetNode.parentElement.insertBefore(dragged, dropTargetNode);
+        } else {
+          dropTargetNode.parentElement.insertBefore(dragged, dropTargetNode.nextSibling);
+        }
+
+        setHistory((prev) => [...prev, beforeHtml]);
+        const nextHtml = root.innerHTML;
+        setWorkingHtml(nextHtml);
+        setExportHtml(nextHtml);
+        setSelectedNodeId(dragged.dataset.layoutNodeId || '');
+        setStatusText('Widget per Drag&Drop verschoben');
+      } else {
+        setStatusText('Widget-Drag abgebrochen (kein Ziel)');
+      }
+
+      placeDropLine(null, 'before');
+      draggingWidget = null;
+      dropTargetNode = null;
+    };
+
+    document.addEventListener('mousemove', hoverHandler, true);
     document.addEventListener('click', clickHandler, true);
+    document.addEventListener('mousedown', dragMouseDownHandler, true);
+    document.addEventListener('mousemove', dragMouseMoveHandler, true);
+    document.addEventListener('mouseup', dragMouseUpHandler, true);
+    window.addEventListener('scroll', refreshSelectedRing, true);
+    window.addEventListener('resize', refreshSelectedRing);
+
     return () => {
+      document.removeEventListener('mousemove', hoverHandler, true);
       document.removeEventListener('click', clickHandler, true);
+      document.removeEventListener('mousedown', dragMouseDownHandler, true);
+      document.removeEventListener('mousemove', dragMouseMoveHandler, true);
+      document.removeEventListener('mouseup', dragMouseUpHandler, true);
+      window.removeEventListener('scroll', refreshSelectedRing, true);
+      window.removeEventListener('resize', refreshSelectedRing);
+      if (hoverRafId) {
+        window.cancelAnimationFrame(hoverRafId);
+      }
+      document.body.style.userSelect = '';
+      if (hoverRing?.parentElement) hoverRing.parentElement.removeChild(hoverRing);
+      if (selectedRing?.parentElement) selectedRing.parentElement.removeChild(selectedRing);
+      if (dropLine?.parentElement) dropLine.parentElement.removeChild(dropLine);
     };
   }, [isLayoutEditMode, selectedNodeId, showSelectableElements, renderedHtml]);
 
@@ -831,7 +1327,7 @@ const WidgetDemoBySlug: React.FC = () => {
     }
 
     const beforeHtml = root.innerHTML;
-    const existingWidgetWrapper = findWidgetWrappers(root)[0] || null;
+    const existingWidgetWrapper = ensureSingleWidget(root, findWidgetWrappers(root)[0] || null);
 
     if (editAction === 'remove') {
       candidate.remove();
@@ -867,6 +1363,7 @@ const WidgetDemoBySlug: React.FC = () => {
         return;
       }
       candidate.parentElement.insertBefore(widgetWrapper, candidate);
+      ensureSingleWidget(root, widgetWrapper);
       setStatusText(existingWidgetWrapper ? 'Widget vor der Auswahl platziert' : 'Neues Widget vor der Auswahl eingefuegt');
     } else if (editAction === 'placeWidgetInside') {
       const widgetWrapper = existingWidgetWrapper || createWidgetWrapperNode();
@@ -875,6 +1372,7 @@ const WidgetDemoBySlug: React.FC = () => {
         return;
       }
       candidate.appendChild(widgetWrapper);
+      ensureSingleWidget(root, widgetWrapper);
       setStatusText(existingWidgetWrapper ? 'Widget in die Auswahl verschoben' : 'Neues Widget in die Auswahl eingefuegt');
     }
 
@@ -1110,7 +1608,30 @@ const WidgetDemoBySlug: React.FC = () => {
             </div>
           )}
 
-          {isLayoutEditMode && (
+          {isLayoutEditMode && isToolbarCollapsed && (
+            <button
+              data-layout-toolbar="true"
+              onClick={() => setIsToolbarCollapsed(false)}
+              style={{
+                position: 'fixed',
+                right: 16,
+                top: 16,
+                zIndex: 9999,
+                background: '#0f172a',
+                color: '#fff',
+                border: '1px solid #334155',
+                borderRadius: 999,
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontWeight: 700,
+                boxShadow: '0 10px 24px rgba(0, 0, 0, 0.28)'
+              }}
+            >
+              Layout Edit oeffnen
+            </button>
+          )}
+
+          {isLayoutEditMode && !isToolbarCollapsed && (
             <div
               data-layout-toolbar="true"
               style={{
@@ -1127,8 +1648,25 @@ const WidgetDemoBySlug: React.FC = () => {
                 fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif'
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-                Layout Edit Modus
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>
+                  Layout Edit Modus
+                </div>
+                <button
+                  onClick={() => setIsToolbarCollapsed(true)}
+                  style={{
+                    background: '#1e293b',
+                    color: '#fff',
+                    border: '1px solid #334155',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 700
+                  }}
+                >
+                  Minimieren
+                </button>
               </div>
               <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 10 }}>
                 1) Element anklicken, 2) Aktion waehlen, 3) Aktion ausfuehren.

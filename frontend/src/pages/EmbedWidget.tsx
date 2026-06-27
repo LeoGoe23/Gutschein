@@ -4,6 +4,86 @@ import { Box, Typography, Card, CardContent, Divider, TextField } from '@mui/mat
 import { CheckoutData, WidgetVoucherOption, loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
 import { loadDemoDataBySlug } from '../utils/loadDemoData';
 
+interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+const parseCssColor = (value: string): RgbColor | null => {
+  const input = (value || '').trim();
+  if (!input || input === 'transparent' || input === 'rgba(0, 0, 0, 0)') return null;
+
+  const rgbMatch = input.match(/rgba?\(([^)]+)\)/i);
+  if (rgbMatch) {
+    const parts = rgbMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length >= 3 && parts.every((part) => Number.isFinite(part))) {
+      return {
+        r: clamp(Math.round(parts[0]), 0, 255),
+        g: clamp(Math.round(parts[1]), 0, 255),
+        b: clamp(Math.round(parts[2]), 0, 255),
+      };
+    }
+  }
+
+  const hexMatch = input.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const hex = hexMatch[1].length === 3
+      ? hexMatch[1].split('').map((ch) => `${ch}${ch}`).join('')
+      : hexMatch[1];
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+    };
+  }
+
+  return null;
+};
+
+const rgbToCss = (rgb: RgbColor): string => `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+
+const rgbToRgba = (rgb: RgbColor, alpha: number): string => {
+  const a = clamp(alpha, 0, 1);
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+};
+
+const mix = (a: RgbColor, b: RgbColor, amount: number): RgbColor => {
+  const t = clamp(amount, 0, 1);
+  return {
+    r: Math.round(a.r + (b.r - a.r) * t),
+    g: Math.round(a.g + (b.g - a.g) * t),
+    b: Math.round(a.b + (b.b - a.b) * t),
+  };
+};
+
+const relativeLuminance = (rgb: RgbColor): number => {
+  const toLinear = (channel: number) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = toLinear(rgb.r);
+  const g = toLinear(rgb.g);
+  const b = toLinear(rgb.b);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const contrastRatio = (a: RgbColor, b: RgbColor): number => {
+  const l1 = relativeLuminance(a);
+  const l2 = relativeLuminance(b);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const isLikelyDefaultLinkBlue = (rgb: RgbColor): boolean => {
+  const classicBlue = Math.abs(rgb.r - 0) <= 20 && Math.abs(rgb.g - 0) <= 30 && Math.abs(rgb.b - 238) <= 30;
+  const safariBlue = Math.abs(rgb.r - 0) <= 25 && Math.abs(rgb.g - 102) <= 35 && Math.abs(rgb.b - 204) <= 35;
+  return classicBlue || safariBlue;
+};
+
 interface GutscheinOption {
   titel: string;
   betrag: number;
@@ -166,15 +246,36 @@ const EmbedWidget: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [autoFontFamily, setAutoFontFamily] = useState('');
+  const [autoPrimaryColor, setAutoPrimaryColor] = useState('');
+  const [autoTextColor, setAutoTextColor] = useState('');
+  const [autoMutedColor, setAutoMutedColor] = useState('');
+  const [autoSurfaceColor, setAutoSurfaceColor] = useState('');
+  const [autoBorderColor, setAutoBorderColor] = useState('');
 
   // URL parameters für Customization
   const params = new URLSearchParams(window.location.search);
-  const primaryColor = params.get('primaryColor') || '#1976d2';
+  const paramPrimaryColor = params.get('primaryColor') || '';
   const isProspectDemo = params.get('demoMode') === '1';
-  const fontFamily = params.get('fontFamily') || (slug?.toUpperCase() === 'JANKIP' 
+  const paramFontFamily = params.get('fontFamily') || '';
+  const defaultFontFamily = (slug?.toUpperCase() === 'JANKIP' 
     ? "'Cormorant Garamond', Georgia, serif" 
     : "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
-  const backgroundColor = params.get('backgroundColor') || 'transparent';
+  const paramBackgroundColor = params.get('backgroundColor') || '';
+  const primaryColor = paramPrimaryColor || autoPrimaryColor || '#1976d2';
+  const fontFamily = paramFontFamily || autoFontFamily || defaultFontFamily;
+  const backgroundColor = paramBackgroundColor || 'transparent';
+  const textStrongColor = autoTextColor || '#1f2937';
+  const textMutedColor = autoMutedColor || '#64748b';
+  const surfaceColor = autoSurfaceColor || 'rgba(255, 255, 255, 0.74)';
+  const borderColor = autoBorderColor || '#dbe4ee';
+  const buttonTextColor = (() => {
+    const primaryRgb = parseCssColor(primaryColor);
+    if (!primaryRgb) return '#ffffff';
+    const white = { r: 255, g: 255, b: 255 };
+    const dark = { r: 17, g: 24, b: 39 };
+    return contrastRatio(primaryRgb, white) >= 4.5 ? '#ffffff' : rgbToCss(dark);
+  })();
   const parentOrigin = (() => {
     try {
       return document.referrer ? new URL(document.referrer).origin : '*';
@@ -182,6 +283,92 @@ const EmbedWidget: React.FC = () => {
       return '*';
     }
   })();
+
+  useEffect(() => {
+    try {
+      const frameEl = window.frameElement as HTMLIFrameElement | null;
+      if (!frameEl) return;
+
+      const hostElement = frameEl.parentElement || frameEl;
+      const parentDoc = frameEl.ownerDocument;
+      if (!parentDoc) return;
+
+      const hostStyles = window.parent.getComputedStyle(hostElement);
+      const bodyStyles = window.parent.getComputedStyle(parentDoc.body);
+
+      const hostFont = hostStyles.fontFamily?.trim();
+      const bodyFont = bodyStyles.fontFamily?.trim();
+      const resolvedFont = hostFont || bodyFont || '';
+
+      const hostBg = parseCssColor(hostStyles.backgroundColor || '');
+      const bodyBg = parseCssColor(bodyStyles.backgroundColor || '');
+      const baseBg = hostBg || bodyBg || { r: 248, g: 250, b: 252 };
+
+      const hostText = parseCssColor(hostStyles.color || '');
+      const bodyText = parseCssColor(bodyStyles.color || '');
+      const baseText = hostText || bodyText || { r: 31, g: 41, b: 55 };
+
+      const backgroundIsDark = relativeLuminance(baseBg) < 0.42;
+      const cardSurface = backgroundIsDark
+        ? mix(baseBg, { r: 255, g: 255, b: 255 }, 0.16)
+        : mix(baseBg, { r: 255, g: 255, b: 255 }, 0.72);
+      const dividerBorder = backgroundIsDark
+        ? mix(baseBg, { r: 255, g: 255, b: 255 }, 0.34)
+        : mix(baseBg, { r: 15, g: 23, b: 42 }, 0.16);
+      const mutedText = mix(baseText, baseBg, backgroundIsDark ? 0.36 : 0.48);
+
+      const pickPrimaryFromSelectors = (selectors: string[]): RgbColor | null => {
+        for (const selector of selectors) {
+          const nodes = Array.from(hostElement.querySelectorAll<HTMLElement>(selector));
+          for (const node of nodes) {
+            const styles = window.parent.getComputedStyle(node);
+            const bg = parseCssColor(styles.backgroundColor || '');
+            if (bg && !isLikelyDefaultLinkBlue(bg)) return bg;
+
+            const border = parseCssColor(styles.borderColor || '');
+            if (border && !isLikelyDefaultLinkBlue(border)) return border;
+
+            const fg = parseCssColor(styles.color || '');
+            if (fg && !isLikelyDefaultLinkBlue(fg)) return fg;
+          }
+        }
+        return null;
+      };
+
+      const pickedPrimary = pickPrimaryFromSelectors([
+        'button',
+        '[class*="btn"]',
+        '[role="button"]',
+        'h1, h2, h3',
+        '.nav a',
+        'a'
+      ]);
+
+      const primaryRgb = pickedPrimary || mix(baseText, baseBg, 0.18);
+      const contrastOnSurface = contrastRatio(primaryRgb, cardSurface);
+      const tunedPrimary = contrastOnSurface < 3
+        ? (backgroundIsDark
+          ? mix(primaryRgb, { r: 255, g: 255, b: 255 }, 0.28)
+          : mix(primaryRgb, { r: 15, g: 23, b: 42 }, 0.22))
+        : primaryRgb;
+
+      const softenedSurface = backgroundIsDark
+        ? mix(baseBg, { r: 255, g: 255, b: 255 }, 0.12)
+        : mix(baseBg, { r: 255, g: 255, b: 255 }, 0.28);
+      const softenedBorder = backgroundIsDark
+        ? mix(baseBg, { r: 255, g: 255, b: 255 }, 0.24)
+        : mix(baseBg, { r: 17, g: 24, b: 39 }, 0.12);
+
+      if (resolvedFont) setAutoFontFamily(resolvedFont);
+      setAutoPrimaryColor(rgbToCss(tunedPrimary));
+      setAutoTextColor(rgbToCss(baseText));
+      setAutoMutedColor(rgbToCss(mutedText));
+      setAutoSurfaceColor(rgbToRgba(softenedSurface, backgroundIsDark ? 0.42 : 0.74));
+      setAutoBorderColor(rgbToCss(softenedBorder));
+    } catch {
+      // Cross-origin embedding may block parent style access.
+    }
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -384,8 +571,8 @@ const EmbedWidget: React.FC = () => {
     <Box sx={{ 
       bgcolor: backgroundColor,
       fontFamily,
-      pt: 3,
-      pb: 1.5,
+      pt: 6,
+      pb: 3,
       px: { xs: 0, md: 2 },
       position: 'relative',
       '& *': {
@@ -393,12 +580,12 @@ const EmbedWidget: React.FC = () => {
       }
     }}>
       {/* Oberer Divider */}
-      <Box sx={{ mb: 3 }}>
-        <Divider sx={{ borderColor: '#e2e8f0' }} />
+      <Box sx={{ mb: 1.5 }}>
+        <Divider sx={{ borderColor }} />
       </Box>
 
       {/* Powered by rechts oben */}
-      <Box sx={{ position: 'absolute', top: 24, right: 24 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3, px: { xs: 1, md: 0 } }}>
         <Typography 
           component="a" 
           href="https://gutscheinfabrik.de" 
@@ -407,7 +594,8 @@ const EmbedWidget: React.FC = () => {
           variant="caption" 
           sx={{ 
             color: '#9ca3af',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
+            lineHeight: 1,
             textDecoration: 'none',
             '&:hover': {
               color: '#6b7280',
@@ -424,7 +612,7 @@ const EmbedWidget: React.FC = () => {
         sx={{
           textAlign: 'center',
           mb: 1,
-          color: '#1f2937',
+          color: textStrongColor,
           fontSize: { xs: '1.35rem', md: '1.55rem' },
           fontWeight: 700,
           letterSpacing: '-0.01em'
@@ -437,8 +625,8 @@ const EmbedWidget: React.FC = () => {
         variant="body1" 
         sx={{ 
           textAlign: 'center', 
-          mb: 4,
-          color: '#718096',
+          mb: 4.5,
+          color: textMutedColor,
           fontSize: '1rem'
         }}
       >
@@ -531,8 +719,8 @@ const EmbedWidget: React.FC = () => {
         sx={{ 
           display: 'flex',
           overflowX: 'auto',
-          gap: { xs: 1.5, md: 3 },
-          pb: 2,
+          gap: { xs: 2, md: 3.5 },
+          pb: 2.5,
           px: { xs: 0, md: 1 },
           alignItems: 'stretch',
           justifyContent: options.length <= 3 ? 'center' : 'flex-start',
@@ -563,20 +751,22 @@ const EmbedWidget: React.FC = () => {
               flex: '1 1 280px',
               maxWidth: '360px',
               scrollSnapAlign: { xs: 'start', md: 'none' },
-              bgcolor: '#ffffff',
+              bgcolor: surfaceColor,
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
               boxShadow: 'none',
               borderRadius: '12px',
-              border: '1px solid #e2e8f0',
+              border: `1px solid ${borderColor}`,
               transition: 'all 0.3s ease',
               '&:hover': {
-                bgcolor: '#f8fafc',
-                borderColor: '#cbd5e0',
+                bgcolor: surfaceColor,
+                borderColor,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
               },
             }}
           >
             <CardContent sx={{ 
-              p: 2.5,
+              p: 3,
               display: 'flex',
               flexDirection: 'column',
               height: '100%'
@@ -588,7 +778,7 @@ const EmbedWidget: React.FC = () => {
                 sx={{ 
                   mb: 1,
                   fontWeight: 600,
-                  color: '#2d3748',
+                  color: textStrongColor,
                   fontSize: '1.15rem',
                   minHeight: '40px',
                   lineHeight: 1.25,
@@ -606,7 +796,7 @@ const EmbedWidget: React.FC = () => {
                 title={option.inhalt || option.beschreibung || ''}
                 sx={{ 
                   mb: (option.inhalt && option.beschreibung) ? 0.75 : 1.5,
-                  color: '#718096',
+                  color: textMutedColor,
                   fontSize: '0.85rem',
                   lineHeight: 1.4,
                   minHeight: '24px',
@@ -644,7 +834,7 @@ const EmbedWidget: React.FC = () => {
                       variant="body2"
                       sx={{
                         mt: 0.75,
-                        color: '#5f6f86',
+                        color: textMutedColor,
                         fontSize: '0.84rem',
                         lineHeight: 1.45,
                         whiteSpace: 'normal',
@@ -660,7 +850,7 @@ const EmbedWidget: React.FC = () => {
 
               <Box sx={{ flex: 1, minHeight: 12 }} />
 
-              <Divider sx={{ mb: 1.5, borderColor: '#e2e8f0' }} />
+              <Divider sx={{ mb: 1.5, borderColor }} />
 
               {/* Preis - zentriert */}
               {option.type === 'contact' && option.betrag <= 0 ? (
@@ -686,10 +876,10 @@ const EmbedWidget: React.FC = () => {
                         fontSize: '1.5rem',
                         fontWeight: 600,
                         '& fieldset': {
-                          borderColor: '#e2e8f0',
+                            borderColor,
                         },
                         '&:hover fieldset': {
-                          borderColor: '#cbd5e0',
+                            borderColor,
                         },
                         '&.Mui-focused fieldset': {
                           borderColor: primaryColor,
@@ -698,10 +888,10 @@ const EmbedWidget: React.FC = () => {
                       '& input': {
                         textAlign: 'center',
                         padding: '10px 8px',
-                        color: '#1a202c',
+                        color: textStrongColor,
                       },
                       '& input::placeholder': {
-                        color: '#cbd5e0',
+                        color: textMutedColor,
                         opacity: 1,
                       }
                     }}
@@ -710,7 +900,7 @@ const EmbedWidget: React.FC = () => {
                     sx={{ 
                       fontSize: '1.5rem',
                       fontWeight: 600,
-                      color: '#1a202c',
+                      color: textStrongColor,
                       ml: 0.5
                     }}
                   >
@@ -730,12 +920,12 @@ const EmbedWidget: React.FC = () => {
                     variant="h3" 
                     sx={{ 
                       fontWeight: 700,
-                      color: '#1a202c',
+                      color: textStrongColor,
                       fontSize: '2rem'
                     }}
                   >
                     {option.abPreis && (
-                      <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 500, color: '#718096', mr: 0.5 }}>ab</Box>
+                      <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 500, color: textMutedColor, mr: 0.5 }}>ab</Box>
                     )}
                     {option.betrag}€
                   </Typography>
@@ -748,7 +938,7 @@ const EmbedWidget: React.FC = () => {
                 sx={{
                   width: '100%',
                   bgcolor: primaryColor,
-                  color: '#ffffff',
+                  color: buttonTextColor,
                   py: 1.25,
                   px: 3,
                   fontWeight: 500,
@@ -780,7 +970,7 @@ const EmbedWidget: React.FC = () => {
 
       {/* Unterer Divider */}
       <Box sx={{ mt: 3 }}>
-        <Divider sx={{ borderColor: '#e2e8f0' }} />
+        <Divider sx={{ borderColor }} />
       </Box>
     </Box>
   );
