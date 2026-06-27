@@ -229,6 +229,7 @@ const WidgetDemoBySlug: React.FC = () => {
   const [demoTemplate, setDemoTemplate] = useState<DemoTemplateData | null>(null);
   const [demoDocId, setDemoDocId] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const hasAutoScrolledToWidgetRef = useRef(false);
   const [workingHtml, setWorkingHtml] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [editAction, setEditAction] = useState<EditAction>('remove');
@@ -778,6 +779,44 @@ const WidgetDemoBySlug: React.FC = () => {
   const renderedHtml = isLayoutEditMode
     ? (workingHtml || originalHTML)
     : originalHTML;
+
+  useEffect(() => {
+    if (loading) return;
+    if (isLayoutEditMode) return;
+    if (hasAutoScrolledToWidgetRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autoScrollWidget') === '0') return;
+
+    const scrollToWidget = () => {
+      const root = rootRef.current;
+      if (!root) return false;
+
+      const preferredTarget = root.querySelector<HTMLElement>('#gutscheine')
+        || root.querySelector<HTMLElement>('[data-widget-root="1"]')
+        || root.querySelector<HTMLElement>('#gutschein-widget-iframe');
+
+      if (!preferredTarget) return false;
+
+      preferredTarget.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+      hasAutoScrolledToWidgetRef.current = true;
+      return true;
+    };
+
+    // Wait briefly so imported templates and images can settle layout.
+    const timerId = window.setTimeout(() => {
+      if (!scrollToWidget()) {
+        window.requestAnimationFrame(() => {
+          scrollToWidget();
+        });
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timerId);
+  }, [loading, renderedHtml, isLayoutEditMode]);
 
   useEffect(() => {
     if (!isLayoutEditMode) return;
