@@ -8,6 +8,27 @@ import { db } from '../auth/firebase';
 
 const API_URL = ((globalThis as any).process?.env?.REACT_APP_API_URL as string | undefined) || '';
 
+const resolveApiBase = (): string => {
+  const raw = (API_URL || '').trim();
+  const isLocalPage = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+  if (!raw) {
+    return isLocalPage ? 'http://localhost:8080' : '';
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const pointsToLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    if (!isLocalPage && pointsToLocal) {
+      // Prevent broken production calls to localhost.
+      return '';
+    }
+    return raw.replace(/\/$/, '');
+  } catch {
+    return isLocalPage ? raw.replace(/\/$/, '') : '';
+  }
+};
+
 interface RabattCode {
   code: string;
   percent: number;
@@ -225,6 +246,7 @@ function DemoSuccessPage({
   isSending,
   pdfGenerated,
   emailSent,
+  emailSendError,
 }: {
   purchasedBetrag: number;
   selectedDienstleistung?: { shortDesc: string; longDesc: string; price: string } | null;
@@ -232,6 +254,7 @@ function DemoSuccessPage({
   isSending: boolean;
   pdfGenerated: boolean;
   emailSent: boolean;
+  emailSendError: string;
 }) {
   return (
     <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -270,9 +293,15 @@ function DemoSuccessPage({
           </Alert>
         )}
 
-        {!emailSent && !isSending && (
+        {!emailSent && !isSending && !emailSendError && (
           <Alert severity="success">
             Zahlung erfolgreich!
+          </Alert>
+        )}
+
+        {!emailSent && !isSending && emailSendError && (
+          <Alert severity="error">
+            {emailSendError}
           </Alert>
         )}
       </Box>
@@ -308,6 +337,7 @@ export default function DemoCheckoutPage() {
   const [isSending, setIsSending] = useState(false);
   const [pdfGenerated, setPdfGenerated] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [emailSendError, setEmailSendError] = useState('');
   const [rabattCodeInput, setRabattCodeInput] = useState('');
   const [appliedRabatt, setAppliedRabatt] = useState<AppliedRabatt | null>(null);
   const [rabattMessage, setRabattMessage] = useState('');
@@ -582,6 +612,7 @@ export default function DemoCheckoutPage() {
     setPurchasedBetrag(finalBetragToCharge);
     setShowSuccessPage(true);
     setIsSending(true);
+    setEmailSendError('');
 
     try {
       const gutscheinCode = generateGutscheinCode();
@@ -697,7 +728,8 @@ export default function DemoCheckoutPage() {
 
       console.log('📧 Sende Demo-Email...');
       
-      const response = await fetch(`${API_URL}/api/gutscheine/send-gutschein`, {
+      const apiBase = resolveApiBase();
+      const response = await fetch(`${apiBase}/api/gutscheine/send-gutschein`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData),
@@ -755,9 +787,11 @@ export default function DemoCheckoutPage() {
         }
       } else {
         console.error('❌ Email-Versand fehlgeschlagen:', responseData);
+        setEmailSendError(responseData?.error || 'E-Mail konnte nicht versendet werden.');
       }
     } catch (error) {
       console.error('❌ Fehler beim Demo-Checkout:', error);
+      setEmailSendError('Verbindung zum E-Mail-Service fehlgeschlagen. Bitte erneut versuchen.');
     } finally {
       setIsSending(false);
     }
@@ -1031,6 +1065,7 @@ export default function DemoCheckoutPage() {
               isSending={isSending}
               pdfGenerated={pdfGenerated}
               emailSent={emailSent}
+              emailSendError={emailSendError}
             />
           )}
         </Box>
