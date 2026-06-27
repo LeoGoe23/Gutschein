@@ -6,26 +6,24 @@ import { useParams, useLocation } from 'react-router-dom';
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 
-const API_URL = ((globalThis as any).process?.env?.REACT_APP_API_URL as string | undefined) || '';
+const FALLBACK_API_BASE = 'https://gutschein-backend.fly.dev';
 
-const resolveApiBase = (): string => {
-  const raw = (API_URL || '').trim();
-  const isLocalPage = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const parseResponseSafely = async (response: Response): Promise<any> => {
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  const rawText = await response.text();
 
-  if (!raw) {
-    return isLocalPage ? 'http://localhost:8080' : '';
+  if (contentType.includes('application/json')) {
+    try {
+      return rawText ? JSON.parse(rawText) : {};
+    } catch {
+      return { raw: rawText };
+    }
   }
 
   try {
-    const parsed = new URL(raw);
-    const pointsToLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-    if (!isLocalPage && pointsToLocal) {
-      // Prevent broken production calls to localhost.
-      return '';
-    }
-    return raw.replace(/\/$/, '');
+    return rawText ? JSON.parse(rawText) : {};
   } catch {
-    return isLocalPage ? raw.replace(/\/$/, '') : '';
+    return { raw: rawText };
   }
 };
 
@@ -728,15 +726,14 @@ export default function DemoCheckoutPage() {
 
       console.log('📧 Sende Demo-Email...');
       
-      const apiBase = resolveApiBase();
-      const response = await fetch(`${apiBase}/api/gutscheine/send-gutschein`, {
+      const endpoint = `${FALLBACK_API_BASE}/api/gutscheine/send-gutschein`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData),
       });
-
-      const responseData = await response.json();
-      console.log('📥 Response:', responseData);
+      const responseData = await parseResponseSafely(response);
+      console.log('📥 Response:', endpoint, response.status, responseData);
 
       if (response.ok) {
         setEmailSent(true);
