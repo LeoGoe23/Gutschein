@@ -23,7 +23,7 @@
 
   function initWidget() {
     // Finde alle Widget-Container
-    const containers = document.querySelectorAll('[id^="gutschein-widget"]');
+    const containers = document.querySelectorAll('[id^="gutschein-widget"][data-slug]');
     
     containers.forEach(function(container) {
       const slug = container.getAttribute('data-slug');
@@ -31,6 +31,8 @@
       const fontFamily = container.getAttribute('data-font-family');
       const backgroundColor = container.getAttribute('data-background-color');
       const theme = container.getAttribute('data-theme'); // "auto", "light", "dark"
+      const demoMode = container.getAttribute('data-demo-mode');
+      const demoLabel = container.getAttribute('data-demo-label');
       
       if (!slug) {
         console.error('GutscheinWidget: data-slug Attribut fehlt!');
@@ -63,6 +65,8 @@
       if (detectedPrimaryColor) params.push('primaryColor=' + encodeURIComponent(detectedPrimaryColor));
       if (detectedFontFamily) params.push('fontFamily=' + encodeURIComponent(detectedFontFamily));
       if (detectedBgColor) params.push('backgroundColor=' + encodeURIComponent(detectedBgColor));
+      if (demoMode === '1') params.push('demoMode=1');
+      if (demoLabel) params.push('demoLabel=' + encodeURIComponent(demoLabel));
       if (params.length > 0) {
         url += '?' + params.join('&');
       }
@@ -75,6 +79,8 @@
       iframe.style.overflow = 'hidden';
       iframe.title = 'Gutschein Widget';
       iframe.setAttribute('scrolling', 'no');
+      iframe.setAttribute('data-widget-iframe', '1');
+      iframe.setAttribute('data-gutschein-widget', '1');
 
       // Füge iframe zum Container hinzu
       container.appendChild(iframe);
@@ -93,6 +99,9 @@
       console.log('GutscheinWidget: Erfolgreich geladen für Slug:', slug);
     });
   }
+
+  window.GutscheinWidget = window.GutscheinWidget || {};
+  window.GutscheinWidget.init = initWidget;
 
   // Theme-Detection Funktion
   function detectParentTheme() {

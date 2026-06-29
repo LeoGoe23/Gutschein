@@ -23,6 +23,14 @@ interface StoredLayoutPayload {
   workingHtml: string;
 }
 
+const escapeHtmlAttribute = (value: string): string => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+};
+
 const stripLayoutEditorArtifacts = (html: string): string => {
   try {
     // Keep original HTML structure untouched (including style/link tags),
@@ -425,8 +433,6 @@ const WidgetDemoBySlug: React.FC = () => {
     loadShopData();
   }, [slug]);
 
-  // No need for widget script - iframe handles everything
-
   const embedSourceSlug = isRealShop
     ? resolvedSlug
     : (demoTemplate?.slug || slug || 'DEMO');
@@ -436,19 +442,15 @@ const WidgetDemoBySlug: React.FC = () => {
     [embedSourceSlug]
   );
 
-  const embedSrc = isProspectDemo
-    ? `/embed/${encodeURIComponent(embedSourceSlug)}?demoMode=1&demoLabel=${encodeURIComponent(displaySlug)}`
-    : `/embed/${encodeURIComponent(resolvedSlug)}`;
-
-  const widgetIframeMarkup = `
+  const widgetSlug = isRealShop ? resolvedSlug : embedSourceSlug;
+  const widgetLoaderMarkup = `
     <div data-widget-root="1" style="width: 100%;">
-      <iframe
-        data-widget-iframe="1"
-        data-gutschein-widget="1"
-        src="${embedSrc}"
-        style="width: 100%; border: none; overflow: hidden; height: auto; background: transparent; display: block; min-height: 280px;"
-        title="Gutschein Widget"
-      ></iframe>
+      <div
+        id="gutschein-widget"
+        data-slug="${escapeHtmlAttribute(widgetSlug)}"
+        data-theme="auto"
+        ${isProspectDemo ? `data-demo-mode="1" data-demo-label="${escapeHtmlAttribute(displaySlug)}"` : ''}
+      ></div>
     </div>
   `;
 
@@ -457,20 +459,16 @@ const WidgetDemoBySlug: React.FC = () => {
     wrapper.setAttribute('data-widget-root', '1');
     wrapper.style.width = '100%';
 
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('data-widget-iframe', '1');
-    iframe.setAttribute('data-gutschein-widget', '1');
-    iframe.setAttribute('src', embedSrc);
-    iframe.setAttribute('title', 'Gutschein Widget');
-    iframe.style.width = '100%';
-    iframe.style.border = 'none';
-    iframe.style.overflow = 'hidden';
-    iframe.style.height = 'auto';
-    iframe.style.background = 'transparent';
-    iframe.style.display = 'block';
-    iframe.style.minHeight = '280px';
+    const container = document.createElement('div');
+    container.id = 'gutschein-widget';
+    container.setAttribute('data-slug', widgetSlug);
+    container.setAttribute('data-theme', 'auto');
+    if (isProspectDemo) {
+      container.setAttribute('data-demo-mode', '1');
+      container.setAttribute('data-demo-label', displaySlug);
+    }
 
-    wrapper.appendChild(iframe);
+    wrapper.appendChild(container);
     return wrapper;
   };
 
@@ -634,7 +632,7 @@ const WidgetDemoBySlug: React.FC = () => {
             </h2>
             
             <!-- WIDGET INTEGRATION -->
-            ${widgetIframeMarkup}
+            ${widgetLoaderMarkup}
         </div>
     </section>
 
@@ -739,7 +737,7 @@ const WidgetDemoBySlug: React.FC = () => {
     <section id="gutscheine" class="gutschein-section">
       <div class="gutschein-container">
         <h2 class="gutschein-title">Gutschein kaufen</h2>
-        ${widgetIframeMarkup}
+        ${widgetLoaderMarkup}
       </div>
     </section>
   `;
@@ -761,14 +759,14 @@ const WidgetDemoBySlug: React.FC = () => {
       }
 
       if (enhancedTemplate.includes('{{WIDGET_IFRAME}}')) {
-        return enhancedTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetIframeMarkup);
+        return enhancedTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetLoaderMarkup);
       }
 
       if (containsWidgetMarkup(enhancedTemplate)) {
         return enhancedTemplate;
       }
 
-      return `${enhancedTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetIframeMarkup}</div></section>`;
+      return `${enhancedTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetLoaderMarkup}</div></section>`;
     }
 
     if (demoTemplate) {
@@ -781,6 +779,53 @@ const WidgetDemoBySlug: React.FC = () => {
   const renderedHtml = isLayoutEditMode
     ? (workingHtml || originalHTML)
     : originalHTML;
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const containers = Array.from(root.querySelectorAll<HTMLElement>('[id^="gutschein-widget"][data-slug]'));
+    if (containers.length === 0) return;
+
+    const resetWidgetInstances = () => {
+      containers.forEach((container) => {
+        container.querySelectorAll('iframe').forEach((iframe) => iframe.remove());
+      });
+      root
+        .querySelectorAll<HTMLIFrameElement>('iframe[data-widget-iframe="1"], iframe[data-gutschein-widget="1"], iframe[src*="/embed/"]')
+        .forEach((iframe) => {
+          if (!iframe.closest('[id^="gutschein-widget"][data-slug]')) {
+            iframe.remove();
+          }
+        });
+    };
+
+    const runLoader = () => {
+      resetWidgetInstances();
+      const loaderApi = (window as any).GutscheinWidget;
+      if (loaderApi && typeof loaderApi.init === 'function') {
+        loaderApi.init();
+      }
+    };
+
+    const existingLoader = (window as any).GutscheinWidget;
+    if (existingLoader && typeof existingLoader.init === 'function') {
+      runLoader();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = '/widget.js';
+    script.async = true;
+    script.onload = () => {
+      runLoader();
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      script.onload = null;
+    };
+  }, [renderedHtml]);
 
   useEffect(() => {
     if (loading) return;

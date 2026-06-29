@@ -68,6 +68,7 @@ type WidgetConfig = {
 
 type ShopRecord = {
   id: string;
+  slug: string;
   unternehmensname: string;
   stripeAccountId: string;
   website: string;
@@ -213,6 +214,7 @@ export default function AdminShopManage() {
         const data = snap.data() as any;
         const nextShop: ShopRecord = {
           id: snap.id,
+          slug: data?.slug || '',
           unternehmensname: data?.Checkout?.Unternehmensname || data?.Unternehmensdaten?.Unternehmensname || data?.email || snap.id,
           stripeAccountId: data?.Checkout?.StripeAccountId || '',
           website: data?.Checkout?.Website || '',
@@ -421,6 +423,44 @@ export default function AdminShopManage() {
     }
   };
 
+  const copyWidgetCode = async () => {
+    const normalizedSlug = String(shop?.slug || '').trim();
+    if (!normalizedSlug) {
+      setError('Kein Slug gefunden. Bitte zuerst einen gültigen Shop-Slug hinterlegen.');
+      setSuccess('');
+      return;
+    }
+
+    const scriptUrl = window.location.origin.includes('localhost')
+      ? 'https://gutscheinery.de/widget.js'
+      : `${window.location.origin}/widget.js`;
+
+    const embedCode = `<div id="gutschein-widget" data-slug="${normalizedSlug}" data-theme="auto"></div>\n<script src="${scriptUrl}"></script>`;
+
+    try {
+      await navigator.clipboard.writeText(embedCode);
+      setSuccess('Widget-Code wurde in die Zwischenablage kopiert.');
+      setError('');
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = embedCode;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (successful) {
+        setSuccess('Widget-Code wurde in die Zwischenablage kopiert.');
+        setError('');
+      } else {
+        setError('Kopieren fehlgeschlagen. Bitte Browser-Berechtigungen prüfen.');
+        setSuccess('');
+      }
+    }
+  };
+
   if (isAdmin === null || loading) {
     return (
       <Box sx={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -448,6 +488,9 @@ export default function AdminShopManage() {
             </Typography>
             <Typography variant="subtitle2" color="text.secondary">
               ID: {shop?.id}
+            </Typography>
+            <Typography variant="subtitle2" color="text.secondary">
+              Slug: {shop?.slug || 'nicht gesetzt'}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -498,6 +541,13 @@ export default function AdminShopManage() {
               sx={{ fontWeight: 600 }}
             >
               Extra-Slug Seite detail-editieren
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={copyWidgetCode}
+              sx={{ fontWeight: 600 }}
+            >
+              Widget-Code kopieren
             </Button>
             {shop?.stripeAccountId && (
               <Button
