@@ -86,14 +86,19 @@ const isLikelyDefaultLinkBlue = (rgb: RgbColor): boolean => {
 
 interface GutscheinOption {
   titel: string;
+  titelEn?: string;
   betrag: number;
   kategorie?: string;
+  kategorieEn?: string;
   abPreis?: boolean;
   inhalt?: string;
+  inhaltEn?: string;
   beschreibung?: string;
+  beschreibungEn?: string;
   type?: 'gutschein' | 'contact';
   contactUrl?: string;
   buttonLabel?: string;
+  buttonLabelEn?: string;
 }
 
 const normalizeCategory = (value: unknown): string | undefined => {
@@ -253,14 +258,19 @@ const buildOptionsFromCustom = (
         || inferCategoryFromText(voucher.titel.trim(), beschreibung);
       loadedOptions.push({
         titel: voucher.titel.trim(),
+        titelEn: typeof (voucher as any).titelEn === 'string' ? (voucher as any).titelEn.trim() : undefined,
         betrag: amount,
         abPreis: Boolean((voucher as any).abPreis),
         inhalt: (voucher as any).inhalt?.trim() || undefined,
+        inhaltEn: (voucher as any).inhaltEn?.trim() || undefined,
         beschreibung,
+        beschreibungEn: (voucher as any).beschreibungEn?.trim() || undefined,
         kategorie,
+        kategorieEn: normalizeCategory((voucher as any).kategorieEn),
         type: 'contact',
         contactUrl: url,
         buttonLabel: (voucher as any).buttonLabel?.trim() || undefined,
+        buttonLabelEn: (voucher as any).buttonLabelEn?.trim() || undefined,
       });
     } else {
       const amount = toAmount(voucher.betrag);
@@ -270,11 +280,15 @@ const buildOptionsFromCustom = (
         || inferCategoryFromText(voucher.titel.trim(), beschreibung);
       loadedOptions.push({
         titel: voucher.titel.trim(),
+        titelEn: typeof (voucher as any).titelEn === 'string' ? (voucher as any).titelEn.trim() : undefined,
         betrag: amount,
         abPreis: Boolean((voucher as any).abPreis),
         inhalt: (voucher as any).inhalt?.trim() || undefined,
+        inhaltEn: (voucher as any).inhaltEn?.trim() || undefined,
         beschreibung,
+        beschreibungEn: (voucher as any).beschreibungEn?.trim() || undefined,
         kategorie,
+        kategorieEn: normalizeCategory((voucher as any).kategorieEn),
         type: 'gutschein',
       });
     }
@@ -288,6 +302,8 @@ const EmbedWidget: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState<GutscheinOption[]>([]);
   const [widgetDisplayMode, setWidgetDisplayMode] = useState<'categorized' | 'flat'>('categorized');
+  const [englishEnabled, setEnglishEnabled] = useState(false);
+  const [language, setLanguage] = useState<'de' | 'en'>('de');
   const [error, setError] = useState('');
   const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
   const [selectedOptionByCategory, setSelectedOptionByCategory] = useState<{ [kategorie: string]: number }>({});
@@ -332,6 +348,37 @@ const EmbedWidget: React.FC = () => {
       return '*';
     }
   })();
+
+  const i18n = useMemo(() => {
+    if (language === 'en') {
+      return {
+        title: 'Buy Voucher',
+        subtitle: 'Buy now and receive instantly by email',
+        fallbackCategory: 'Care Packages',
+        serviceLabel: 'Service',
+        startingAt: 'starting at',
+        toVoucher: 'Get Voucher',
+        contact: 'Contact me',
+        customAmountPlaceholder: '50',
+      };
+    }
+    return {
+      title: 'Gutschein kaufen',
+      subtitle: 'Jetzt kaufen und sofort per E-Mail erhalten',
+      fallbackCategory: 'Weitere Angebote',
+      serviceLabel: 'Leistung',
+      startingAt: 'ab',
+      toVoucher: 'Zum Gutschein',
+      contact: 'Jetzt anfragen',
+      customAmountPlaceholder: '50',
+    };
+  }, [language]);
+
+  const resolveInitialLanguage = (mode: 'de' | 'en' | 'auto'): 'de' | 'en' => {
+    if (mode === 'de' || mode === 'en') return mode;
+    const navigatorLanguage = (typeof navigator !== 'undefined' ? navigator.language : '').toLowerCase();
+    return navigatorLanguage.startsWith('en') ? 'en' : 'de';
+  };
 
   useEffect(() => {
     try {
@@ -446,6 +493,12 @@ const EmbedWidget: React.FC = () => {
             : buildOptionsFromCheckout(data, includeCustomValue);
 
           setWidgetDisplayMode(data.widgetConfig.displayMode === 'flat' ? 'flat' : 'categorized');
+          const hasEnglish = Boolean((data.widgetConfig as any).enableEnglish);
+          const languageDefault = (data.widgetConfig as any).languageDefault === 'en'
+            ? 'en'
+            : (((data.widgetConfig as any).languageDefault === 'auto') ? 'auto' : 'de');
+          setEnglishEnabled(hasEnglish);
+          setLanguage(hasEnglish ? resolveInitialLanguage(languageDefault) : 'de');
 
           if (loadedOptions.length === 0) {
             setError('Keine Widget-Gutscheine verfügbar.');
@@ -461,9 +514,13 @@ const EmbedWidget: React.FC = () => {
               const demoOptions = buildOptionsFromDemo(demoData.dienstleistungen || [], demoData.customValue);
               setOptions(demoOptions.length > 0 ? demoOptions : PROSPECT_DEMO_OPTIONS);
               setWidgetDisplayMode('categorized');
+              setEnglishEnabled(false);
+              setLanguage('de');
             } else {
               setOptions(PROSPECT_DEMO_OPTIONS);
               setWidgetDisplayMode('categorized');
+              setEnglishEnabled(false);
+              setLanguage('de');
             }
           } else {
             setError('Gutschein-Daten nicht gefunden');
@@ -477,9 +534,13 @@ const EmbedWidget: React.FC = () => {
             const demoOptions = buildOptionsFromDemo(demoData.dienstleistungen || [], demoData.customValue);
             setOptions(demoOptions.length > 0 ? demoOptions : PROSPECT_DEMO_OPTIONS);
             setWidgetDisplayMode('categorized');
+            setEnglishEnabled(false);
+            setLanguage('de');
           } else {
             setOptions(PROSPECT_DEMO_OPTIONS);
             setWidgetDisplayMode('categorized');
+            setEnglishEnabled(false);
+            setLanguage('de');
           }
           setError('');
         } else {
@@ -504,7 +565,7 @@ const EmbedWidget: React.FC = () => {
     const grouped = new Map<string, Array<{ option: GutscheinOption; originalIndex: number }>>();
 
     options.forEach((option, originalIndex) => {
-      const kategorie = option.kategorie?.trim() || 'Weitere Angebote';
+      const kategorie = option.kategorie?.trim() || i18n.fallbackCategory;
       if (!grouped.has(kategorie)) {
         grouped.set(kategorie, []);
       }
@@ -514,7 +575,7 @@ const EmbedWidget: React.FC = () => {
     return Array.from(grouped.entries())
       .map(([kategorie, items]) => ({ kategorie, items }))
       .sort((a, b) => a.items[0].originalIndex - b.items[0].originalIndex);
-  }, [options, widgetDisplayMode]);
+  }, [options, widgetDisplayMode, i18n.fallbackCategory]);
 
   useEffect(() => {
     setSelectedOptionByCategory((prev) => {
@@ -604,7 +665,7 @@ const EmbedWidget: React.FC = () => {
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, [loading, categoryCards, selectedOptionByCategory, backgroundColor, parentOrigin, canScrollLeft, canScrollRight]);
+  }, [loading, categoryCards, selectedOptionByCategory, backgroundColor, parentOrigin, canScrollLeft, canScrollRight, language, englishEnabled]);
 
   const scrollCards = (direction: 'left' | 'right') => {
     const container = scrollContainerRef.current;
@@ -647,11 +708,15 @@ const EmbedWidget: React.FC = () => {
       betrag = parseFloat(customAmounts[index]) || 0;
     }
     
+    const selectedTitle = language === 'en'
+      ? (option.titelEn?.trim() || (option.titel === 'Freier Betrag' ? 'Custom Amount' : option.titel))
+      : option.titel;
+
     window.parent.postMessage({ 
       type: 'gutscheinSelected', 
       slug, 
       betrag,
-      titel: option.titel 
+      titel: selectedTitle 
     }, parentOrigin);
   };
 
@@ -706,7 +771,53 @@ const EmbedWidget: React.FC = () => {
       </Box>
 
       {/* Powered by rechts oben */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3, px: { xs: 1, md: 0 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, px: { xs: 1, md: 0 } }}>
+        <Box>
+          {englishEnabled && (
+            <Box
+              sx={{
+                display: 'inline-flex',
+                border: `1px solid ${borderColor}`,
+                borderRadius: '999px',
+                overflow: 'hidden',
+                bgcolor: 'rgba(255,255,255,0.7)'
+              }}
+            >
+              <Box
+                component="button"
+                onClick={() => setLanguage('de')}
+                sx={{
+                  border: 'none',
+                  px: 1.4,
+                  py: 0.45,
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  bgcolor: language === 'de' ? primaryColor : 'transparent',
+                  color: language === 'de' ? buttonTextColor : textStrongColor,
+                }}
+              >
+                DE
+              </Box>
+              <Box
+                component="button"
+                onClick={() => setLanguage('en')}
+                sx={{
+                  border: 'none',
+                  px: 1.4,
+                  py: 0.45,
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  bgcolor: language === 'en' ? primaryColor : 'transparent',
+                  color: language === 'en' ? buttonTextColor : textStrongColor,
+                }}
+              >
+                EN
+              </Box>
+            </Box>
+          )}
+        </Box>
         <Typography 
           component="a" 
           href="https://gutscheinery.de" 
@@ -739,7 +850,7 @@ const EmbedWidget: React.FC = () => {
           letterSpacing: '-0.01em'
         }}
       >
-        Gutschein kaufen
+        {i18n.title}
       </Typography>
       
       <Typography 
@@ -751,7 +862,7 @@ const EmbedWidget: React.FC = () => {
           fontSize: '1rem'
         }}
       >
-        Jetzt kaufen und sofort per E-Mail erhalten
+        {i18n.subtitle}
       </Typography>
 
       {categoryCards.length > 1 && (
@@ -868,13 +979,21 @@ const EmbedWidget: React.FC = () => {
           const selectedItem = card.items.find((item) => item.originalIndex === selectedIndex) || card.items[0];
           const option = selectedItem.option;
           const originalIndex = selectedItem.originalIndex;
+          const localizedTitle = language === 'en'
+            ? (option.titelEn?.trim() || (option.titel === 'Freier Betrag' ? 'Custom Amount' : option.titel))
+            : option.titel;
+          const localizedCategoryTitle = language === 'en'
+            ? (option.kategorieEn?.trim() || (card.kategorie === 'Weitere Angebote' ? i18n.fallbackCategory : card.kategorie))
+            : card.kategorie;
           const pricedItems = card.items.filter((item) => item.option.type !== 'contact' && item.option.betrag > 0);
           const minCategoryAmount = pricedItems.length > 0
             ? Math.min(...pricedItems.map((item) => item.option.betrag))
             : 0;
           const userHasChosen = Boolean(hasUserSelectionByCategory[card.kategorie]);
           const showAbPrice = !userHasChosen && card.items.length > 1 && minCategoryAmount > 0 && option.type !== 'contact';
-          const detailText = option.inhalt || option.beschreibung || option.titel;
+          const detailText = language === 'en'
+            ? (option.inhaltEn || option.beschreibungEn || option.inhalt || option.beschreibung || localizedTitle)
+            : (option.inhalt || option.beschreibung || option.titel);
           const isFlatCard = widgetDisplayMode === 'flat';
 
           return (
@@ -909,7 +1028,7 @@ const EmbedWidget: React.FC = () => {
               {/* Kategorie-Titel */}
               <Typography 
                 variant="h6" 
-                title={isFlatCard ? option.titel : card.kategorie}
+                title={isFlatCard ? localizedTitle : localizedCategoryTitle}
                 sx={{ 
                   mb: 1,
                   fontWeight: 600,
@@ -922,14 +1041,14 @@ const EmbedWidget: React.FC = () => {
                   wordBreak: 'break-word'
                 }}
               >
-                {isFlatCard ? option.titel : card.kategorie}
+                {isFlatCard ? localizedTitle : localizedCategoryTitle}
               </Typography>
 
               {card.items.length > 1 ? (
                 <TextField
                   select
                   size="small"
-                  label="Leistung"
+                  label={i18n.serviceLabel}
                   value={originalIndex}
                   onChange={(e) => {
                     const nextIndex = Number(e.target.value);
@@ -951,7 +1070,9 @@ const EmbedWidget: React.FC = () => {
                 >
                   {card.items.map((item) => (
                     <MenuItem key={`${card.kategorie}-${item.originalIndex}`} value={item.originalIndex}>
-                      {item.option.titel}
+                      {language === 'en'
+                        ? (item.option.titelEn?.trim() || (item.option.titel === 'Freier Betrag' ? 'Custom Amount' : item.option.titel))
+                        : item.option.titel}
                       {item.option.type !== 'contact' && item.option.betrag > 0 ? ` - ${item.option.betrag}€` : ''}
                       {item.option.type === 'contact' && item.option.betrag > 0 ? ` - ${item.option.betrag}€` : ''}
                     </MenuItem>
@@ -960,7 +1081,7 @@ const EmbedWidget: React.FC = () => {
               ) : (
                 !isFlatCard ? <Typography
                   variant="body2"
-                  title={option.titel}
+                  title={localizedTitle}
                   sx={{
                     mb: 1,
                     color: textStrongColor,
@@ -973,7 +1094,7 @@ const EmbedWidget: React.FC = () => {
                     wordBreak: 'break-word'
                   }}
                 >
-                  {option.titel}
+                  {localizedTitle}
                 </Typography> : <Box sx={{ mb: 1 }} />
               )}
 
@@ -1012,7 +1133,7 @@ const EmbedWidget: React.FC = () => {
                 }}>
                   <TextField
                     type="number"
-                    placeholder="50"
+                    placeholder={i18n.customAmountPlaceholder}
                     value={customAmounts[originalIndex] || ''}
                     onChange={(e) => handleCustomAmountChange(originalIndex, e.target.value)}
                     inputProps={{ min: 10, step: 5 }}
@@ -1072,7 +1193,7 @@ const EmbedWidget: React.FC = () => {
                     }}
                   >
                     {(showAbPrice || option.abPreis) && (
-                      <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 500, color: textMutedColor, mr: 0.5 }}>ab</Box>
+                      <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 500, color: textMutedColor, mr: 0.5 }}>{i18n.startingAt}</Box>
                     )}
                     {showAbPrice ? minCategoryAmount : option.betrag}€
                   </Typography>
@@ -1107,8 +1228,10 @@ const EmbedWidget: React.FC = () => {
                 }}
               >
                 {option.type === 'contact'
-                  ? (option.buttonLabel || 'Jetzt anfragen')
-                  : 'Zum Gutschein'}
+                  ? (language === 'en'
+                    ? (option.buttonLabelEn || option.buttonLabel || i18n.contact)
+                    : (option.buttonLabel || i18n.contact))
+                  : i18n.toVoucher}
               </Box>
             </CardContent>
           </Card>

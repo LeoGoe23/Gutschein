@@ -50,12 +50,18 @@ type WidgetVoucherOption = {
   id: string;
   type: 'gutschein' | 'contact';
   titel: string;
+  titelEn: string;
   betrag: number;
   abPreis: boolean;
   inhalt: string;
+  inhaltEn: string;
   beschreibung: string;
+  beschreibungEn: string;
   contactUrl: string;
   buttonLabel: string;
+  buttonLabelEn: string;
+  kategorie: string;
+  kategorieEn: string;
 };
 
 type WidgetConfig = {
@@ -63,6 +69,8 @@ type WidgetConfig = {
   source: WidgetVoucherSource;
   customValue: boolean;
   displayMode: 'categorized' | 'flat';
+  enableEnglish: boolean;
+  languageDefault: 'de' | 'en' | 'auto';
   customVouchers: WidgetVoucherOption[];
 };
 
@@ -99,12 +107,18 @@ const createDefaultWidgetVoucher = (): WidgetVoucherOption => ({
   id: `voucher-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   type: 'gutschein',
   titel: '',
+  titelEn: '',
   betrag: 50,
   abPreis: false,
   inhalt: '',
+  inhaltEn: '',
   beschreibung: '',
+  beschreibungEn: '',
   contactUrl: '',
   buttonLabel: '',
+  buttonLabelEn: '',
+  kategorie: '',
+  kategorieEn: '',
 });
 
 const defaultWidgetConfig: WidgetConfig = {
@@ -112,6 +126,8 @@ const defaultWidgetConfig: WidgetConfig = {
   source: 'checkout',
   customValue: false,
   displayMode: 'categorized',
+  enableEnglish: false,
+  languageDefault: 'de',
   customVouchers: [createDefaultWidgetVoucher()],
 };
 
@@ -119,6 +135,10 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
   const raw = (value || {}) as Partial<WidgetConfig>;
   const source: WidgetVoucherSource = raw.source === 'custom' ? 'custom' : 'checkout';
   const displayMode: 'categorized' | 'flat' = raw.displayMode === 'flat' ? 'flat' : 'categorized';
+  const enableEnglish = Boolean((raw as any).enableEnglish);
+  const languageDefault: 'de' | 'en' | 'auto' = (raw as any).languageDefault === 'en'
+    ? 'en'
+    : ((raw as any).languageDefault === 'auto' ? 'auto' : 'de');
   const customValue = Boolean(raw.customValue);
 
   const rawVouchers = Array.isArray(raw.customVouchers) ? raw.customVouchers : [];
@@ -131,12 +151,18 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
         id: typeof voucher.id === 'string' && voucher.id.trim() ? voucher.id : `voucher-${index + 1}`,
         type: voucherType,
         titel: typeof voucher.titel === 'string' ? voucher.titel : '',
+        titelEn: typeof (voucher as any).titelEn === 'string' ? (voucher as any).titelEn : '',
         betrag: Number.isFinite(betrag) ? betrag : 0,
         abPreis: Boolean(voucher.abPreis),
         inhalt: typeof voucher.inhalt === 'string' ? voucher.inhalt : '',
+        inhaltEn: typeof (voucher as any).inhaltEn === 'string' ? (voucher as any).inhaltEn : '',
         beschreibung: typeof voucher.beschreibung === 'string' ? voucher.beschreibung : '',
+        beschreibungEn: typeof (voucher as any).beschreibungEn === 'string' ? (voucher as any).beschreibungEn : '',
         contactUrl: typeof voucher.contactUrl === 'string' ? voucher.contactUrl : '',
         buttonLabel: typeof voucher.buttonLabel === 'string' ? voucher.buttonLabel : '',
+        buttonLabelEn: typeof (voucher as any).buttonLabelEn === 'string' ? (voucher as any).buttonLabelEn : '',
+        kategorie: typeof (voucher as any).kategorie === 'string' ? (voucher as any).kategorie : '',
+        kategorieEn: typeof (voucher as any).kategorieEn === 'string' ? (voucher as any).kategorieEn : '',
       };
     })
     .filter((voucher) => voucher.titel.trim().length > 0 && (voucher.type === 'contact' || voucher.betrag > 0));
@@ -146,6 +172,8 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
     source,
     customValue,
     displayMode,
+    enableEnglish,
+    languageDefault,
     customVouchers: vouchers.length > 0 ? vouchers : [createDefaultWidgetVoucher()],
   };
 };
@@ -334,9 +362,15 @@ export default function AdminShopManage() {
         betrag: Number(voucher.betrag),
         abPreis: Boolean(voucher.abPreis),
         inhalt: voucher.inhalt.trim(),
+        inhaltEn: voucher.inhaltEn.trim(),
         beschreibung: voucher.beschreibung.trim(),
+        beschreibungEn: voucher.beschreibungEn.trim(),
+        titelEn: voucher.titelEn.trim(),
         contactUrl: voucher.contactUrl.trim(),
         buttonLabel: voucher.buttonLabel.trim(),
+        buttonLabelEn: voucher.buttonLabelEn.trim(),
+        kategorie: voucher.kategorie.trim(),
+        kategorieEn: voucher.kategorieEn.trim(),
       }))
       .filter((voucher) =>
         voucher.titel.length > 0 &&
@@ -353,6 +387,8 @@ export default function AdminShopManage() {
       source: form.widgetConfig.source,
       customValue: form.widgetConfig.customValue,
       displayMode: form.widgetConfig.displayMode,
+      enableEnglish: form.widgetConfig.enableEnglish,
+      languageDefault: form.widgetConfig.enableEnglish ? form.widgetConfig.languageDefault : 'de',
       customVouchers: sanitizedWidgetVouchers,
     };
 
@@ -732,6 +768,35 @@ export default function AdminShopManage() {
                 <MenuItem value="flat">Alle Gutscheine einzeln anzeigen</MenuItem>
               </Select>
             </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="widget-language-option-label">Sprachen im Widget</InputLabel>
+              <Select
+                labelId="widget-language-option-label"
+                value={form.widgetConfig.enableEnglish ? 'de-en' : 'de-only'}
+                label="Sprachen im Widget"
+                disabled={!form.widgetConfig.enabled}
+                onChange={(e) => updateWidgetField('enableEnglish', e.target.value === 'de-en')}
+              >
+                <MenuItem value="de-only">Nur Deutsch</MenuItem>
+                <MenuItem value="de-en">Deutsch + Englisch (optional)</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="widget-default-language-label">Standard-Sprache</InputLabel>
+              <Select
+                labelId="widget-default-language-label"
+                value={form.widgetConfig.languageDefault}
+                label="Standard-Sprache"
+                disabled={!form.widgetConfig.enabled || !form.widgetConfig.enableEnglish}
+                onChange={(e) => updateWidgetField('languageDefault', e.target.value as 'de' | 'en' | 'auto')}
+              >
+                <MenuItem value="auto">Automatisch (Browser-Sprache)</MenuItem>
+                <MenuItem value="de">Deutsch</MenuItem>
+                <MenuItem value="en">Englisch</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
           {form.widgetConfig.source === 'custom' && form.widgetConfig.enabled && (
@@ -761,6 +826,14 @@ export default function AdminShopManage() {
                         value={voucher.titel}
                         onChange={(e) => updateWidgetVoucher(voucher.id, 'titel', e.target.value)}
                       />
+                      {form.widgetConfig.enableEnglish && (
+                        <TextField
+                          fullWidth
+                          label="Title (EN, optional)"
+                          value={voucher.titelEn}
+                          onChange={(e) => updateWidgetVoucher(voucher.id, 'titelEn', e.target.value)}
+                        />
+                      )}
                       <FormControl fullWidth>
                         <InputLabel id={`voucher-type-${voucher.id}`}>Typ</InputLabel>
                         <Select
@@ -805,6 +878,15 @@ export default function AdminShopManage() {
                             value={voucher.buttonLabel}
                             onChange={(e) => updateWidgetVoucher(voucher.id, 'buttonLabel', e.target.value)}
                           />
+                          {form.widgetConfig.enableEnglish && (
+                            <TextField
+                              fullWidth
+                              label="Button-Text (EN, optional)"
+                              placeholder="Contact me"
+                              value={voucher.buttonLabelEn}
+                              onChange={(e) => updateWidgetVoucher(voucher.id, 'buttonLabelEn', e.target.value)}
+                            />
+                          )}
                           <Box
                             component="label"
                             sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none', pl: 0.5 }}
@@ -850,6 +932,22 @@ export default function AdminShopManage() {
                     )}
                     <TextField
                       fullWidth
+                      label="Kategorie (optional)"
+                      value={voucher.kategorie}
+                      onChange={(e) => updateWidgetVoucher(voucher.id, 'kategorie', e.target.value)}
+                      sx={{ mt: 1.5 }}
+                    />
+                    {form.widgetConfig.enableEnglish && (
+                      <TextField
+                        fullWidth
+                        label="Category (EN, optional)"
+                        value={voucher.kategorieEn}
+                        onChange={(e) => updateWidgetVoucher(voucher.id, 'kategorieEn', e.target.value)}
+                        sx={{ mt: 1.5 }}
+                      />
+                    )}
+                    <TextField
+                      fullWidth
                       multiline
                       minRows={2}
                       label="Inhalt (sofort sichtbar, optional)"
@@ -857,6 +955,17 @@ export default function AdminShopManage() {
                       onChange={(e) => updateWidgetVoucher(voucher.id, 'inhalt', e.target.value)}
                       sx={{ mt: 1.5 }}
                     />
+                    {form.widgetConfig.enableEnglish && (
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        label="Content (EN, optional)"
+                        value={voucher.inhaltEn}
+                        onChange={(e) => updateWidgetVoucher(voucher.id, 'inhaltEn', e.target.value)}
+                        sx={{ mt: 1.5 }}
+                      />
+                    )}
                     <TextField
                       fullWidth
                       multiline
@@ -866,6 +975,17 @@ export default function AdminShopManage() {
                       onChange={(e) => updateWidgetVoucher(voucher.id, 'beschreibung', e.target.value)}
                       sx={{ mt: 1.5 }}
                     />
+                    {form.widgetConfig.enableEnglish && (
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        label="Description (EN, optional)"
+                        value={voucher.beschreibungEn}
+                        onChange={(e) => updateWidgetVoucher(voucher.id, 'beschreibungEn', e.target.value)}
+                        sx={{ mt: 1.5 }}
+                      />
+                    )}
                   </Box>
                 ))}
               </Box>

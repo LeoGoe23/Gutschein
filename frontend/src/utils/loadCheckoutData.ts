@@ -20,13 +20,18 @@ export interface WidgetVoucherOption {
   id: string;
   type: 'gutschein' | 'contact';
   titel: string;
+  titelEn?: string;
   betrag: number;
   kategorie?: string;
+  kategorieEn?: string;
   abPreis?: boolean;
   inhalt?: string;
+  inhaltEn?: string;
   beschreibung?: string;
+  beschreibungEn?: string;
   contactUrl?: string;
   buttonLabel?: string;
+  buttonLabelEn?: string;
 }
 
 export interface WidgetConfig {
@@ -34,6 +39,8 @@ export interface WidgetConfig {
   source: 'checkout' | 'custom';
   customValue: boolean;
   displayMode: 'categorized' | 'flat';
+  enableEnglish?: boolean;
+  languageDefault?: 'de' | 'en' | 'auto';
   customVouchers: WidgetVoucherOption[];
 }
 
@@ -62,6 +69,10 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
   const raw = (value || {}) as Partial<WidgetConfig>;
   const source: 'checkout' | 'custom' = raw.source === 'custom' ? 'custom' : 'checkout';
   const displayMode: 'categorized' | 'flat' = raw.displayMode === 'flat' ? 'flat' : 'categorized';
+  const enableEnglish = Boolean((raw as any).enableEnglish);
+  const languageDefault: 'de' | 'en' | 'auto' = (raw as any).languageDefault === 'en'
+    ? 'en'
+    : ((raw as any).languageDefault === 'auto' ? 'auto' : 'de');
   const vouchers: WidgetVoucherOption[] = (Array.isArray(raw.customVouchers) ? raw.customVouchers : [])
     .map((entry, index) => {
       const voucher = entry as Partial<WidgetVoucherOption>;
@@ -71,15 +82,20 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
         id: typeof voucher.id === 'string' && voucher.id.trim() ? voucher.id : `voucher-${index + 1}`,
         type: voucherType,
         titel: typeof voucher.titel === 'string' ? voucher.titel : '',
+        titelEn: typeof (voucher as any).titelEn === 'string' ? (voucher as any).titelEn : '',
         betrag: Number.isFinite(betrag) ? betrag : 0,
         kategorie: typeof (voucher as any).kategorie === 'string'
           ? (voucher as any).kategorie
           : (typeof (voucher as any).category === 'string' ? (voucher as any).category : ''),
+        kategorieEn: typeof (voucher as any).kategorieEn === 'string' ? (voucher as any).kategorieEn : '',
         abPreis: Boolean(voucher.abPreis),
         inhalt: typeof voucher.inhalt === 'string' ? voucher.inhalt : '',
+        inhaltEn: typeof (voucher as any).inhaltEn === 'string' ? (voucher as any).inhaltEn : '',
         beschreibung: typeof voucher.beschreibung === 'string' ? voucher.beschreibung : '',
+        beschreibungEn: typeof (voucher as any).beschreibungEn === 'string' ? (voucher as any).beschreibungEn : '',
         contactUrl: typeof voucher.contactUrl === 'string' ? voucher.contactUrl : '',
         buttonLabel: typeof voucher.buttonLabel === 'string' ? voucher.buttonLabel : '',
+        buttonLabelEn: typeof (voucher as any).buttonLabelEn === 'string' ? (voucher as any).buttonLabelEn : '',
       };
     })
     .filter((voucher) => voucher.titel.trim().length > 0 && (voucher.type === 'contact' || voucher.betrag > 0));
@@ -89,6 +105,8 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
     source,
     customValue: Boolean(raw.customValue),
     displayMode,
+    enableEnglish,
+    languageDefault,
     customVouchers: vouchers,
   };
 };
