@@ -26,6 +26,11 @@
     const containers = document.querySelectorAll('[id^="gutschein-widget"][data-slug]');
     
     containers.forEach(function(container) {
+      const alreadyInitialized = container.querySelector('iframe[data-widget-iframe="1"], iframe[data-gutschein-widget="1"]');
+      if (alreadyInitialized) {
+        return;
+      }
+
       const slug = container.getAttribute('data-slug');
       const primaryColor = container.getAttribute('data-primary-color');
       const fontFamily = container.getAttribute('data-font-family');

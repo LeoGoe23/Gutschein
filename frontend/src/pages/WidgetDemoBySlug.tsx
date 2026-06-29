@@ -253,6 +253,37 @@ const sanitizeExternalStylesheets = (html: string): string => {
   }
 };
 
+const sanitizeCrossOriginFontFaces = (html: string): string => {
+  try {
+    const allowedHosts = new Set([
+      window.location.hostname,
+      'fonts.googleapis.com',
+      'fonts.gstatic.com',
+    ]);
+
+    return html.replace(/@font-face\s*\{[\s\S]*?\}/gi, (block) => {
+      const urlMatches = Array.from(block.matchAll(/url\(([^)]+)\)/gi));
+      if (urlMatches.length === 0) return block;
+
+      const hasBlockedHost = urlMatches.some((match) => {
+        const raw = (match[1] || '').trim().replace(/^['"]|['"]$/g, '');
+        if (!/^https?:\/\//i.test(raw)) return false;
+        try {
+          const parsed = new URL(raw);
+          return !allowedHosts.has(parsed.hostname.toLowerCase());
+        } catch {
+          return false;
+        }
+      });
+
+      return hasBlockedHost ? '' : block;
+    });
+  } catch (error) {
+    console.warn('Konnte Cross-Origin Font-Faces nicht bereinigen:', error);
+    return html;
+  }
+};
+
 const containsWidgetMarkup = (html: string): boolean => {
   return /<iframe[^>]+(data-widget-iframe\s*=|id\s*=\s*["']gutschein-widget-iframe["']|src\s*=\s*["'][^"']*\/embed\/[^"']*["'])/i.test(html)
     || /data-widget-root\s*=\s*["']1["']/i.test(html)
@@ -477,7 +508,7 @@ const WidgetDemoBySlug: React.FC = () => {
     [embedSourceSlug]
   );
 
-  const widgetSlug = isRealShop ? resolvedSlug : embedSourceSlug;
+  const widgetSlug = (isRealShop ? resolvedSlug : embedSourceSlug) || (slug || '');
   const widgetLoaderMarkup = `
     <div data-widget-root="1" style="width: 100%;">
       <div
@@ -782,7 +813,8 @@ const WidgetDemoBySlug: React.FC = () => {
       const cleanedTemplate = stripLayoutEditorArtifacts(demoTemplate.demoHtml);
       const normalizedTemplate = normalizeRelativeAssetUrls(cleanedTemplate);
       const sanitizedTemplate = sanitizeExternalStylesheets(normalizedTemplate);
-      const withImage = sanitizedTemplate.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
+      const fontSafeTemplate = sanitizeCrossOriginFontFaces(sanitizedTemplate);
+      const withImage = fontSafeTemplate.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
 
       let enhancedTemplate = withImage;
       if (demoTemplate.bildURL && !hasMainHeroImage(withImage)) {
@@ -817,27 +849,21 @@ const WidgetDemoBySlug: React.FC = () => {
     : originalHTML;
 
   useEffect(() => {
+    if (loading) return;
+
     const root = rootRef.current;
     if (!root) return;
 
     const containers = Array.from(root.querySelectorAll<HTMLElement>('[id^="gutschein-widget"][data-slug]'));
     if (containers.length === 0) return;
 
-    const resetWidgetInstances = () => {
-      containers.forEach((container) => {
-        container.querySelectorAll('iframe').forEach((iframe) => iframe.remove());
-      });
-      root
-        .querySelectorAll<HTMLIFrameElement>('iframe[data-widget-iframe="1"], iframe[data-gutschein-widget="1"], iframe[src*="/embed/"]')
-        .forEach((iframe) => {
-          if (!iframe.closest('[id^="gutschein-widget"][data-slug]')) {
-            iframe.remove();
-          }
-        });
-    };
+    const hasMissingSlug = containers.some((container) => {
+      const slugValue = (container.getAttribute('data-slug') || '').trim();
+      return slugValue.length === 0;
+    });
+    if (hasMissingSlug) return;
 
     const runLoader = () => {
-      resetWidgetInstances();
       const loaderApi = (window as any).GutscheinWidget;
       if (loaderApi && typeof loaderApi.init === 'function') {
         loaderApi.init();
@@ -861,7 +887,7 @@ const WidgetDemoBySlug: React.FC = () => {
     return () => {
       script.onload = null;
     };
-  }, [renderedHtml]);
+  }, [loading, renderedHtml]);
 
   useEffect(() => {
     if (loading) return;
