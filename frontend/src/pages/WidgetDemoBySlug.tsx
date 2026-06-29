@@ -218,41 +218,6 @@ const normalizeRelativeAssetUrls = (html: string): string => {
   return normalized;
 };
 
-const sanitizeExternalStylesheets = (html: string): string => {
-  try {
-    const allowedHosts = new Set([
-      window.location.hostname,
-      'fonts.googleapis.com',
-      'fonts.gstatic.com',
-    ]);
-
-    return html.replace(/<link\b[^>]*>/gi, (tag) => {
-      const relMatch = tag.match(/\brel\s*=\s*["']?([^"'\s>]+)["']?/i);
-      const hrefMatch = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
-      const relValue = (relMatch?.[1] || '').toLowerCase();
-      const hrefValue = hrefMatch?.[1] || '';
-
-      if (!relValue.includes('stylesheet')) return tag;
-      if (!hrefValue) return tag;
-
-      // Keep relative/internal stylesheets.
-      if (!/^https?:\/\//i.test(hrefValue)) return tag;
-
-      try {
-        const parsed = new URL(hrefValue);
-        if (allowedHosts.has(parsed.hostname.toLowerCase())) return tag;
-      } catch {
-        return tag;
-      }
-
-      return '';
-    });
-  } catch (error) {
-    console.warn('Konnte externe Stylesheets nicht bereinigen:', error);
-    return html;
-  }
-};
-
 const sanitizeCrossOriginFontFaces = (html: string): string => {
   try {
     const allowedHosts = new Set([
@@ -812,8 +777,7 @@ const WidgetDemoBySlug: React.FC = () => {
     if (demoTemplate?.demoHtml) {
       const cleanedTemplate = stripLayoutEditorArtifacts(demoTemplate.demoHtml);
       const normalizedTemplate = normalizeRelativeAssetUrls(cleanedTemplate);
-      const sanitizedTemplate = sanitizeExternalStylesheets(normalizedTemplate);
-      const fontSafeTemplate = sanitizeCrossOriginFontFaces(sanitizedTemplate);
+      const fontSafeTemplate = sanitizeCrossOriginFontFaces(normalizedTemplate);
       const withImage = fontSafeTemplate.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
 
       let enhancedTemplate = withImage;
