@@ -287,6 +287,7 @@ const EmbedWidget: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState<GutscheinOption[]>([]);
+  const [widgetDisplayMode, setWidgetDisplayMode] = useState<'categorized' | 'flat'>('categorized');
   const [error, setError] = useState('');
   const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
   const [selectedOptionByCategory, setSelectedOptionByCategory] = useState<{ [kategorie: string]: number }>({});
@@ -444,6 +445,8 @@ const EmbedWidget: React.FC = () => {
             ? buildOptionsFromCustom(data.widgetConfig.customVouchers, includeCustomValue)
             : buildOptionsFromCheckout(data, includeCustomValue);
 
+          setWidgetDisplayMode(data.widgetConfig.displayMode === 'flat' ? 'flat' : 'categorized');
+
           if (loadedOptions.length === 0) {
             setError('Keine Widget-Gutscheine verfügbar.');
             setOptions([]);
@@ -457,8 +460,10 @@ const EmbedWidget: React.FC = () => {
             if (demoData) {
               const demoOptions = buildOptionsFromDemo(demoData.dienstleistungen || [], demoData.customValue);
               setOptions(demoOptions.length > 0 ? demoOptions : PROSPECT_DEMO_OPTIONS);
+              setWidgetDisplayMode('categorized');
             } else {
               setOptions(PROSPECT_DEMO_OPTIONS);
+              setWidgetDisplayMode('categorized');
             }
           } else {
             setError('Gutschein-Daten nicht gefunden');
@@ -471,8 +476,10 @@ const EmbedWidget: React.FC = () => {
           if (demoData) {
             const demoOptions = buildOptionsFromDemo(demoData.dienstleistungen || [], demoData.customValue);
             setOptions(demoOptions.length > 0 ? demoOptions : PROSPECT_DEMO_OPTIONS);
+            setWidgetDisplayMode('categorized');
           } else {
             setOptions(PROSPECT_DEMO_OPTIONS);
+            setWidgetDisplayMode('categorized');
           }
           setError('');
         } else {
@@ -487,6 +494,13 @@ const EmbedWidget: React.FC = () => {
   }, [slug, isProspectDemo]);
 
   const categoryCards = useMemo(() => {
+    if (widgetDisplayMode === 'flat') {
+      return options.map((option, originalIndex) => ({
+        kategorie: `item-${originalIndex}`,
+        items: [{ option, originalIndex }],
+      }));
+    }
+
     const grouped = new Map<string, Array<{ option: GutscheinOption; originalIndex: number }>>();
 
     options.forEach((option, originalIndex) => {
@@ -500,7 +514,7 @@ const EmbedWidget: React.FC = () => {
     return Array.from(grouped.entries())
       .map(([kategorie, items]) => ({ kategorie, items }))
       .sort((a, b) => a.items[0].originalIndex - b.items[0].originalIndex);
-  }, [options]);
+  }, [options, widgetDisplayMode]);
 
   useEffect(() => {
     setSelectedOptionByCategory((prev) => {
@@ -861,6 +875,7 @@ const EmbedWidget: React.FC = () => {
           const userHasChosen = Boolean(hasUserSelectionByCategory[card.kategorie]);
           const showAbPrice = !userHasChosen && card.items.length > 1 && minCategoryAmount > 0 && option.type !== 'contact';
           const detailText = option.inhalt || option.beschreibung || option.titel;
+          const isFlatCard = widgetDisplayMode === 'flat';
 
           return (
           <Card
@@ -894,7 +909,7 @@ const EmbedWidget: React.FC = () => {
               {/* Kategorie-Titel */}
               <Typography 
                 variant="h6" 
-                title={card.kategorie}
+                title={isFlatCard ? option.titel : card.kategorie}
                 sx={{ 
                   mb: 1,
                   fontWeight: 600,
@@ -907,7 +922,7 @@ const EmbedWidget: React.FC = () => {
                   wordBreak: 'break-word'
                 }}
               >
-                {card.kategorie}
+                {isFlatCard ? option.titel : card.kategorie}
               </Typography>
 
               {card.items.length > 1 ? (
@@ -943,7 +958,7 @@ const EmbedWidget: React.FC = () => {
                   ))}
                 </TextField>
               ) : (
-                <Typography
+                !isFlatCard ? <Typography
                   variant="body2"
                   title={option.titel}
                   sx={{
@@ -959,7 +974,7 @@ const EmbedWidget: React.FC = () => {
                   }}
                 >
                   {option.titel}
-                </Typography>
+                </Typography> : <Box sx={{ mb: 1 }} />
               )}
 
               {/* Inhalt / Beschreibung */}

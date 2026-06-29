@@ -62,6 +62,7 @@ type WidgetConfig = {
   enabled: boolean;
   source: WidgetVoucherSource;
   customValue: boolean;
+  displayMode: 'categorized' | 'flat';
   customVouchers: WidgetVoucherOption[];
 };
 
@@ -109,12 +110,14 @@ const defaultWidgetConfig: WidgetConfig = {
   enabled: true,
   source: 'checkout',
   customValue: false,
+  displayMode: 'categorized',
   customVouchers: [createDefaultWidgetVoucher()],
 };
 
 const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
   const raw = (value || {}) as Partial<WidgetConfig>;
   const source: WidgetVoucherSource = raw.source === 'custom' ? 'custom' : 'checkout';
+  const displayMode: 'categorized' | 'flat' = raw.displayMode === 'flat' ? 'flat' : 'categorized';
   const customValue = Boolean(raw.customValue);
 
   const rawVouchers = Array.isArray(raw.customVouchers) ? raw.customVouchers : [];
@@ -141,6 +144,7 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
     enabled: raw.enabled === undefined ? true : Boolean(raw.enabled),
     source,
     customValue,
+    displayMode,
     customVouchers: vouchers.length > 0 ? vouchers : [createDefaultWidgetVoucher()],
   };
 };
@@ -346,6 +350,7 @@ export default function AdminShopManage() {
       enabled: form.widgetConfig.enabled,
       source: form.widgetConfig.source,
       customValue: form.widgetConfig.customValue,
+      displayMode: form.widgetConfig.displayMode,
       customVouchers: sanitizedWidgetVouchers,
     };
 
@@ -661,6 +666,20 @@ export default function AdminShopManage() {
               >
                 <MenuItem value="enabled">Im Widget anzeigen</MenuItem>
                 <MenuItem value="disabled">Nicht anzeigen</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="widget-display-mode-label">Darstellung im Widget</InputLabel>
+              <Select
+                labelId="widget-display-mode-label"
+                value={form.widgetConfig.displayMode}
+                label="Darstellung im Widget"
+                disabled={!form.widgetConfig.enabled}
+                onChange={(e) => updateWidgetField('displayMode', e.target.value as 'categorized' | 'flat')}
+              >
+                <MenuItem value="categorized">Nach Kategorien gruppieren</MenuItem>
+                <MenuItem value="flat">Alle Gutscheine einzeln anzeigen</MenuItem>
               </Select>
             </FormControl>
           </Box>

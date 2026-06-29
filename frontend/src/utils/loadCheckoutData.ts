@@ -33,6 +33,7 @@ export interface WidgetConfig {
   enabled: boolean;
   source: 'checkout' | 'custom';
   customValue: boolean;
+  displayMode: 'categorized' | 'flat';
   customVouchers: WidgetVoucherOption[];
 }
 
@@ -60,6 +61,7 @@ export interface CheckoutData {
 const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
   const raw = (value || {}) as Partial<WidgetConfig>;
   const source: 'checkout' | 'custom' = raw.source === 'custom' ? 'custom' : 'checkout';
+  const displayMode: 'categorized' | 'flat' = raw.displayMode === 'flat' ? 'flat' : 'categorized';
   const vouchers: WidgetVoucherOption[] = (Array.isArray(raw.customVouchers) ? raw.customVouchers : [])
     .map((entry, index) => {
       const voucher = entry as Partial<WidgetVoucherOption>;
@@ -86,6 +88,7 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
     enabled: raw.enabled === undefined ? true : Boolean(raw.enabled),
     source,
     customValue: Boolean(raw.customValue),
+    displayMode,
     customVouchers: vouchers,
   };
 };
