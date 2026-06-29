@@ -72,36 +72,50 @@ export default function WidgetDemo() {
   }, []);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'white', py: 6 }}>
-      <Container maxWidth="lg">
-        {/* Fake Website Header */}
-        <Box sx={{ mb: 6, textAlign: 'center' }}>
-          <Typography variant="h3" sx={{ fontWeight: 700, color: '#1a202c', mb: 1, letterSpacing: '-0.02em' }}>
-            Thai Massage Berlin
-          </Typography>
-          <Typography variant="subtitle1" sx={{ color: '#718096', fontSize: '1.1rem' }}>
-            Traditionelle thailändische Massage & Wellness
-          </Typography>
-        </Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          bgcolor: 'rgba(255, 255, 255, 0.94)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid #e2e8f0',
+          boxShadow: '0 6px 24px rgba(15, 23, 42, 0.06)',
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: { xs: 1.5, md: 2 } }}>
+          {/* Sticky Demo Header */}
+          <Box sx={{ mb: 2, textAlign: 'center' }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#1a202c', mb: 1, letterSpacing: '-0.02em' }}>
+              Thai Massage Berlin
+            </Typography>
+            <Typography variant="subtitle1" sx={{ color: '#718096', fontSize: '1.1rem' }}>
+              Traditionelle thailändische Massage & Wellness
+            </Typography>
+          </Box>
 
-        {/* Fake Navigation */}
-        <Paper elevation={0} sx={{ 
-          p: 2, 
-          mb: 6, 
-          display: 'flex', 
-          gap: 4, 
-          justifyContent: 'center',
-          bgcolor: 'white',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0'
-        }}>
-          <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Home</Typography>
-          <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Leistungen</Typography>
-          <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Preise</Typography>
-          <Typography sx={{ cursor: 'pointer', fontWeight: 600, color: '#2d3748' }}>Gutscheine</Typography>
-          <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Kontakt</Typography>
-        </Paper>
+          {/* Sticky Navigation */}
+          <Paper elevation={0} sx={{
+            p: 2,
+            display: 'flex',
+            gap: { xs: 2, md: 4 },
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            bgcolor: 'white',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Home</Typography>
+            <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Leistungen</Typography>
+            <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Preise</Typography>
+            <Typography sx={{ cursor: 'pointer', fontWeight: 600, color: '#2d3748' }}>Gutscheine</Typography>
+            <Typography sx={{ cursor: 'pointer', color: '#718096', fontWeight: 500, transition: 'color 0.2s', '&:hover': { color: '#2d3748' } }}>Kontakt</Typography>
+          </Paper>
+        </Container>
+      </Box>
 
+      <Container maxWidth="lg" sx={{ py: 6 }}>
         {/* Fake Content */}
         <Box sx={{ mb: 5 }}>
           <Typography variant="h4" sx={{ mb: 2, fontWeight: 700, color: '#1a202c' }}>

@@ -1,16 +1,22 @@
 import {
   Box, Button, CircularProgress, Paper, Typography,
-  TextField, Select, MenuItem, FormControl, InputLabel,
-  Chip, IconButton, Divider, Tooltip,
+  TextField,
+  Chip, IconButton, Divider, Tooltip, Dialog, DialogTitle, DialogContent,
+  DialogActions, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  FormControl, InputLabel, MenuItem, Select,
 } from '@mui/material';
 import { signOut } from 'firebase/auth';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import AddIcon from '@mui/icons-material/Add';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
+import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
 import germany from '@svg-maps/germany';
+import * as XLSX from 'xlsx';
 import useAuth from '../auth/useAuth';
 import { auth, db } from '../auth/firebase';
 
@@ -24,6 +30,7 @@ interface Region {
   name: string;
   status: MarketingStatus;
   areaId?: number;
+  leadCategory?: LeadCategory;
   leads?: LeadContact[];
   leadsSyncAt?: string;
 }
@@ -33,10 +40,17 @@ interface LeadContact {
   name: string;
   adresse: string;
   email: string;
+  mailSent: boolean;
+  demoClicked: boolean;
+  notes: string;
+  website: string;
+  instagram: string;
   anrede: string;
   vorname: string;
   nachname: string;
 }
+
+type LeadCategory = 'massage' | 'kosmetik';
 
 interface BundeslandData {
   status: MarketingStatus;
@@ -52,25 +66,93 @@ type MarketingMap = Record<string, BundeslandData>;
 type MunicipalityItem = { name: string; areaId: number };
 type MunicipalityMap = Record<string, MunicipalityItem[]>;
 
-const STATUS_LABELS: Record<MarketingStatus, string> = {
-  nicht_geplant: 'Nicht geplant',
-  geplant: 'Geplant',
-  aktiv: 'Aktiv',
-  pausiert: 'Pausiert',
-  abgeschlossen: 'Abgeschlossen',
-};
-
-const STATUS_COLORS: Record<MarketingStatus, string> = {
-  nicht_geplant: '#cbd5e1',
-  geplant: '#fbbf24',
-  aktiv: '#22c55e',
-  pausiert: '#f97316',
-  abgeschlossen: '#6366f1',
+const BUNDESLAND_QUERY_NAME: Record<string, string> = {
+  bw: 'Baden-Wuerttemberg',
+  by: 'Bayern',
+  be: 'Berlin',
+  bb: 'Brandenburg',
+  hb: 'Bremen',
+  hh: 'Hamburg',
+  he: 'Hessen',
+  ni: 'Niedersachsen',
+  mv: 'Mecklenburg-Vorpommern',
+  nw: 'Nordrhein-Westfalen',
+  rp: 'Rheinland-Pfalz',
+  sl: 'Saarland',
+  sn: 'Sachsen',
+  st: 'Sachsen-Anhalt',
+  sh: 'Schleswig-Holstein',
+  th: 'Thueringen',
 };
 
 function emptyBundesland(): BundeslandData {
   return { status: 'nicht_geplant', notizen: '', budget: 0, regionen: [], leadNamen: [], zuletzt_bearbeitet: '' };
 }
+
+function normalizeLeadContact(lead: any): LeadContact {
+  return {
+    id: String(lead?.id || `${lead?.name || 'lead'}-${Math.random().toString(36).slice(2, 8)}`),
+    name: String(lead?.name || '').trim(),
+    adresse: String(lead?.adresse || '').trim(),
+    email: String(lead?.email || '').trim(),
+    mailSent: Boolean(lead?.mailSent),
+    demoClicked: Boolean(lead?.demoClicked),
+    notes: String(lead?.notes || '').trim(),
+    website: String(lead?.website || '').trim(),
+    instagram: String(lead?.instagram || '').trim(),
+    anrede: String(lead?.anrede || '').trim(),
+    vorname: String(lead?.vorname || '').trim(),
+    nachname: String(lead?.nachname || '').trim(),
+  };
+}
+
+function branchKeyForCategory(category: LeadCategory) {
+  return category === 'kosmetik' ? 'kosmetik' : 'massage';
+}
+
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedDeep(item))
+      .filter((item) => item !== undefined) as unknown as T;
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, stripUndefinedDeep(v)]);
+    return Object.fromEntries(entries) as T;
+  }
+
+  return value;
+}
+
+function totalContactsForBundesland(data?: BundeslandData): number {
+  if (!data || !Array.isArray(data.regionen)) return 0;
+  return data.regionen.reduce((sum, region) => {
+    const leads = Array.isArray(region?.leads) ? region.leads : [];
+    return sum + leads.filter((lead) => String(lead?.name || '').trim()).length;
+  }, 0);
+}
+
+const BUNDESLAND_BADGE_POSITIONS: Record<string, { x: number; y: number }> = {
+  bw: { x: 202, y: 650 },
+  by: { x: 356, y: 670 },
+  be: { x: 360, y: 228 },
+  bb: { x: 410, y: 265 },
+  hb: { x: 210, y: 195 },
+  hh: { x: 258, y: 165 },
+  he: { x: 216, y: 430 },
+  ni: { x: 205, y: 278 },
+  mv: { x: 398, y: 142 },
+  nw: { x: 126, y: 322 },
+  rp: { x: 142, y: 500 },
+  sl: { x: 88, y: 570 },
+  sn: { x: 456, y: 468 },
+  st: { x: 325, y: 315 },
+  sh: { x: 258, y: 88 },
+  th: { x: 304, y: 435 },
+};
 
 export default function Marketing() {
   const user = useAuth();
@@ -88,17 +170,25 @@ export default function Marketing() {
   const [municipalityNames, setMunicipalityNames] = useState<MunicipalityMap>({});
   const [municipalityLoading, setMunicipalityLoading] = useState(false);
   const [municipalityError, setMunicipalityError] = useState('');
+  const [municipalityInfo, setMunicipalityInfo] = useState('');
   const [regionLeadLoading, setRegionLeadLoading] = useState<Record<string, boolean>>({});
   const [regionLeadError, setRegionLeadError] = useState<Record<string, string>>({});
-  const [regionAutoCollecting, setRegionAutoCollecting] = useState<Record<string, boolean>>({});
-  const [regionLeadLogs, setRegionLeadLogs] = useState<Record<string, string[]>>({});
-  const autoCollectTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [leadEditorOpen, setLeadEditorOpen] = useState(false);
+  const [leadEditorRegionIndex, setLeadEditorRegionIndex] = useState<number | null>(null);
+  const [leadEditorDrafts, setLeadEditorDrafts] = useState<LeadContact[]>([]);
+  const [leadEditorSaving, setLeadEditorSaving] = useState(false);
+  const [allContactsExpanded, setAllContactsExpanded] = useState(true);
+  const [exportFromRegionIndex, setExportFromRegionIndex] = useState('');
+  const [exportToRegionIndex, setExportToRegionIndex] = useState('');
+  const [exportInfo, setExportInfo] = useState('');
+  const [exportError, setExportError] = useState('');
   const API_URL = process.env.REACT_APP_API_URL;
   const API_BASE = API_URL || '';
+  const LEAD_SOURCE = 'google';
 
-  useEffect(() => () => {
-    Object.values(autoCollectTimersRef.current).forEach((timer) => clearTimeout(timer));
-    autoCollectTimersRef.current = {};
+  const getBundeslandQueryName = useCallback((location: GermanyLocation | null) => {
+    if (!location) return '';
+    return BUNDESLAND_QUERY_NAME[location.id] || location.name;
   }, []);
 
   // Admin-Check + Daten laden
@@ -124,21 +214,22 @@ export default function Marketing() {
     setSelectedLocation(location);
     const existing = marketingData[location.id];
     const normalizedRegionen: Region[] = Array.isArray(existing?.regionen)
-      ? existing.regionen.map((region) => ({
-        name: String(region?.name || '').trim(),
-        status: region?.status || 'geplant',
-        areaId: Number.isFinite(Number(region?.areaId)) ? Number(region.areaId) : undefined,
-        leads: Array.isArray(region?.leads) ? region.leads.map((lead: any) => ({
-          id: String(lead?.id || `${lead?.name || 'lead'}-${Math.random().toString(36).slice(2, 8)}`),
-          name: String(lead?.name || '').trim(),
-          adresse: String(lead?.adresse || '').trim(),
-          email: String(lead?.email || '').trim(),
-          anrede: String(lead?.anrede || '').trim(),
-          vorname: String(lead?.vorname || '').trim(),
-          nachname: String(lead?.nachname || '').trim(),
-        })) : [],
-        leadsSyncAt: region?.leadsSyncAt || undefined,
-      })).filter((region) => region.name)
+      ? existing.regionen.map((region): Region => {
+        const leadCategory: LeadCategory | undefined = region?.leadCategory === 'kosmetik'
+          ? 'kosmetik'
+          : region?.leadCategory === 'massage'
+            ? 'massage'
+            : undefined;
+
+        return {
+          name: String(region?.name || '').trim(),
+          status: region?.status || 'geplant',
+          areaId: Number.isFinite(Number(region?.areaId)) ? Number(region.areaId) : undefined,
+          leadCategory,
+          leads: Array.isArray(region?.leads) ? region.leads.map((lead: any) => normalizeLeadContact(lead)) : [],
+          leadsSyncAt: region?.leadsSyncAt || undefined,
+        };
+      }).filter((region) => region.name)
       : [];
 
     setEditData(existing
@@ -153,6 +244,7 @@ export default function Marketing() {
     setSaveSuccess(false);
     setLeadError('');
     setMunicipalityError('');
+    setMunicipalityInfo('');
   }, [marketingData]);
 
   const handleSave = async () => {
@@ -162,11 +254,59 @@ export default function Marketing() {
       ...marketingData,
       [selectedLocation.id]: { ...editData, zuletzt_bearbeitet: new Date().toISOString() },
     };
-    await setDoc(doc(db, 'admin_marketing', 'bundeslaender'), updated);
+    await setDoc(doc(db, 'admin_marketing', 'bundeslaender'), stripUndefinedDeep(updated));
     setMarketingData(updated);
     setSaving(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
+  const saveBranchLeadSnapshot = async (
+    category: LeadCategory,
+    region: Region,
+    leads: LeadContact[],
+  ) => {
+    if (!selectedLocation) return;
+
+    const branchDocId = branchKeyForCategory(category);
+    const branchRef = doc(db, 'admin_marketing_branchen', branchDocId);
+    const branchDoc = await getDoc(branchRef);
+    const branchData = branchDoc.exists() ? branchDoc.data() : {};
+    const currentBundeslaender = (branchData?.bundeslaender || {}) as Record<string, any>;
+    const currentState = currentBundeslaender[selectedLocation.id] || {};
+    const currentRegions = (currentState?.regionen || {}) as Record<string, any>;
+    const regionKey = region.name.trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-');
+
+    const nextBranchData = {
+      ...branchData,
+      branche: branchDocId,
+      updatedAt: new Date().toISOString(),
+      bundeslaender: {
+        ...currentBundeslaender,
+        [selectedLocation.id]: {
+          name: selectedLocation.name,
+          updatedAt: new Date().toISOString(),
+          regionen: {
+            ...currentRegions,
+            [regionKey]: {
+              name: region.name,
+              areaId: region.areaId || null,
+              category: branchDocId,
+              leads: leads.map((lead) => ({
+                ...lead,
+                category: branchDocId,
+                bundeslandId: selectedLocation.id,
+                bundeslandName: selectedLocation.name,
+                regionName: region.name,
+                updatedAt: new Date().toISOString(),
+              })),
+            },
+          },
+        },
+      },
+    };
+
+    await setDoc(branchRef, stripUndefinedDeep(nextBranchData), { merge: true });
   };
 
   const handleLoadLeadNames = async () => {
@@ -178,13 +318,14 @@ export default function Marketing() {
 
     try {
       const token = await user.getIdToken();
+      const bundeslandQueryName = getBundeslandQueryName(selectedLocation);
       const startResponse = await fetch(`${API_BASE}/api/admin/lead-research/start`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ bundesland: selectedLocation.name, limit: 5000 }),
+        body: JSON.stringify({ bundesland: bundeslandQueryName, limit: 5000 }),
       });
 
       if (!startResponse.ok) {
@@ -195,7 +336,7 @@ export default function Marketing() {
       let finalStatus = 'running';
       for (let i = 0; i < 240; i += 1) {
         const statusResponse = await fetch(
-          `${API_BASE}/api/admin/lead-research/status?bundesland=${encodeURIComponent(selectedLocation.name)}`,
+          `${API_BASE}/api/admin/lead-research/status?bundesland=${encodeURIComponent(bundeslandQueryName)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -223,7 +364,7 @@ export default function Marketing() {
       }
 
       const resultsResponse = await fetch(
-        `${API_BASE}/api/admin/lead-research/results?bundesland=${encodeURIComponent(selectedLocation.name)}&limit=5000`,
+        `${API_BASE}/api/admin/lead-research/results?bundesland=${encodeURIComponent(bundeslandQueryName)}&limit=5000`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!resultsResponse.ok) {
@@ -250,7 +391,7 @@ export default function Marketing() {
         },
       };
 
-      await setDoc(doc(db, 'admin_marketing', 'bundeslaender'), updated);
+      await setDoc(doc(db, 'admin_marketing', 'bundeslaender'), stripUndefinedDeep(updated));
       setMarketingData(updated);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -265,10 +406,11 @@ export default function Marketing() {
     if (!selectedLocation || !user) return;
 
     const locationId = selectedLocation.id;
-    const locationName = selectedLocation.name;
+    const locationName = getBundeslandQueryName(selectedLocation);
 
     setMunicipalityLoading(true);
     setMunicipalityError('');
+    setMunicipalityInfo('');
 
     try {
       const token = await user.getIdToken();
@@ -293,6 +435,7 @@ export default function Marketing() {
         : [];
 
       setMunicipalityNames((prev) => ({ ...prev, [locationId]: municipalities }));
+      setMunicipalityInfo(`${municipalities.length} Orte geladen.`);
 
       // Backfill fuer bereits gespeicherte Regionen ohne areaId
       setEditData((prev) => {
@@ -320,7 +463,7 @@ export default function Marketing() {
     }
   };
 
-  const loadRegionLeads = async (idx: number) => {
+  const loadRegionLeads = async (idx: number, category: LeadCategory) => {
     if (!selectedLocation || !user) return;
     const region = editData.regionen[idx];
     const regionKey = `${selectedLocation.id}-${region?.areaId || region?.name || idx}`;
@@ -330,32 +473,21 @@ export default function Marketing() {
       return;
     }
 
-    const appendRegionLog = (message: string) => {
-      const ts = new Date().toLocaleTimeString('de-DE');
-      setRegionLeadLogs((prev) => {
-        const existing = prev[regionKey] || [];
-        const next = [`[${ts}] ${message}`, ...existing].slice(0, 14);
-        return { ...prev, [regionKey]: next };
-      });
-    };
-
     setRegionLeadLoading((prev) => ({ ...prev, [regionKey]: true }));
     setRegionLeadError((prev) => ({ ...prev, [regionKey]: '' }));
-    appendRegionLog(`Start: Gemeinde=${region.name}, Bundesland=${selectedLocation.name}`);
 
     try {
       const token = await user.getIdToken();
       const params = new URLSearchParams({
         municipality: region.name,
-        bundesland: selectedLocation.name,
-        source: 'auto',
-        limit: '5000',
-        debug: '1',
+        bundesland: getBundeslandQueryName(selectedLocation),
+        source: LEAD_SOURCE,
+        category,
+        limit: '120',
       });
       if (region.areaId && region.areaId > 0) {
         params.set('areaId', String(region.areaId));
       }
-      appendRegionLog(`Request: ${params.toString()}`);
       const response = await fetch(
         `${API_BASE}/api/admin/lead-research/municipality-leads?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -363,99 +495,52 @@ export default function Marketing() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Massagelaeden konnten nicht geladen werden.');
+        throw new Error(errorData.error || `${category === 'massage' ? 'Massagelaeden' : 'Kosmetikstudios'} konnten nicht geladen werden.`);
       }
 
       const data = await response.json();
-      appendRegionLog(`Response: source=${data?.source || '-'} count=${Number(data?.count || 0)}`);
-      if (Array.isArray(data?.debug?.attempts)) {
-        data.debug.attempts.slice(-6).forEach((attempt: any) => {
-          const label = `${attempt.step || 'step'}${typeof attempt.count === 'number' ? ` count=${attempt.count}` : ''}${attempt.error ? ` err=${attempt.error}` : ''}`;
-          appendRegionLog(`Try: ${label}`);
-        });
-      }
       const leadsFromApi: LeadContact[] = Array.isArray(data.leads)
-        ? data.leads.map((lead: any, leadIndex: number) => ({
-          id: String(lead?.id || `${region.areaId}-${leadIndex}`),
-          name: String(lead?.name || '').trim(),
-          adresse: String(lead?.adresse || '').trim(),
-          email: String(lead?.email || '').trim(),
-          anrede: String(lead?.anrede || '').trim(),
-          vorname: String(lead?.vorname || '').trim(),
-          nachname: String(lead?.nachname || '').trim(),
-        })).filter((lead: LeadContact) => lead.name)
+        ? data.leads.map((lead: any) => normalizeLeadContact(lead)).filter((lead: LeadContact) => lead.name)
         : [];
 
-      const mergeLeads = (existing: LeadContact[], incoming: LeadContact[]): LeadContact[] => {
-        const map = new Map<string, LeadContact>();
-        [...existing, ...incoming].forEach((lead) => {
-          const key = `${lead.name.trim().toLowerCase()}::${lead.adresse.trim().toLowerCase()}`;
-          if (!key) return;
-          if (!map.has(key)) {
-            map.set(key, lead);
-          }
-        });
-        return Array.from(map.values());
+      const nextRegionen = [...editData.regionen];
+      if (!nextRegionen[idx]) {
+        return;
+      }
+      const syncedAt = new Date().toISOString();
+      nextRegionen[idx] = {
+        ...nextRegionen[idx],
+        leads: leadsFromApi,
+        leadCategory: category,
+        leadsSyncAt: syncedAt,
       };
 
-      setEditData((prev) => {
-        const nextRegionen = [...prev.regionen];
-        if (!nextRegionen[idx]) return prev;
-        const existingLeads = Array.isArray(nextRegionen[idx].leads) ? nextRegionen[idx].leads as LeadContact[] : [];
-        nextRegionen[idx] = {
-          ...nextRegionen[idx],
-          leads: mergeLeads(existingLeads, leadsFromApi),
-          leadsSyncAt: new Date().toISOString(),
-        };
-        return { ...prev, regionen: nextRegionen };
-      });
-      appendRegionLog(`Merge: +${leadsFromApi.length} (gesamt nach merge)`);
+      const nextEditData: BundeslandData = {
+        ...editData,
+        regionen: nextRegionen,
+        zuletzt_bearbeitet: syncedAt,
+      };
+
+      setEditData(nextEditData);
+
+      const updated: MarketingMap = {
+        ...marketingData,
+        [selectedLocation.id]: {
+          ...nextEditData,
+        },
+      };
+
+      await setDoc(doc(db, 'admin_marketing', 'bundeslaender'), stripUndefinedDeep(updated));
+      setMarketingData(updated);
+      await saveBranchLeadSnapshot(category, nextRegionen[idx], leadsFromApi);
     } catch (error: any) {
       setRegionLeadError((prev) => ({
         ...prev,
-        [regionKey]: error?.message || 'Massagelaeden konnten nicht geladen werden.',
+        [regionKey]: error?.message || `${category === 'massage' ? 'Massagelaeden' : 'Kosmetikstudios'} konnten nicht geladen werden.`,
       }));
-      appendRegionLog(`Error: ${error?.message || 'Massagelaeden konnten nicht geladen werden.'}`);
     } finally {
       setRegionLeadLoading((prev) => ({ ...prev, [regionKey]: false }));
     }
-  };
-
-  const startRegionAutoCollect = (idx: number) => {
-    if (!selectedLocation) return;
-    const region = editData.regionen[idx];
-    const regionKey = `${selectedLocation.id}-${region?.areaId || region?.name || idx}`;
-    if (!region || !region.name?.trim()) return;
-
-    if (autoCollectTimersRef.current[regionKey]) {
-      clearTimeout(autoCollectTimersRef.current[regionKey]);
-      delete autoCollectTimersRef.current[regionKey];
-    }
-
-    const endAt = Date.now() + (30 * 60 * 1000);
-    setRegionAutoCollecting((prev) => ({ ...prev, [regionKey]: true }));
-    setRegionLeadLogs((prev) => ({
-      ...prev,
-      [regionKey]: [`[${new Date().toLocaleTimeString('de-DE')}] AutoCollect gestartet (30 Min, alle 2 Min)`, ...(prev[regionKey] || [])].slice(0, 14),
-    }));
-
-    const run = async () => {
-      await loadRegionLeads(idx);
-
-      if (Date.now() >= endAt) {
-        setRegionAutoCollecting((prev) => ({ ...prev, [regionKey]: false }));
-        setRegionLeadLogs((prev) => ({
-          ...prev,
-          [regionKey]: [`[${new Date().toLocaleTimeString('de-DE')}] AutoCollect beendet`, ...(prev[regionKey] || [])].slice(0, 14),
-        }));
-        delete autoCollectTimersRef.current[regionKey];
-        return;
-      }
-
-      autoCollectTimersRef.current[regionKey] = setTimeout(run, 120000);
-    };
-
-    run();
   };
 
   const addRegion = () => {
@@ -475,13 +560,6 @@ export default function Marketing() {
       regionen: [...prev.regionen, { name: normalized, status: 'geplant', leads: [] }],
     }));
     setNewRegionName('');
-  };
-
-  const sortRegionenAZ = () => {
-    setEditData((prev) => ({
-      ...prev,
-      regionen: [...prev.regionen].sort((a, b) => a.name.localeCompare(b.name, 'de')),
-    }));
   };
 
   const importMunicipalitiesAsRegions = () => {
@@ -504,12 +582,13 @@ export default function Marketing() {
         }
       });
 
-      const imported = municipalities
+      const imported: Region[] = municipalities
         .filter((item) => !byName.has(item.name.trim().toLowerCase()))
         .map((item) => ({
           name: item.name,
           status: 'geplant' as MarketingStatus,
           areaId: item.areaId,
+          leadCategory: undefined,
           leads: [],
         }));
 
@@ -532,7 +611,250 @@ export default function Marketing() {
     setEditData(prev => ({ ...prev, regionen: prev.regionen.filter((_, i) => i !== idx) }));
   };
 
+  const openRegionLeadEditor = (idx: number) => {
+    const region = editData.regionen[idx];
+    if (!region) return;
+    setLeadEditorRegionIndex(idx);
+    setLeadEditorDrafts((Array.isArray(region.leads) ? region.leads : []).map((lead) => normalizeLeadContact(lead)));
+    setLeadEditorOpen(true);
+  };
+
+  const closeRegionLeadEditor = () => {
+    if (leadEditorSaving) return;
+    setLeadEditorOpen(false);
+    setLeadEditorRegionIndex(null);
+    setLeadEditorDrafts([]);
+  };
+
+  const escapeCsvField = (value: string) => {
+    const normalized = String(value || '').replace(/\r?\n/g, ' ').trim();
+    if (/[";\n]/.test(normalized)) {
+      return `"${normalized.replace(/"/g, '""')}"`;
+    }
+    return normalized;
+  };
+
+  const sanitizeExportFilePart = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+
+  const prepareExportRowsByRegionRange = () => {
+    if (!selectedLocation) {
+      setExportError('Kein Bundesland ausgewaehlt.');
+      setExportInfo('');
+      return null;
+    }
+
+    const namedRegions = editData.regionen
+      .map((region, idx) => ({ idx, name: String(region?.name || '').trim() }))
+      .filter((region) => region.name);
+
+    if (namedRegions.length === 0) {
+      setExportError('Keine Regionen zum Export vorhanden.');
+      setExportInfo('');
+      return null;
+    }
+
+    const firstIndex = namedRegions[0].idx;
+    const lastIndex = namedRegions[namedRegions.length - 1].idx;
+    const fromIdxRaw = Number.parseInt(exportFromRegionIndex, 10);
+    const toIdxRaw = Number.parseInt(exportToRegionIndex, 10);
+    const fromIdx = Number.isFinite(fromIdxRaw) ? fromIdxRaw : firstIndex;
+    const toIdx = Number.isFinite(toIdxRaw) ? toIdxRaw : lastIndex;
+
+    const start = Math.max(0, Math.min(fromIdx, toIdx));
+    const end = Math.min(editData.regionen.length - 1, Math.max(fromIdx, toIdx));
+
+    const rows = editData.regionen
+      .filter((_, idx) => idx >= start && idx <= end)
+      .flatMap((region) => {
+        const leads = Array.isArray(region?.leads) ? region.leads : [];
+        return leads
+          .filter((lead) => String(lead?.email || '').trim())
+          .map((lead) => {
+            const personName = [String(lead?.vorname || '').trim(), String(lead?.nachname || '').trim()]
+              .filter(Boolean)
+              .join(' ')
+              .trim();
+            return {
+              Anrede: String(lead?.anrede || '').trim(),
+              Name: personName || String(lead?.name || '').trim(),
+              Mail: String(lead?.email || '').trim(),
+            };
+          });
+      });
+
+    if (rows.length === 0) {
+      setExportError('Im gewaehlten Bereich wurden keine Leads mit Mail gefunden.');
+      setExportInfo('');
+      return null;
+    }
+
+    const fromRegionName = String(editData.regionen[start]?.name || 'start').trim();
+    const toRegionName = String(editData.regionen[end]?.name || 'ende').trim();
+
+    return {
+      selectedName: selectedLocation.name,
+      fromRegionName,
+      toRegionName,
+      rows,
+    };
+  };
+
+  const exportLeadCsvByRegionRange = () => {
+    const payload = prepareExportRowsByRegionRange();
+    if (!payload) return;
+
+    const csvLines = [
+      'Anrede;Name;Mail',
+      ...payload.rows.map((row) => [row.Anrede, row.Name, row.Mail].map(escapeCsvField).join(';')),
+    ];
+
+    const fileName = `leads-${sanitizeExportFilePart(payload.selectedName)}-${sanitizeExportFilePart(payload.fromRegionName)}-bis-${sanitizeExportFilePart(payload.toRegionName)}.csv`;
+
+    const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+
+    setExportError('');
+    setExportInfo(`${payload.rows.length} Leads exportiert (${payload.fromRegionName} bis ${payload.toRegionName}).`);
+  };
+
+  const exportLeadExcelByRegionRange = () => {
+    const payload = prepareExportRowsByRegionRange();
+    if (!payload) return;
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(payload.rows, {
+      header: ['Anrede', 'Name', 'Mail'],
+    });
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+
+    const fileName = `leads-${sanitizeExportFilePart(payload.selectedName)}-${sanitizeExportFilePart(payload.fromRegionName)}-bis-${sanitizeExportFilePart(payload.toRegionName)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+
+    setExportError('');
+    setExportInfo(`${payload.rows.length} Leads als Excel exportiert (${payload.fromRegionName} bis ${payload.toRegionName}).`);
+  };
+
+  useEffect(() => {
+    const namedRegions = editData.regionen
+      .map((region, idx) => ({ idx, name: String(region?.name || '').trim() }))
+      .filter((region) => region.name);
+
+    if (namedRegions.length === 0) {
+      setExportFromRegionIndex('');
+      setExportToRegionIndex('');
+      return;
+    }
+
+    const firstIndex = String(namedRegions[0].idx);
+    const lastIndex = String(namedRegions[namedRegions.length - 1].idx);
+    setExportFromRegionIndex(firstIndex);
+    setExportToRegionIndex(lastIndex);
+  }, [selectedLocation?.id, editData.regionen.length]);
+
+  const updateLeadDraft = (leadIdx: number, field: keyof LeadContact, value: string | boolean) => {
+    setLeadEditorDrafts((prev) => prev.map((lead, idx) => (idx === leadIdx ? { ...lead, [field]: value } : lead)));
+  };
+
+  const addLeadDraftRow = () => {
+    setLeadEditorDrafts((prev) => ([
+      ...prev,
+      normalizeLeadContact({
+        id: `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: '',
+        adresse: '',
+        email: '',
+        mailSent: false,
+        demoClicked: false,
+        notes: '',
+        website: '',
+        instagram: '',
+        anrede: '',
+        vorname: '',
+        nachname: '',
+      }),
+    ]));
+  };
+
+  const removeLeadDraftRow = (leadIdx: number) => {
+    setLeadEditorDrafts((prev) => prev.filter((_, idx) => idx !== leadIdx));
+  };
+
+  const openGoogleSearchForLead = (lead: LeadContact) => {
+    const regionName = leadEditorRegionIndex !== null ? (editData.regionen[leadEditorRegionIndex]?.name || '') : '';
+    const query = [lead.name, regionName].filter(Boolean).join(' ').trim();
+    if (!query) return;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const saveRegionLeadEditor = async () => {
+    if (!selectedLocation || leadEditorRegionIndex === null) return;
+    const region = editData.regionen[leadEditorRegionIndex];
+    if (!region) return;
+
+    setLeadEditorSaving(true);
+    try {
+      const cleanedLeads = leadEditorDrafts
+        .map((lead) => normalizeLeadContact(lead))
+        .filter((lead) => lead.name || lead.email || lead.adresse || lead.website || lead.instagram || lead.vorname || lead.nachname || lead.anrede || lead.mailSent || lead.demoClicked || lead.notes);
+
+      const syncedAt = new Date().toISOString();
+      const nextRegion = {
+        ...region,
+        leads: cleanedLeads,
+        leadsSyncAt: syncedAt,
+      };
+
+      const nextRegionen = [...editData.regionen];
+      nextRegionen[leadEditorRegionIndex] = nextRegion;
+
+      const nextEditData: BundeslandData = {
+        ...editData,
+        regionen: nextRegionen,
+        zuletzt_bearbeitet: syncedAt,
+      };
+
+      setEditData(nextEditData);
+
+      const updated: MarketingMap = {
+        ...marketingData,
+        [selectedLocation.id]: {
+          ...nextEditData,
+        },
+      };
+
+      await setDoc(doc(db, 'admin_marketing', 'bundeslaender'), stripUndefinedDeep(updated));
+      setMarketingData(updated);
+
+      if (nextRegion.leadCategory) {
+        await saveBranchLeadSnapshot(nextRegion.leadCategory, nextRegion, cleanedLeads);
+      }
+
+      setLeadEditorOpen(false);
+      setLeadEditorRegionIndex(null);
+      setLeadEditorDrafts([]);
+    } finally {
+      setLeadEditorSaving(false);
+    }
+  };
+
   const selectedMunicipalities = selectedLocation ? (municipalityNames[selectedLocation.id] || []) : [];
+  const hasRegionBeenSearched = (region: Region) => {
+    const hasSyncTimestamp = Boolean(region?.leadsSyncAt);
+    const hasCategory = Boolean(region?.leadCategory);
+    const hasLeadArray = Array.isArray(region?.leads);
+    const hasLeadEntries = hasLeadArray && region.leads!.some((lead) => String(lead?.name || '').trim() || String(lead?.email || '').trim() || String(lead?.adresse || '').trim());
+    return hasSyncTimestamp || hasCategory || hasLeadEntries;
+  };
+  const searchedRegionsCount = editData.regionen.filter((region) => hasRegionBeenSearched(region)).length;
+  const totalRegionsCount = editData.regionen.filter((region) => String(region?.name || '').trim()).length;
 
   if (isAdmin === null) {
     return (
@@ -744,7 +1066,7 @@ export default function Marketing() {
         >
           <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>Marketing – Regionale Planung</Typography>
           <Typography color="text.secondary" variant="body2" sx={{ mb: 3 }}>
-            Klicke auf ein Bundesland → lade Orte → uebernimm als Regionen → lade Massagelaeden pro Gemeinde.
+            Klicke auf ein Bundesland → lade Orte → uebernimm als Regionen → lade pro Gemeinde Massage ODER Kosmetik.
           </Typography>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1.4fr' }, gap: 3, alignItems: 'start' }}>
@@ -754,34 +1076,48 @@ export default function Marketing() {
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
                 Bundesländer
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
-                {Object.entries(STATUS_COLORS).map(([s, c]) => (
-                  <Box key={s} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c }} />
-                    <Typography variant="caption" color="text.secondary">{STATUS_LABELS[s as MarketingStatus]}</Typography>
-                  </Box>
-                ))}
-              </Box>
               <svg viewBox={germanyMap.viewBox} width="100%" style={{ display: 'block' }} aria-label="Deutschlandkarte">
                 {germanyMap.locations.map((loc) => {
                   const isSelected = selectedLocation?.id === loc.id;
-                  const blData = marketingData[loc.id];
-                  const fillColor = isSelected ? '#1d4ed8' : blData ? STATUS_COLORS[blData.status] : '#cbd5e1';
+                  const fillColor = isSelected ? '#1d4ed8' : '#cbd5e1';
+                  const contactsCount = totalContactsForBundesland(marketingData[loc.id]);
+                  const countLabel = String(contactsCount);
+                  const center = BUNDESLAND_BADGE_POSITIONS[loc.id] || { x: 0, y: 0 };
+
                   return (
-                    <Tooltip key={loc.id} title={`${loc.name}${blData ? ' – ' + STATUS_LABELS[blData.status] : ''}`} placement="top">
-                      <path
-                        d={loc.path}
-                        onClick={() => handleSelectBundesland(loc)}
-                        style={{
-                          cursor: 'pointer',
-                          fill: fillColor,
-                          stroke: '#ffffff',
-                          strokeWidth: isSelected ? 2 : 0.8,
-                          transition: 'fill 0.15s ease',
-                          filter: isSelected ? 'drop-shadow(0 0 4px #2563eb88)' : 'none',
-                        }}
-                      />
-                    </Tooltip>
+                    <g key={loc.id}>
+                      <Tooltip title={`${loc.name}: ${contactsCount} Kontakte`} placement="top">
+                        <path
+                          d={loc.path}
+                          onClick={() => handleSelectBundesland(loc)}
+                          style={{
+                            cursor: 'pointer',
+                            fill: fillColor,
+                            stroke: '#ffffff',
+                            strokeWidth: isSelected ? 2 : 0.8,
+                            transition: 'fill 0.15s ease',
+                            filter: isSelected ? 'drop-shadow(0 0 4px #2563eb88)' : 'none',
+                          }}
+                        />
+                      </Tooltip>
+
+                      <g pointerEvents="none" transform={`translate(${center.x}, ${center.y})`}>
+                        <circle r="11" fill={isSelected ? '#1d4ed8' : '#ffffff'} stroke={isSelected ? '#1d4ed8' : '#94a3b8'} strokeWidth="1.2" />
+                        <text
+                          x="0"
+                          y="0"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            fill: isSelected ? '#ffffff' : '#0f172a',
+                          }}
+                        >
+                          {countLabel}
+                        </text>
+                      </g>
+                    </g>
                   );
                 })}
               </svg>
@@ -797,7 +1133,12 @@ export default function Marketing() {
               ) : (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" fontWeight={700}>{selectedLocation.name}</Typography>
+                    <Box>
+                      <Typography variant="h6" fontWeight={700}>{selectedLocation.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {searchedRegionsCount} von {totalRegionsCount} Regionen gesucht
+                      </Typography>
+                    </Box>
                     <Button
                       variant="contained"
                       size="small"
@@ -809,27 +1150,6 @@ export default function Marketing() {
                     >
                       {saveSuccess ? 'Gespeichert!' : 'Speichern'}
                     </Button>
-                  </Box>
-
-                  {/* Bundesland-Status */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5, mb: 2 }}>
-                    <FormControl size="small" fullWidth>
-                      <InputLabel>Status</InputLabel>
-                      <Select
-                        label="Status"
-                        value={editData.status}
-                        onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value as MarketingStatus }))}
-                      >
-                        {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                          <MenuItem key={val} value={val}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: STATUS_COLORS[val as MarketingStatus] }} />
-                              {label}
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
                   </Box>
 
                   <Divider sx={{ mb: 2 }}>
@@ -877,6 +1197,12 @@ export default function Marketing() {
                   {municipalityError && (
                     <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1.5 }}>
                       {municipalityError}
+                    </Typography>
+                  )}
+
+                  {municipalityInfo && !municipalityError && (
+                    <Typography variant="caption" color="success.main" sx={{ display: 'block', mb: 1.5 }}>
+                      {municipalityInfo}
                     </Typography>
                   )}
 
@@ -934,20 +1260,107 @@ export default function Marketing() {
                     >
                       Alle Orte als Regionen uebernehmen
                     </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={sortRegionenAZ}
-                      disabled={editData.regionen.length < 2}
-                      sx={{ textTransform: 'none', borderRadius: 2 }}
-                    >
-                      Regionen A-Z sortieren
-                    </Button>
                   </Box>
 
                   <Divider sx={{ mb: 2 }}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600}>REGIONEN</Typography>
                   </Divider>
+
+                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, mb: 1.5, bgcolor: '#f8fafc' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      Export: Region von bis, nur Leads mit Mail (Anrede, Name, Mail)
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr auto auto' }, gap: 1, alignItems: 'center' }}>
+                      <FormControl size="small" fullWidth>
+                        <InputLabel id="export-region-from-label">Region von</InputLabel>
+                        <Select
+                          labelId="export-region-from-label"
+                          label="Region von"
+                          value={exportFromRegionIndex}
+                          onChange={(e) => {
+                            setExportFromRegionIndex(String(e.target.value));
+                            setExportError('');
+                            setExportInfo('');
+                          }}
+                        >
+                          {editData.regionen.map((region, idx) => {
+                            const regionName = String(region?.name || '').trim();
+                            if (!regionName) return null;
+                            return (
+                              <MenuItem key={`from-${idx}-${regionName}`} value={String(idx)}>
+                                {regionName}
+                              </MenuItem>
+                            );
+                          })}
+                        </Select>
+                      </FormControl>
+
+                      <FormControl size="small" fullWidth>
+                        <InputLabel id="export-region-to-label">Region bis</InputLabel>
+                        <Select
+                          labelId="export-region-to-label"
+                          label="Region bis"
+                          value={exportToRegionIndex}
+                          onChange={(e) => {
+                            setExportToRegionIndex(String(e.target.value));
+                            setExportError('');
+                            setExportInfo('');
+                          }}
+                        >
+                          {editData.regionen.map((region, idx) => {
+                            const regionName = String(region?.name || '').trim();
+                            if (!regionName) return null;
+                            return (
+                              <MenuItem key={`to-${idx}-${regionName}`} value={String(idx)}>
+                                {regionName}
+                              </MenuItem>
+                            );
+                          })}
+                        </Select>
+                      </FormControl>
+
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={exportLeadCsvByRegionRange}
+                        disabled={!selectedLocation || editData.regionen.length === 0}
+                        sx={{ textTransform: 'none', borderRadius: 2, whiteSpace: 'nowrap' }}
+                      >
+                        Export CSV
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={exportLeadExcelByRegionRange}
+                        disabled={!selectedLocation || editData.regionen.length === 0}
+                        sx={{ textTransform: 'none', borderRadius: 2, whiteSpace: 'nowrap' }}
+                      >
+                        Export Excel
+                      </Button>
+                    </Box>
+
+                    {exportError && (
+                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                        {exportError}
+                      </Typography>
+                    )}
+                    {exportInfo && !exportError && (
+                      <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 1 }}>
+                        {exportInfo}
+                      </Typography>
+                    )}
+                  </Paper>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+                    <Button
+                      variant="text"
+                      size="small"
+                      onClick={() => setAllContactsExpanded((prev) => !prev)}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {allContactsExpanded ? 'Alle Kontakte einklappen' : 'Alle Kontakte ausklappen'}
+                    </Button>
+                  </Box>
 
                   {/* Regionen */}
                   {editData.regionen.map((region, idx) => (
@@ -955,16 +1368,23 @@ export default function Marketing() {
                       {(() => {
                         const regionKey = `${selectedLocation.id}-${region.areaId || region.name || idx}`;
                         const isLoading = !!regionLeadLoading[regionKey];
-                        const isAutoCollecting = !!regionAutoCollecting[regionKey];
                         const errorText = regionLeadError[regionKey] || '';
-                        const debugLines = regionLeadLogs[regionKey] || [];
                         const leads = Array.isArray(region.leads) ? region.leads : [];
+                        const hasLoadedLeads = Boolean(region.leadsSyncAt);
 
                         return (
                           <>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                         <Typography variant="subtitle2" fontWeight={700}>{region.name}</Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => openRegionLeadEditor(idx)}
+                            sx={{ textTransform: 'none', borderRadius: 2 }}
+                          >
+                            Bearbeiten
+                          </Button>
                           <IconButton size="small" color="error" onClick={() => removeRegion(idx)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -975,21 +1395,21 @@ export default function Marketing() {
                         <Button
                           variant="outlined"
                           size="small"
-                          onClick={() => loadRegionLeads(idx)}
-                          disabled={isLoading || isAutoCollecting}
+                          onClick={() => loadRegionLeads(idx, 'massage')}
+                          disabled={isLoading}
                           startIcon={isLoading ? <CircularProgress size={14} /> : undefined}
                           sx={{ textTransform: 'none', borderRadius: 2 }}
                         >
-                          {isLoading ? 'Lade Massagelaeden...' : 'Massagelaeden laden'}
+                          {isLoading ? 'Lade Massage...' : 'Massage laden'}
                         </Button>
                         <Button
                           variant="outlined"
                           size="small"
-                          onClick={() => startRegionAutoCollect(idx)}
-                          disabled={isAutoCollecting}
+                          onClick={() => loadRegionLeads(idx, 'kosmetik')}
+                          disabled={isLoading}
                           sx={{ textTransform: 'none', borderRadius: 2 }}
                         >
-                          {isAutoCollecting ? 'Sammelt 30 Min...' : '30 Min sammeln'}
+                          Kosmetik laden
                         </Button>
                         <Chip label={`${leads.length} Kontakte`} size="small" />
                       </Box>
@@ -1006,30 +1426,39 @@ export default function Marketing() {
                         </Typography>
                       )}
 
-                      {debugLines.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.5, mb: 1, maxHeight: 120, overflow: 'auto', bgcolor: '#f8fafc' }}>
-                          {debugLines.map((line, i) => (
-                            <Typography key={`${regionKey}-log-${i}`} variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                              {line}
-                            </Typography>
-                          ))}
-                        </Paper>
+                      {!isLoading && !errorText && hasLoadedLeads && leads.length === 0 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          0 Kontakte gefunden.
+                        </Typography>
                       )}
 
                       {leads.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.5, maxHeight: 260, overflow: 'auto', bgcolor: '#fafafa' }}>
+                        <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.5, bgcolor: '#fafafa' }}>
                           {leads.map((lead, leadIdx) => (
-                            <Box key={`${lead.id}-${leadIdx}`} sx={{ py: 0.75, borderBottom: leadIdx < leads.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                            <Box key={`${lead.id}-${leadIdx}`} sx={{ py: 0.5, borderBottom: leadIdx < leads.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
                               <Typography variant="body2" fontWeight={700}>{lead.name}</Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                Adresse: {lead.adresse || '-'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                Mail: {lead.email || '-'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                Anrede: {lead.anrede || '-'} | Vorname: {lead.vorname || '-'} | Nachname: {lead.nachname || '-'}
-                              </Typography>
+                              {allContactsExpanded && (
+                                <Box sx={{ pt: 0.25 }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Adresse: {lead.adresse || '-'}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Mail: {lead.email || '-'}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Mail gesendet: {lead.mailSent ? 'Ja' : 'Nein'}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Demo geklickt: {lead.demoClicked ? 'Ja' : 'Nein'}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Notizen: {lead.notes || '-'}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Anrede: {lead.anrede || '-'} | Nachname: {lead.nachname || '-'}
+                                  </Typography>
+                                </Box>
+                              )}
                             </Box>
                           ))}
                         </Paper>
@@ -1077,6 +1506,166 @@ export default function Marketing() {
           </Box>
         </Paper>
       </Box>
+
+      <Dialog open={leadEditorOpen} onClose={closeRegionLeadEditor} maxWidth="xl" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Region bearbeiten
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+            <Typography variant="body2" color="text.secondary">
+              Hier kannst du Name, Mail, Website, Instagram und die weiteren Kontaktdaten direkt bearbeiten.
+            </Typography>
+            <Button variant="outlined" size="small" onClick={addLeadDraftRow} sx={{ textTransform: 'none', borderRadius: 2 }}>
+              Zeile hinzufügen
+            </Button>
+          </Box>
+
+          <TableContainer sx={{ maxHeight: '70vh' }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 72 }}>Suche</TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>Name</TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>Mail</TableCell>
+                  <TableCell sx={{ minWidth: 120 }}>Anrede</TableCell>
+                  <TableCell sx={{ minWidth: 160 }}>Nachname</TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>Adresse</TableCell>
+                  <TableCell sx={{ minWidth: 140 }}>Mail gesendet</TableCell>
+                  <TableCell sx={{ minWidth: 140 }}>Demo geklickt</TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>Notizen</TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>Website</TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>Instagram</TableCell>
+                  <TableCell sx={{ width: 80 }} />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {leadEditorDrafts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12}>
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                        Keine Kontakte vorhanden. Mit „Zeile hinzufügen“ kannst du einen neuen Eintrag anlegen.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  leadEditorDrafts.map((lead, leadIdx) => (
+                    <TableRow key={lead.id || `${lead.name}-${leadIdx}`} hover>
+                      <TableCell>
+                        <IconButton
+                          onClick={() => openGoogleSearchForLead(lead)}
+                          color="primary"
+                          title="In Google suchen"
+                        >
+                          <SearchIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.name}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'name', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.email}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'email', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.anrede}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'anrede', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.nachname}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'nachname', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.adresse}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'adresse', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton
+                          onClick={() => updateLeadDraft(leadIdx, 'mailSent', !lead.mailSent)}
+                          color={lead.mailSent ? 'success' : 'default'}
+                        >
+                          {lead.mailSent ? <CheckCircleOutlineIcon fontSize="small" /> : <HighlightOffIcon fontSize="small" />}
+                        </IconButton>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton
+                          onClick={() => updateLeadDraft(leadIdx, 'demoClicked', !lead.demoClicked)}
+                          color={lead.demoClicked ? 'success' : 'default'}
+                        >
+                          {lead.demoClicked ? <CheckCircleOutlineIcon fontSize="small" /> : <HighlightOffIcon fontSize="small" />}
+                        </IconButton>
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.notes}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'notes', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.website}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'website', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={lead.instagram}
+                          onChange={(e) => updateLeadDraft(leadIdx, 'instagram', e.target.value)}
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton color="error" onClick={() => removeLeadDraftRow(leadIdx)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeRegionLeadEditor} disabled={leadEditorSaving} sx={{ textTransform: 'none' }}>
+            Abbrechen
+          </Button>
+          <Button
+            onClick={saveRegionLeadEditor}
+            variant="contained"
+            disabled={leadEditorSaving}
+            sx={{ textTransform: 'none' }}
+          >
+            {leadEditorSaving ? 'Speichere...' : 'Speichern'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

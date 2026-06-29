@@ -588,7 +588,7 @@ const EmbedWidget: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3, px: { xs: 1, md: 0 } }}>
         <Typography 
           component="a" 
-          href="https://gutscheinfabrik.de" 
+          href="https://gutscheinery.de" 
           target="_blank" 
           rel="noopener noreferrer"
           variant="caption" 

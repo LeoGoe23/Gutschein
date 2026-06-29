@@ -27,6 +27,22 @@ const parseResponseSafely = async (response: Response): Promise<any> => {
   }
 };
 
+const buildSendErrorMessage = (data: any, fallback = 'E-Mail konnte nicht zugestellt werden.'): string => {
+  const smtpResponse = String(data?.smtpResponse || '').trim();
+  const details = String(data?.details || '').trim();
+  const generic = String(data?.error || '').trim();
+  const merged = `${smtpResponse} ${details} ${generic}`.toLowerCase();
+
+  if (merged.includes('554') || merged.includes('5.7.1') || merged.includes('message rejected') || merged.includes('rejected')) {
+    return 'Empfaenger-Server hat die E-Mail abgelehnt (z.B. 554 5.7.1). Bitte andere Empfaengeradresse testen.';
+  }
+
+  if (smtpResponse) return smtpResponse;
+  if (details) return details;
+  if (generic) return generic;
+  return fallback;
+};
+
 interface RabattCode {
   code: string;
   percent: number;
@@ -607,13 +623,49 @@ export default function DemoCheckoutPage() {
 
     setCustomerEmail(email);
     const finalBetragToCharge = finalBetrag || 0;
+    const gutscheinCode = generateGutscheinCode();
     setPurchasedBetrag(finalBetragToCharge);
     setShowSuccessPage(true);
     setIsSending(true);
     setEmailSendError('');
 
+    const persistPurchase = async () => {
+      await addDoc(collection(db, 'demo-gutscheine'), {
+        gutscheinCode,
+        betrag: finalBetragToCharge,
+        originalBetrag: getBasisBetrag(),
+        rabattCode: appliedRabatt?.code || null,
+        rabattProzent: appliedRabatt?.percent || null,
+        rabattBetrag: appliedRabatt?.rabattBetrag || 0,
+        customerEmail: email,
+        dienstleistung: selectedDienstleistung?.shortDesc || null,
+        kaufdatum: new Date().toISOString(),
+        unternehmensname: demoData?.name || 'Demo',
+        slug: slug
+      });
+
+      if (appliedRabatt && demoDocId) {
+        const demoRef = doc(db, 'demos', demoDocId);
+        const latestSnap = await getDoc(demoRef);
+        if (latestSnap.exists()) {
+          const latestData = latestSnap.data() as any;
+          const latestCodes: RabattCode[] = Array.isArray(latestData.rabattcodes) ? latestData.rabattcodes : [];
+          const updatedCodes = latestCodes.map((code) => {
+            if (code.code?.toUpperCase() !== appliedRabatt.code.toUpperCase()) return code;
+            const usedCount = Number(code.usedCount || 0);
+            return {
+              ...code,
+              usedCount: usedCount + 1,
+            };
+          });
+
+          await updateDoc(demoRef, { rabattcodes: updatedCodes });
+          setDemoData((prev) => (prev ? { ...prev, rabattcodes: updatedCodes } : prev));
+        }
+      }
+    };
+
     try {
-      const gutscheinCode = generateGutscheinCode();
       console.log('🎨 Erstelle Demo-Gutschein...');
       
       // PDF erstellen
@@ -724,7 +776,7 @@ export default function DemoCheckoutPage() {
         rabattProzent: appliedRabatt?.percent || null
       };
 
-      console.log('📧 Sende Demo-Email...');
+      console.log('📧 Sende Demo-Email (mit PDF)...');
       
       const endpoint = `${FALLBACK_API_BASE}/api/gutscheine/send-gutschein`;
       const response = await fetch(endpoint, {
@@ -737,58 +789,53 @@ export default function DemoCheckoutPage() {
 
       if (response.ok) {
         setEmailSent(true);
-        console.log('✅ Demo-Email erfolgreich versendet');
-
-        // In Firebase speichern
+        console.log('✅ Demo-Email erfolgreich versendet (mit PDF)');
         try {
-          await addDoc(collection(db, 'demo-gutscheine'), {
-            gutscheinCode,
-            betrag: finalBetragToCharge,
-            originalBetrag: getBasisBetrag(),
-            rabattCode: appliedRabatt?.code || null,
-            rabattProzent: appliedRabatt?.percent || null,
-            rabattBetrag: appliedRabatt?.rabattBetrag || 0,
-            customerEmail: email,
-            dienstleistung: selectedDienstleistung?.shortDesc || null,
-            kaufdatum: new Date().toISOString(),
-            unternehmensname: demoData?.name || 'Demo',
-            slug: slug
-          });
+          await persistPurchase();
           console.log('✅ Demo-Gutschein in Firebase gespeichert');
-
-          if (appliedRabatt && demoDocId) {
-            try {
-              const demoRef = doc(db, 'demos', demoDocId);
-              const latestSnap = await getDoc(demoRef);
-              if (latestSnap.exists()) {
-                const latestData = latestSnap.data() as any;
-                const latestCodes: RabattCode[] = Array.isArray(latestData.rabattcodes) ? latestData.rabattcodes : [];
-                const updatedCodes = latestCodes.map((code) => {
-                  if (code.code?.toUpperCase() !== appliedRabatt.code.toUpperCase()) return code;
-                  const usedCount = Number(code.usedCount || 0);
-                  return {
-                    ...code,
-                    usedCount: usedCount + 1,
-                  };
-                });
-
-                await updateDoc(demoRef, { rabattcodes: updatedCodes });
-                setDemoData((prev) => (prev ? { ...prev, rabattcodes: updatedCodes } : prev));
-              }
-            } catch (usageError) {
-              console.warn('Rabattcode-Nutzung konnte nicht aktualisiert werden:', usageError);
-            }
-          }
         } catch (fbError) {
           console.error('❌ Firebase-Fehler:', fbError);
         }
       } else {
         console.error('❌ Email-Versand fehlgeschlagen:', responseData);
-        setEmailSendError(responseData?.error || 'E-Mail konnte nicht versendet werden.');
+        throw new Error(buildSendErrorMessage(responseData, 'send-gutschein fehlgeschlagen'));
       }
-    } catch (error) {
-      console.error('❌ Fehler beim Demo-Checkout:', error);
-      setEmailSendError('Verbindung zum E-Mail-Service fehlgeschlagen. Bitte erneut versuchen.');
+    } catch (error: any) {
+      console.error('❌ Fehler beim Demo-Checkout (primary):', error);
+
+      // Fallback: send without PDF attachment if primary flow fails.
+      try {
+        const simpleEndpoint = `${FALLBACK_API_BASE}/api/gutscheine/send-simple-gutschein`;
+        const simpleResponse = await fetch(simpleEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            empfaengerEmail: email,
+            unternehmensname: demoData?.name || 'Demo',
+            gutscheinCode,
+            betrag: finalBetragToCharge,
+            dienstleistung: selectedDienstleistung,
+            isDemoMode: true,
+            rabattCode: appliedRabatt?.code || null,
+            rabattProzent: appliedRabatt?.percent || null,
+          }),
+        });
+        const simpleData = await parseResponseSafely(simpleResponse);
+        console.log('📥 Response (simple fallback):', simpleEndpoint, simpleResponse.status, simpleData);
+
+        if (!simpleResponse.ok) {
+          throw new Error(buildSendErrorMessage(simpleData, 'send-simple-gutschein fehlgeschlagen'));
+        }
+
+        setEmailSent(true);
+        setPdfGenerated(false);
+        await persistPurchase();
+        console.log('✅ Demo-Email erfolgreich versendet (simple fallback)');
+      } catch (fallbackError: any) {
+        console.error('❌ Fehler beim Demo-Checkout (fallback):', fallbackError);
+        const detailedMessage = fallbackError?.message || error?.message || 'Unbekannter Fehler';
+        setEmailSendError(`E-Mail konnte nicht zugestellt werden: ${detailedMessage}`);
+      }
     } finally {
       setIsSending(false);
     }

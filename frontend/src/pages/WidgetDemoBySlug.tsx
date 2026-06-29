@@ -32,6 +32,7 @@ const stripLayoutEditorArtifacts = (html: string): string => {
     cleaned = cleaned.replace(/\sdata-layout-editable=("[^"]*"|'[^']*')/gi, '');
     cleaned = cleaned.replace(/\sdata-layout-node-id=("[^"]*"|'[^']*')/gi, '');
     cleaned = cleaned.replace(/\sdata-layout-ignore=("[^"]*"|'[^']*')/gi, '');
+    cleaned = cleaned.replace(/\sdata-layout-selected=("[^"]*"|'[^']*')/gi, '');
 
     // Remove temporary widget overlay helper nodes injected by layout editor.
     cleaned = cleaned.replace(/<div[^>]*data-widget-overlay=("[^"]*"|'[^']*')[^>]*><\/div>/gi, '');
@@ -236,6 +237,7 @@ const WidgetDemoBySlug: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [selectedNodeInfo, setSelectedNodeInfo] = useState('');
   const [showSelectableElements, setShowSelectableElements] = useState(true);
+  const [showClickHints, setShowClickHints] = useState(true);
   const [widgetCount, setWidgetCount] = useState(0);
   const [selectedWidgetIndex, setSelectedWidgetIndex] = useState<number | null>(null);
   const [statusText, setStatusText] = useState('');
@@ -860,16 +862,76 @@ const WidgetDemoBySlug: React.FC = () => {
     const root = rootRef.current;
     if (!root) return;
 
+    root.setAttribute('data-layout-edit-mode', '1');
+    root.setAttribute('data-layout-show-selectable', showSelectableElements ? '1' : '0');
+    root.setAttribute('data-layout-click-hints', showClickHints ? '1' : '0');
+
     const getWidgetWrappers = () => findWidgetWrappers(root);
     let hoverRing: HTMLDivElement | null = null;
     let selectedRing: HTMLDivElement | null = null;
     let dropLine: HTMLDivElement | null = null;
+    let selectionStyleTag: HTMLStyleElement | null = null;
+    let mutationObserver: MutationObserver | null = null;
     let hoverRafId = 0;
     let pendingHoverEvent: MouseEvent | null = null;
+    let refreshRafId = 0;
     let lastHoverNodeId = '';
     let draggingWidget: HTMLElement | null = null;
     let dropTargetNode: HTMLElement | null = null;
     let dropPlacement: 'before' | 'after' = 'before';
+
+    const installSelectionStyles = () => {
+      selectionStyleTag = document.createElement('style');
+      selectionStyleTag.setAttribute('data-layout-selection-styles', '1');
+      selectionStyleTag.textContent = `
+        [data-layout-edit-mode="1"] [data-layout-node-id] {
+          cursor: pointer !important;
+        }
+
+        [data-layout-edit-mode="1"][data-layout-show-selectable="1"] [data-layout-node-id] {
+          outline: 2px dashed rgba(37, 99, 235, 0.88) !important;
+          outline-offset: 2px !important;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 0 0 2px rgba(37, 99, 235, 0.08) !important;
+        }
+
+        [data-layout-edit-mode="1"][data-layout-show-selectable="0"] [data-layout-node-id] {
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
+        [data-layout-edit-mode="1"][data-layout-show-selectable="1"] [data-layout-node-id]:hover {
+          outline-color: rgba(29, 78, 216, 1) !important;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
+        }
+
+        @keyframes layoutHintPulse {
+          0% { outline-color: rgba(37, 99, 235, 0.9); }
+          50% { outline-color: rgba(14, 116, 144, 1); }
+          100% { outline-color: rgba(37, 99, 235, 0.9); }
+        }
+
+        [data-layout-edit-mode="1"][data-layout-click-hints="1"] [data-layout-node-id]:not([data-layout-selected="1"]) {
+          outline-width: 3px !important;
+          outline-style: dashed !important;
+          outline-offset: 2px !important;
+          animation: layoutHintPulse 1.35s ease-in-out infinite !important;
+          box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.1), inset 0 0 0 9999px rgba(37, 99, 235, 0.03) !important;
+        }
+
+        [data-layout-edit-mode="1"] [data-layout-node-id][data-layout-selected="1"] {
+          outline: 3px solid rgba(37, 99, 235, 1) !important;
+          outline-offset: 3px !important;
+          animation: none !important;
+          box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18), inset 0 0 0 4px rgba(37, 99, 235, 0.14) !important;
+        }
+
+        [data-layout-edit-mode="1"] [data-widget-root="1"] {
+          outline: 2px dashed #16a34a !important;
+          outline-offset: 3px !important;
+        }
+      `;
+      document.head.appendChild(selectionStyleTag);
+    };
 
     const createRing = (border: string, background: string, zIndex: number) => {
       const ring = document.createElement('div');
@@ -943,6 +1005,16 @@ const WidgetDemoBySlug: React.FC = () => {
       dropLine.style.height = '0';
     };
 
+    const isLineLikeRect = (rect: DOMRect): boolean => {
+      const horizontalLine = rect.width >= 120 && rect.height >= 1 && rect.height <= 10;
+      const verticalLine = rect.height >= 120 && rect.width >= 1 && rect.width <= 10;
+      return horizontalLine || verticalLine;
+    };
+
+    const isSelectableRect = (rect: DOMRect): boolean => {
+      return (rect.width >= 16 && rect.height >= 16) || isLineLikeRect(rect);
+    };
+
     const resolveEditableTarget = (from: HTMLElement): HTMLElement | null => {
       const widgetOverlay = from.closest<HTMLElement>('[data-widget-overlay="1"]');
       if (widgetOverlay) {
@@ -958,7 +1030,7 @@ const WidgetDemoBySlug: React.FC = () => {
         if (parentContainer) return parentContainer;
       }
 
-      const target = from.closest<HTMLElement>('section, div, header, nav, main, footer, article');
+      const target = from.closest<HTMLElement>('section, div, header, nav, main, footer, article, aside, hr');
       if (!target) return null;
       if (target.closest('[data-layout-toolbar="true"]')) return null;
       if (target.getAttribute('data-layout-ignore') === '1') return null;
@@ -978,7 +1050,7 @@ const WidgetDemoBySlug: React.FC = () => {
         if (node.getAttribute('data-layout-ignore') === '1') return;
 
         const rect = node.getBoundingClientRect();
-        if (rect.width < 16 || rect.height < 16) return;
+        if (!isSelectableRect(rect)) return;
 
         const inside = clientX >= rect.left
           && clientX <= rect.right
@@ -1008,7 +1080,7 @@ const WidgetDemoBySlug: React.FC = () => {
         }
 
         const rect = current.getBoundingClientRect();
-        if (rect.width >= 16 && rect.height >= 16) {
+        if (isSelectableRect(rect)) {
           return current;
         }
 
@@ -1038,7 +1110,7 @@ const WidgetDemoBySlug: React.FC = () => {
         changed = true;
       });
 
-      const candidates = Array.from(root.querySelectorAll<HTMLElement>('section, div, header, nav, main, footer, article, aside'));
+      const candidates = Array.from(root.querySelectorAll<HTMLElement>('section, div, header, nav, main, footer, article, aside, hr'));
       let maxId = 0;
       candidates.forEach((node) => {
         const current = Number(node.dataset.layoutNodeId || '0');
@@ -1054,15 +1126,11 @@ const WidgetDemoBySlug: React.FC = () => {
           node.dataset.layoutNodeId = String(maxId);
           changed = true;
         }
-        node.style.cursor = 'pointer';
-        if (showSelectableElements) {
-          node.style.outline = '1px dashed rgba(59,130,246,0.45)';
-          node.style.outlineOffset = '1px';
-        } else {
-          // Keep a faint guide line so selection never feels "dead".
-          node.style.outline = '1px dashed rgba(59,130,246,0.15)';
-          node.style.outlineOffset = '1px';
-        }
+        node.style.removeProperty('cursor');
+        node.style.removeProperty('outline');
+        node.style.removeProperty('outline-offset');
+        node.style.removeProperty('box-shadow');
+        node.dataset.layoutSelected = node.dataset.layoutNodeId === selectedNodeId ? '1' : '0';
       });
 
       // Persist generated ids once so selection remains stable across rerenders.
@@ -1072,6 +1140,9 @@ const WidgetDemoBySlug: React.FC = () => {
 
       if (selectedNodeId) {
         const selectedNode = root.querySelector<HTMLElement>(`[data-layout-node-id="${selectedNodeId}"]`);
+        if (selectedNode) {
+          selectedNode.dataset.layoutSelected = '1';
+        }
         placeRing(selectedRing, selectedNode || null);
       } else {
         placeRing(selectedRing, null);
@@ -1079,9 +1150,7 @@ const WidgetDemoBySlug: React.FC = () => {
 
       const widgetWrappers = getWidgetWrappers();
       widgetWrappers.forEach((widgetWrapper) => {
-        widgetWrapper.style.position = 'relative';
-        widgetWrapper.style.outline = '2px dashed #16a34a';
-        widgetWrapper.style.outlineOffset = '3px';
+        widgetWrapper.style.setProperty('position', 'relative', 'important');
 
         let overlay = widgetWrapper.querySelector<HTMLElement>('[data-widget-overlay="1"]');
         if (!overlay) {
@@ -1091,11 +1160,11 @@ const WidgetDemoBySlug: React.FC = () => {
           widgetWrapper.appendChild(overlay);
         }
 
-        overlay.style.position = 'absolute';
-        overlay.style.inset = '0';
-        overlay.style.cursor = 'pointer';
-        overlay.style.background = 'transparent';
-        overlay.style.zIndex = '8';
+        overlay.style.setProperty('position', 'absolute', 'important');
+        overlay.style.setProperty('inset', '0', 'important');
+        overlay.style.setProperty('cursor', 'pointer', 'important');
+        overlay.style.setProperty('background', 'transparent', 'important');
+        overlay.style.setProperty('z-index', '8', 'important');
 
         let dragHandle = widgetWrapper.querySelector<HTMLElement>('[data-widget-drag-handle="1"]');
         if (!dragHandle) {
@@ -1106,21 +1175,21 @@ const WidgetDemoBySlug: React.FC = () => {
           widgetWrapper.appendChild(dragHandle);
         }
 
-        dragHandle.style.position = 'absolute';
-        dragHandle.style.top = '8px';
-        dragHandle.style.right = '8px';
-        dragHandle.style.zIndex = '10';
-        dragHandle.style.padding = '4px 8px';
-        dragHandle.style.fontSize = '12px';
-        dragHandle.style.fontWeight = '700';
-        dragHandle.style.lineHeight = '1.2';
-        dragHandle.style.color = '#ffffff';
-        dragHandle.style.background = 'rgba(2,132,199,0.92)';
-        dragHandle.style.border = '1px solid rgba(3,105,161,0.95)';
-        dragHandle.style.borderRadius = '999px';
-        dragHandle.style.cursor = 'grab';
-        dragHandle.style.userSelect = 'none';
-        dragHandle.style.pointerEvents = 'auto';
+        dragHandle.style.setProperty('position', 'absolute', 'important');
+        dragHandle.style.setProperty('top', '8px', 'important');
+        dragHandle.style.setProperty('right', '8px', 'important');
+        dragHandle.style.setProperty('z-index', '10', 'important');
+        dragHandle.style.setProperty('padding', '4px 8px', 'important');
+        dragHandle.style.setProperty('font-size', '12px', 'important');
+        dragHandle.style.setProperty('font-weight', '700', 'important');
+        dragHandle.style.setProperty('line-height', '1.2', 'important');
+        dragHandle.style.setProperty('color', '#ffffff', 'important');
+        dragHandle.style.setProperty('background', 'rgba(2,132,199,0.92)', 'important');
+        dragHandle.style.setProperty('border', '1px solid rgba(3,105,161,0.95)', 'important');
+        dragHandle.style.setProperty('border-radius', '999px', 'important');
+        dragHandle.style.setProperty('cursor', 'grab', 'important');
+        dragHandle.style.setProperty('user-select', 'none', 'important');
+        dragHandle.style.setProperty('pointer-events', 'auto', 'important');
       });
 
       setWidgetCount(widgetWrappers.length);
@@ -1137,10 +1206,39 @@ const WidgetDemoBySlug: React.FC = () => {
       interactives.forEach((node) => {
         node.style.pointerEvents = 'none';
       });
+
+      const clearSelectionFlags = () => {
+        root.querySelectorAll<HTMLElement>('[data-layout-node-id][data-layout-selected="1"]').forEach((node) => {
+          if (node.dataset.layoutNodeId !== selectedNodeId) {
+            node.dataset.layoutSelected = '0';
+          }
+        });
+      };
+
+      clearSelectionFlags();
     };
 
+    const scheduleRefresh = () => {
+      if (refreshRafId) return;
+      refreshRafId = window.requestAnimationFrame(() => {
+        refreshRafId = 0;
+        assignEditableMarkers();
+      });
+    };
+
+    installSelectionStyles();
     mountRings();
     assignEditableMarkers();
+
+    mutationObserver = new MutationObserver(() => {
+      scheduleRefresh();
+    });
+    mutationObserver.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'data-layout-node-id', 'data-widget-root', 'data-widget-iframe'],
+    });
 
     const resolveFromEventPath = (event: MouseEvent): HTMLElement | null => {
       const path = event.composedPath();
@@ -1340,12 +1438,22 @@ const WidgetDemoBySlug: React.FC = () => {
       if (hoverRafId) {
         window.cancelAnimationFrame(hoverRafId);
       }
+      if (refreshRafId) {
+        window.cancelAnimationFrame(refreshRafId);
+      }
+      if (mutationObserver) {
+        mutationObserver.disconnect();
+      }
       document.body.style.userSelect = '';
       if (hoverRing?.parentElement) hoverRing.parentElement.removeChild(hoverRing);
       if (selectedRing?.parentElement) selectedRing.parentElement.removeChild(selectedRing);
       if (dropLine?.parentElement) dropLine.parentElement.removeChild(dropLine);
+      if (selectionStyleTag?.parentElement) selectionStyleTag.parentElement.removeChild(selectionStyleTag);
+      root.removeAttribute('data-layout-edit-mode');
+      root.removeAttribute('data-layout-show-selectable');
+      root.removeAttribute('data-layout-click-hints');
     };
-  }, [isLayoutEditMode, selectedNodeId, showSelectableElements, renderedHtml]);
+  }, [isLayoutEditMode, selectedNodeId, showSelectableElements, showClickHints, renderedHtml]);
 
   const applyActionToSelection = () => {
     if (!isLayoutEditMode) return;
@@ -1726,7 +1834,13 @@ const WidgetDemoBySlug: React.FC = () => {
                   style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
                   onClick={() => setShowSelectableElements((prev) => !prev)}
                 >
-                  {showSelectableElements ? 'Elemente ausblenden' : 'Alle Elemente anzeigen'}
+                  {showSelectableElements ? 'Linien ausblenden' : 'Linien anzeigen'}
+                </button>
+                <button
+                  style={{ background: showClickHints ? '#0f766e' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                  onClick={() => setShowClickHints((prev) => !prev)}
+                >
+                  {showClickHints ? 'Klick-Hinweise AN' : 'Klick-Hinweise AUS'}
                 </button>
                 <button style={{ background: editAction === 'remove' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('remove')}>Entfernen</button>
                 <button style={{ background: editAction === 'swapUp' ? '#2563eb' : '#1f2937', color: '#fff', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }} onClick={() => setEditAction('swapUp')}>Tauschen hoch</button>
