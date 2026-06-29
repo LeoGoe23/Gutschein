@@ -9,6 +9,7 @@ export interface DemoData {
     shortDesc: string;
     longDesc: string;
     price: string;
+    kategorie?: string;
   }>;
   slug: string;
 }

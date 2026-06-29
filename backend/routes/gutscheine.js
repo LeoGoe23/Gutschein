@@ -204,7 +204,10 @@ router.post("/send-gutschein", async (req, res) => {
     res.status(500).json({ 
       error: "Fehler beim Senden der E-Mail",
       details: err.message,
-      code: err.code 
+      code: err.code,
+      smtpResponse: err.response,
+      smtpResponseCode: err.responseCode,
+      smtpCommand: err.command,
     });
   }
 });
@@ -282,7 +285,10 @@ router.post("/send-simple-gutschein", async (req, res) => {
     res.status(500).json({ 
       error: "Fehler beim Senden der E-Mail",
       details: err.message,
-      code: err.code 
+      code: err.code,
+      smtpResponse: err.response,
+      smtpResponseCode: err.responseCode,
+      smtpCommand: err.command,
     });
   }
 });

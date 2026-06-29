@@ -12,6 +12,7 @@ export interface Dienstleistung {
   longDesc: string;
   price?: string; // Für flache Dienstleistungen
   reihenfolge: number;
+  kategorie?: string;
   varianten?: DienstleistungVariante[]; // Optional: Für Dienstleistungen mit Varianten
 }
 
@@ -20,6 +21,7 @@ export interface WidgetVoucherOption {
   type: 'gutschein' | 'contact';
   titel: string;
   betrag: number;
+  kategorie?: string;
   abPreis?: boolean;
   inhalt?: string;
   beschreibung?: string;
@@ -68,6 +70,9 @@ const normalizeWidgetConfig = (value: unknown): WidgetConfig => {
         type: voucherType,
         titel: typeof voucher.titel === 'string' ? voucher.titel : '',
         betrag: Number.isFinite(betrag) ? betrag : 0,
+        kategorie: typeof (voucher as any).kategorie === 'string'
+          ? (voucher as any).kategorie
+          : (typeof (voucher as any).category === 'string' ? (voucher as any).category : ''),
         abPreis: Boolean(voucher.abPreis),
         inhalt: typeof voucher.inhalt === 'string' ? voucher.inhalt : '',
         beschreibung: typeof voucher.beschreibung === 'string' ? voucher.beschreibung : '',
@@ -138,7 +143,10 @@ const extractDienstleistungen = (gutscheinarten: any): Dienstleistung[] => {
       const dienstleistung: Dienstleistung = {
         shortDesc: item.name,
         longDesc: item.beschreibung || item.name,
-        reihenfolge: item.reihenfolge || 0
+        reihenfolge: item.reihenfolge || 0,
+        kategorie: typeof item.kategorie === 'string'
+          ? item.kategorie
+          : (typeof item.category === 'string' ? item.category : undefined)
       };
 
       // Check ob Varianten vorhanden sind

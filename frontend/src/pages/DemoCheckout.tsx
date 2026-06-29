@@ -1,6 +1,6 @@
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField, Chip } from '@mui/material';
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, TextField, Chip, MenuItem } from '@mui/material';
 import LocalOfferOutlined from '@mui/icons-material/LocalOfferOutlined';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import { useParams, useLocation } from 'react-router-dom';
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -63,12 +63,15 @@ interface DemoData {
   bildURL: string;
   customValue: boolean;
   rabattcodes?: RabattCode[];
-  dienstleistungen: Array<{
-    shortDesc: string;
-    longDesc: string;
-    price: string;
-  }>;
+  dienstleistungen: DemoDienstleistung[];
   slug: string;
+}
+
+interface DemoDienstleistung {
+  shortDesc: string;
+  longDesc: string;
+  price: string;
+  kategorie?: string;
 }
 
 // Demo Payment Form - mit echtem E-Mail-Versand
@@ -85,7 +88,7 @@ function DemoPaymentForm({
   rabattMessage,
 }: {
   finalBetrag: number | null;
-  selectedDienstleistung: { shortDesc: string; longDesc: string; price: string } | null;
+  selectedDienstleistung: DemoDienstleistung | null;
   onPaymentComplete: (email: string) => void;
   rabattCodeInput: string;
   setRabattCodeInput: (v: string) => void;
@@ -263,7 +266,7 @@ function DemoSuccessPage({
   emailSendError,
 }: {
   purchasedBetrag: number;
-  selectedDienstleistung?: { shortDesc: string; longDesc: string; price: string } | null;
+  selectedDienstleistung?: DemoDienstleistung | null;
   customerEmail: string;
   isSending: boolean;
   pdfGenerated: boolean;
@@ -339,7 +342,8 @@ export default function DemoCheckoutPage() {
   const [error, setError] = useState<string>('');
   
   const [betrag, setBetrag] = useState<number | null>(null);
-  const [selectedDienstleistung, setSelectedDienstleistung] = useState<{ shortDesc: string; longDesc: string; price: string } | null>(null);
+  const [selectedDienstleistung, setSelectedDienstleistung] = useState<DemoDienstleistung | null>(null);
+  const [selectedKategorie, setSelectedKategorie] = useState<string>('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [gutscheinType, setGutscheinType] = useState<'wert' | 'dienstleistung'>('wert');
@@ -379,6 +383,46 @@ export default function DemoCheckoutPage() {
   const getReducedPrice = (price: number) => {
     return calculateFinalAmount(price, appliedRabatt?.percent) ?? price;
   };
+
+  const inferKategorie = (dienstleistung: DemoDienstleistung): string => {
+    const raw = (dienstleistung.kategorie || '').trim();
+    if (raw) return raw;
+
+    const text = `${dienstleistung.shortDesc} ${dienstleistung.longDesc || ''}`.toLowerCase();
+    if (/\b(kurs|workshop|paar|praevention|prävention)\b/.test(text)) return 'Kurse';
+    if (/\b(verwoehn|verwöhn|paket)\b/.test(text)) return 'Verwoehn-Massagen';
+    if (/\b(aroma|aetherisch|ätherisch|duft|oel|öl|vetiver|zitrus|ingwer|rose)\b/.test(text)) return 'Aroma-Massagen';
+    if (/\b(massage|nacken|ruecken|rücken|ganzkoerper|ganzkörper|fuss|fuß|akupressur)\b/.test(text)) return 'Ganzheitliche Massagen';
+    return 'Weitere Angebote';
+  };
+
+  const kategorisierteDienstleistungen = useMemo(() => {
+    if (!demoData) return [] as Array<DemoDienstleistung & { kategorieResolved: string }>;
+    return demoData.dienstleistungen.map((dl) => ({
+      ...dl,
+      kategorieResolved: inferKategorie(dl),
+    }));
+  }, [demoData]);
+
+  const verfuegbareKategorien = useMemo(() => {
+    const unique = Array.from(new Set(kategorisierteDienstleistungen.map((dl) => dl.kategorieResolved)));
+    return unique;
+  }, [kategorisierteDienstleistungen]);
+
+  const dienstleistungenInKategorie = useMemo(() => {
+    if (!selectedKategorie) return kategorisierteDienstleistungen;
+    return kategorisierteDienstleistungen.filter((dl) => dl.kategorieResolved === selectedKategorie);
+  }, [kategorisierteDienstleistungen, selectedKategorie]);
+
+  useEffect(() => {
+    if (!verfuegbareKategorien.length) {
+      if (selectedKategorie) setSelectedKategorie('');
+      return;
+    }
+    if (!selectedKategorie || !verfuegbareKategorien.includes(selectedKategorie)) {
+      setSelectedKategorie(verfuegbareKategorien[0]);
+    }
+  }, [verfuegbareKategorien, selectedKategorie]);
 
   // Lade Demo-Daten basierend auf Slug
   useEffect(() => {
@@ -440,6 +484,7 @@ export default function DemoCheckoutPage() {
       if (matchedDienstleistung) {
         setGutscheinType('dienstleistung');
         setSelectedDienstleistung(matchedDienstleistung);
+        setSelectedKategorie(inferKategorie(matchedDienstleistung));
         setBetrag(Number(matchedDienstleistung.price));
         setIsPresetSelection(fromWidgetPreset);
         setShowPaymentForm(shouldOpenPayment);
@@ -525,11 +570,11 @@ export default function DemoCheckoutPage() {
   const handleDienstleistungSelect = (dienstleistung: { shortDesc: string; longDesc: string; price: string }) => {
     setBetrag(Number(dienstleistung.price));
     setSelectedDienstleistung(dienstleistung);
+    setSelectedKategorie(inferKategorie(dienstleistung));
     setRabattMessage('');
   };
 
   const handleToggleChange = (event: React.MouseEvent<HTMLElement>, newType: 'wert' | 'dienstleistung') => {
-    if (isPresetSelection) return;
     if (newType) {
       setGutscheinType(newType);
       setBetrag(null);
@@ -872,7 +917,7 @@ export default function DemoCheckoutPage() {
               {/* Rabattcode-Einlösung nur im Zahlungsformular */}
 
               {/* Toggle für beide Optionen - identisch zu checkoutc */}
-              {hasBoth && !isPresetSelection && (
+              {hasBoth && (
                 <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
                   <ToggleButtonGroup
                     value={gutscheinType}
@@ -895,7 +940,7 @@ export default function DemoCheckoutPage() {
                 </Box>
               )}
 
-              {!showPaymentForm && !isPresetSelection && (
+              {!showPaymentForm && (
                 <Box sx={{ minHeight: '200px', mb: 4 }}>
                   {/* Wertgutschein - identisch zu checkoutc */}
                   {gutscheinType === 'wert' && hasWertGutschein && (
@@ -932,55 +977,57 @@ export default function DemoCheckoutPage() {
                       <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
                         Welche Dienstleistung möchten Sie verschenken?
                       </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {demoData.dienstleistungen.map((dienstleistung, index) => (
-                          (() => {
-                            const originalPrice = Number(dienstleistung.price);
-                            const reducedPrice = getReducedPrice(originalPrice);
-                            return (
-                          <Button
-                            key={index}
-                            variant={selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? "contained" : "outlined"}
-                            onClick={() => handleDienstleistungSelect(dienstleistung)}
-                            sx={{
-                              borderRadius: 2,
-                              px: 3,
-                              py: 2,
-                              textTransform: 'none',
-                              textAlign: 'left',
-                              justifyContent: 'space-between',
-                              display: 'flex',
-                              fontWeight: 600,
-                              width: '100%',
-                              minWidth: '220px',
-                              boxShadow: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? 4 : 1,
-                              borderColor: '#bdbdbd',
-                              backgroundColor: selectedDienstleistung?.shortDesc === dienstleistung.shortDesc ? '#e3f2fd' : '#fff',
-                              color: '#222',
-                              transition: 'all 0.2s',
-                              '&:hover': {
-                                backgroundColor: '#f5f5f5',
-                                boxShadow: 3,
-                              },
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxWidth: 520 }}>
+                        {verfuegbareKategorien.length > 1 && (
+                          <TextField
+                            select
+                            label="Kategorie"
+                            size="small"
+                            value={selectedKategorie}
+                            onChange={(e) => {
+                              const nextKategorie = e.target.value;
+                              setSelectedKategorie(nextKategorie);
+                              const firstInCategory = kategorisierteDienstleistungen.find((dl) => dl.kategorieResolved === nextKategorie);
+                              if (firstInCategory) {
+                                handleDienstleistungSelect(firstInCategory);
+                              }
                             }}
                           >
-                            <span>{dienstleistung.shortDesc}</span>
-                            {!appliedRabatt ? (
-                              <span style={{ fontWeight: 700 }}>{dienstleistung.price}€</span>
-                            ) : (
-                              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                                <Typography sx={{ textDecoration: 'line-through', color: 'text.secondary', fontSize: '0.95rem', fontWeight: 500 }}>
-                                  {originalPrice.toFixed(2)}€
-                                </Typography>
-                                <Typography sx={{ color: 'success.main', fontWeight: 800, fontSize: '1rem' }}>
-                                  {reducedPrice.toFixed(2)}€
-                                </Typography>
-                              </Box>
-                            )}
-                          </Button>
+                            {verfuegbareKategorien.map((kategorie) => (
+                              <MenuItem key={kategorie} value={kategorie}>{kategorie}</MenuItem>
+                            ))}
+                          </TextField>
+                        )}
+
+                        <TextField
+                          select
+                          label="Leistung"
+                          size="small"
+                          value={selectedDienstleistung?.shortDesc || ''}
+                          onChange={(e) => {
+                            const next = dienstleistungenInKategorie.find((dl) => dl.shortDesc === e.target.value);
+                            if (next) handleDienstleistungSelect(next);
+                          }}
+                        >
+                          {dienstleistungenInKategorie.map((dienstleistung) => {
+                            const originalPrice = Number(dienstleistung.price);
+                            const reducedPrice = getReducedPrice(originalPrice);
+                            const priceLabel = !appliedRabatt
+                              ? `${originalPrice.toFixed(2)}€`
+                              : `${reducedPrice.toFixed(2)}€`;
+                            return (
+                              <MenuItem key={`${dienstleistung.shortDesc}-${dienstleistung.price}`} value={dienstleistung.shortDesc}>
+                                {`${dienstleistung.shortDesc} - ${priceLabel}`}
+                              </MenuItem>
                             );
-                          })()
-                        ))}
+                          })}
+                        </TextField>
+
+                        {selectedDienstleistung?.longDesc && (
+                          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                            {selectedDienstleistung.longDesc}
+                          </Typography>
+                        )}
                       </Box>
                     </Box>
                   )}
@@ -1072,16 +1119,47 @@ export default function DemoCheckoutPage() {
               {/* Payment Form */}
               {showPaymentForm && (
                 <>
-                  {isPresetSelection && (
-                    <Box sx={{ mb: 2.5, p: 1.75, borderRadius: 2, backgroundColor: '#f8fafc', border: '1px solid #dbe7f8' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.4, color: '#0f172a' }}>
-                        Der ausgewählte Gutschein
+                  {((hasBoth && gutscheinType === 'dienstleistung') || (!hasWertGutschein && hasDienstleistungGutschein)) && (
+                    <Box sx={{ mb: 2.5, p: 1.75, borderRadius: 2, backgroundColor: '#f8fafc', border: '1px solid #dbe7f8', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                        Auswahl anpassen
                       </Typography>
-                      <Typography variant="body2" sx={{ color: '#475569' }}>
-                        {selectedDienstleistung
-                          ? `${selectedDienstleistung.shortDesc} - ${Number(selectedDienstleistung.price).toFixed(2)}€`
-                          : `Wertgutschein über ${(betrag || 0).toFixed(2)}€`}
-                      </Typography>
+                      {verfuegbareKategorien.length > 1 && (
+                        <TextField
+                          select
+                          label="Kategorie"
+                          size="small"
+                          value={selectedKategorie}
+                          onChange={(e) => {
+                            const nextKategorie = e.target.value;
+                            setSelectedKategorie(nextKategorie);
+                            const firstInCategory = kategorisierteDienstleistungen.find((dl) => dl.kategorieResolved === nextKategorie);
+                            if (firstInCategory) {
+                              handleDienstleistungSelect(firstInCategory);
+                            }
+                          }}
+                        >
+                          {verfuegbareKategorien.map((kategorie) => (
+                            <MenuItem key={kategorie} value={kategorie}>{kategorie}</MenuItem>
+                          ))}
+                        </TextField>
+                      )}
+                      <TextField
+                        select
+                        label="Leistung"
+                        size="small"
+                        value={selectedDienstleistung?.shortDesc || ''}
+                        onChange={(e) => {
+                          const next = dienstleistungenInKategorie.find((dl) => dl.shortDesc === e.target.value);
+                          if (next) handleDienstleistungSelect(next);
+                        }}
+                      >
+                        {dienstleistungenInKategorie.map((dienstleistung) => (
+                          <MenuItem key={`${dienstleistung.shortDesc}-${dienstleistung.price}`} value={dienstleistung.shortDesc}>
+                            {`${dienstleistung.shortDesc} - ${Number(dienstleistung.price).toFixed(2)}€`}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Box>
                   )}
 

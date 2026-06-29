@@ -20,6 +20,7 @@ interface DemoData {
     shortDesc: string;
     longDesc: string;
     price: string;
+    kategorie?: string;
   }>;
   slug: string;
   createdAt: string;
@@ -30,6 +31,7 @@ interface DienstleistungForm {
   shortDesc: string;
   longDesc: string;
   price: string;
+  kategorie?: string;
 }
 
 interface RabattCode {
@@ -72,6 +74,87 @@ const sanitizeForFirestore = (value: any): any => {
   return value;
 };
 
+const normalizePriceString = (value: string): string => {
+  const normalized = value.replace(',', '.').trim();
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return '';
+  return String(Math.round(parsed * 100) / 100);
+};
+
+const extractPriceFromText = (text: string): string => {
+  const fromPreis = text.match(/preis\s*:\s*([^\n]+)/i)?.[1] || text;
+  const numberMatch = fromPreis.match(/(\d{1,4}(?:[\.,]\d{1,2})?)/);
+  if (!numberMatch) return '';
+  return normalizePriceString(numberMatch[1]);
+};
+
+const inferCategoryFromEntry = (text: string): string | undefined => {
+  const lower = text.toLowerCase();
+  if (/\b(kurs|workshop|paar|praevention|prävention)\b/.test(lower)) return 'Kurse';
+  if (/\b(verwoehn|verwöhn|paket)\b/.test(lower)) return 'Verwoehn-Massagen';
+  if (/\b(aroma|aetherisch|ätherisch|duft|oel|öl|vetiver|zitrus|ingwer|rose)\b/.test(lower)) return 'Aroma-Massagen';
+  if (/\b(massage|nacken|ruecken|rücken|ganzkoerper|ganzkörper|fuss|fuß|akupressur)\b/.test(lower)) return 'Ganzheitliche Massagen';
+  return undefined;
+};
+
+const isCategoryHeading = (paragraph: string): boolean => {
+  const line = paragraph.trim();
+  if (!line) return false;
+  if (/preis\s*:/i.test(line)) return false;
+  if (/dauer\s*:/i.test(line)) return false;
+  if (/\d/.test(line)) return false;
+  if (line.length > 60) return false;
+  const words = line.split(/\s+/).filter(Boolean).length;
+  if (words > 6) return false;
+  return /massag|kurs|behandlung|wellness|duft|aroma/i.test(line);
+};
+
+const parseDienstleistungenFromInput = (raw: string): DienstleistungForm[] => {
+  const text = (raw || '').replace(/\r\n/g, '\n').trim();
+  if (!text) return [];
+
+  const paragraphs = text
+    .split(/\n\s*\n+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  const parsed: DienstleistungForm[] = [];
+  let activeCategory = '';
+
+  paragraphs.forEach((paragraph) => {
+    const compact = paragraph.replace(/\s+/g, ' ').trim();
+    if (!compact) return;
+
+    if (isCategoryHeading(compact)) {
+      if (compact.toLowerCase() !== 'massage') {
+        activeCategory = compact;
+      }
+      return;
+    }
+
+    const price = extractPriceFromText(compact);
+    if (!price) return;
+
+    const beforeDauer = compact.split(/\bdauer\s*:/i)[0] || compact;
+    const beforePreis = beforeDauer.split(/\bpreis\s*:/i)[0] || beforeDauer;
+    const shortDesc = beforePreis.trim();
+    if (!shortDesc) return;
+
+    const longDescRaw = compact.replace(/\bpreis\s*:[\s\S]*$/i, '').trim();
+    const longDesc = longDescRaw === shortDesc ? '' : longDescRaw;
+    const inferredCategory = inferCategoryFromEntry(`${shortDesc} ${longDesc}`);
+
+    parsed.push({
+      shortDesc,
+      longDesc,
+      price,
+      kategorie: activeCategory || inferredCategory || undefined,
+    });
+  });
+
+  return parsed;
+};
+
 export default function AdminDemosPage() {
   const user = useAuth();
   const navigate = useNavigate();
@@ -109,8 +192,11 @@ export default function AdminDemosPage() {
   const [newDienstleistung, setNewDienstleistung] = useState<DienstleistungForm>({
     shortDesc: '',
     longDesc: '',
-    price: ''
+    price: '',
+    kategorie: ''
   });
+  const [bulkDienstleistungenInput, setBulkDienstleistungenInput] = useState('');
+  const [bulkImportInfo, setBulkImportInfo] = useState('');
   const [newRabattCode, setNewRabattCode] = useState<RabattCodeForm>({
     code: '',
     percent: '10',
@@ -240,7 +326,7 @@ export default function AdminDemosPage() {
   };
 
   const mapCheckoutDienstleistungenToDemo = (gutscheinarten: any): DemoData['dienstleistungen'] => {
-    const mapped: Array<{ shortDesc: string; longDesc: string; price: string; reihenfolge: number }> = [];
+    const mapped: Array<{ shortDesc: string; longDesc: string; price: string; kategorie?: string; reihenfolge: number }> = [];
 
     Object.keys(gutscheinarten || {}).forEach((key) => {
       const item = gutscheinarten[key];
@@ -254,6 +340,9 @@ export default function AdminDemosPage() {
             shortDesc: `${item.name} - ${variante.name}`,
             longDesc: variante.beschreibung || item.beschreibung || item.name || '',
             price: String(variante.preis ?? ''),
+            kategorie: typeof item.kategorie === 'string'
+              ? item.kategorie
+              : (typeof item.category === 'string' ? item.category : ''),
             reihenfolge: baseOrder * 100 + index,
           });
         });
@@ -262,6 +351,9 @@ export default function AdminDemosPage() {
           shortDesc: item.name || '',
           longDesc: item.beschreibung || item.name || '',
           price: String(item.preis ?? ''),
+          kategorie: typeof item.kategorie === 'string'
+            ? item.kategorie
+            : (typeof item.category === 'string' ? item.category : ''),
           reihenfolge: baseOrder,
         });
       }
@@ -269,7 +361,7 @@ export default function AdminDemosPage() {
 
     return mapped
       .sort((a, b) => a.reihenfolge - b.reihenfolge)
-      .map(({ shortDesc, longDesc, price }) => ({ shortDesc, longDesc, price }));
+      .map(({ shortDesc, longDesc, price, kategorie }) => ({ shortDesc, longDesc, price, kategorie }));
   };
 
   const importFromCheckoutSlug = async () => {
@@ -371,6 +463,8 @@ export default function AdminDemosPage() {
     setPreviewUrl('');
     setCopySourceSlug('');
     setImportInfo('');
+    setBulkDienstleistungenInput('');
+    setBulkImportInfo('');
     setOpenDialog(true);
   };
 
@@ -382,6 +476,8 @@ export default function AdminDemosPage() {
     setCopySourceSlug('');
     setImportInfo('');
     setNewRabattCode({ code: '', percent: '10', maxUses: '10' });
+    setBulkDienstleistungenInput('');
+    setBulkImportInfo('');
     setOpenDialog(true);
   };
 
@@ -591,10 +687,28 @@ export default function AdminDemosPage() {
 
     setFormData({
       ...formData,
-      dienstleistungen: [...formData.dienstleistungen, { ...newDienstleistung }]
+      dienstleistungen: [...formData.dienstleistungen, { ...newDienstleistung, kategorie: (newDienstleistung.kategorie || '').trim() || undefined }]
     });
 
-    setNewDienstleistung({ shortDesc: '', longDesc: '', price: '' });
+    setNewDienstleistung({ shortDesc: '', longDesc: '', price: '', kategorie: '' });
+  };
+
+  const importDienstleistungenFromText = (mode: 'append' | 'replace') => {
+    const parsed = parseDienstleistungenFromInput(bulkDienstleistungenInput);
+    if (parsed.length === 0) {
+      alert('Keine gueltigen Dienstleistungen erkannt. Bitte Eingabe pruefen (inkl. Preisangaben).');
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      dienstleistungen: mode === 'replace'
+        ? parsed
+        : [...prev.dienstleistungen, ...parsed],
+    }));
+
+    const actionText = mode === 'replace' ? 'ersetzt' : 'hinzugefuegt';
+    setBulkImportInfo(`${parsed.length} Dienstleistungen automatisch erkannt und ${actionText}.`);
   };
 
   const removeDienstleistung = (index: number) => {
@@ -1138,6 +1252,49 @@ export default function AdminDemosPage() {
             </Box>
 
             <Typography variant="h6">Dienstleistungen</Typography>
+
+            <Box sx={{ border: '1px dashed #90caf9', p: 2, borderRadius: 2, backgroundColor: '#f8fbff' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1.25, fontWeight: 700 }}>
+                Auto-Import aus Text
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Fuegen Sie einen strukturierten Block mit Kategorien, Dauer und Preis ein. Der Parser erkennt Kategorien automatisch und erstellt Dienstleistungen.
+              </Typography>
+              <TextField
+                multiline
+                minRows={8}
+                maxRows={16}
+                fullWidth
+                placeholder={'Beispiel:\nGanzheitliche Massagen\n\n20 Min. Schulter/Nacken Massage Dauer: 20 Min, Preis: 27 Euro'}
+                value={bulkDienstleistungenInput}
+                onChange={(e) => {
+                  setBulkDienstleistungenInput(e.target.value);
+                  if (bulkImportInfo) setBulkImportInfo('');
+                }}
+              />
+              <Box sx={{ display: 'flex', gap: 1.25, mt: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  onClick={() => importDienstleistungenFromText('append')}
+                  disabled={!bulkDienstleistungenInput.trim()}
+                >
+                  Automatisch hinzufuegen
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => importDienstleistungenFromText('replace')}
+                  disabled={!bulkDienstleistungenInput.trim()}
+                >
+                  Bestehende ersetzen
+                </Button>
+              </Box>
+              {bulkImportInfo && (
+                <Alert severity="success" sx={{ mt: 1.5 }}>
+                  {bulkImportInfo}
+                </Alert>
+              )}
+            </Box>
             
             {/* Neue Dienstleistung hinzufügen */}
             <Box sx={{ border: '1px dashed #ccc', p: 2, borderRadius: 2 }}>
@@ -1164,6 +1321,13 @@ export default function AdminDemosPage() {
                   onChange={(e) => setNewDienstleistung({ ...newDienstleistung, price: e.target.value })}
                   size="small"
                   sx={{ flex: '0 1 120px' }}
+                />
+                <TextField
+                  label="Kategorie (optional)"
+                  value={newDienstleistung.kategorie || ''}
+                  onChange={(e) => setNewDienstleistung({ ...newDienstleistung, kategorie: e.target.value })}
+                  size="small"
+                  sx={{ flex: '1 1 220px' }}
                 />
                 <Button 
                   variant="contained" 
@@ -1194,6 +1358,11 @@ export default function AdminDemosPage() {
                       <Typography variant="body2" fontWeight={600}>
                         {dienst.shortDesc} - {dienst.price}€
                       </Typography>
+                      {dienst.kategorie && (
+                        <Typography variant="caption" color="primary" sx={{ display: 'block', mb: 0.25 }}>
+                          Kategorie: {dienst.kategorie}
+                        </Typography>
+                      )}
                       {dienst.longDesc && (
                         <Typography variant="caption" color="text.secondary">
                           {dienst.longDesc}

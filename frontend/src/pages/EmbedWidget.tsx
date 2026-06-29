@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, Typography, Card, CardContent, Divider, TextField } from '@mui/material';
+import { Box, Typography, Card, CardContent, Divider, TextField, MenuItem } from '@mui/material';
 import { CheckoutData, WidgetVoucherOption, loadCheckoutDataBySlug } from '../utils/loadCheckoutData';
 import { loadDemoDataBySlug } from '../utils/loadDemoData';
 
@@ -87,6 +87,7 @@ const isLikelyDefaultLinkBlue = (rgb: RgbColor): boolean => {
 interface GutscheinOption {
   titel: string;
   betrag: number;
+  kategorie?: string;
   abPreis?: boolean;
   inhalt?: string;
   beschreibung?: string;
@@ -94,6 +95,31 @@ interface GutscheinOption {
   contactUrl?: string;
   buttonLabel?: string;
 }
+
+const normalizeCategory = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const inferCategoryFromText = (titel: string, beschreibung?: string): string | undefined => {
+  const text = `${titel} ${beschreibung || ''}`.toLowerCase();
+
+  if (/\b(kurs|workshop|paar|praevention|prävention)\b/.test(text)) {
+    return 'Kurse';
+  }
+  if (/\b(verwoehn|verwöhn|paket)\b/.test(text)) {
+    return 'Verwoehn-Massagen';
+  }
+  if (/\b(aroma|aetherisch|ätherisch|duft|oel|öl)\b/.test(text)) {
+    return 'Aroma-Massagen';
+  }
+  if (/\b(massage|nacken|ruecken|rücken|ganzkoerper|ganzkörper|fuss|fuß|akupressur)\b/.test(text)) {
+    return 'Ganzheitliche Massagen';
+  }
+
+  return undefined;
+};
 
 const PROSPECT_DEMO_OPTIONS: GutscheinOption[] = [
   {
@@ -117,7 +143,7 @@ const PROSPECT_DEMO_OPTIONS: GutscheinOption[] = [
 ];
 
 const buildOptionsFromDemo = (
-  demoDienstleistungen: Array<{ shortDesc: string; longDesc: string; price: string }>,
+  demoDienstleistungen: Array<{ shortDesc: string; longDesc: string; price: string; kategorie?: string }>,
   includeCustomValue: boolean
 ): GutscheinOption[] => {
   const loadedOptions: GutscheinOption[] = [];
@@ -135,10 +161,15 @@ const buildOptionsFromDemo = (
     const amount = toAmount(dienstleistung.price);
     if (amount <= 0) return;
 
+    const beschreibung = dienstleistung.longDesc || undefined;
+    const kategorie = normalizeCategory((dienstleistung as any).kategorie)
+      || inferCategoryFromText(dienstleistung.shortDesc, beschreibung);
+
     loadedOptions.push({
       titel: dienstleistung.shortDesc,
       betrag: amount,
-      beschreibung: dienstleistung.longDesc || undefined,
+      beschreibung,
+      kategorie,
       type: 'gutschein',
     });
   });
@@ -168,19 +199,27 @@ const buildOptionsFromCheckout = (data: CheckoutData, includeCustomValue: boolea
         dienstleistung.varianten.forEach((variant) => {
           const amount = toAmount(variant.preis);
           if (amount <= 0) return;
+          const beschreibung = variant.beschreibung || dienstleistung.longDesc;
+          const kategorie = normalizeCategory((dienstleistung as any).kategorie)
+            || inferCategoryFromText(`${dienstleistung.shortDesc} - ${variant.name}`, beschreibung);
           loadedOptions.push({
             titel: `${dienstleistung.shortDesc} - ${variant.name}`,
             betrag: amount,
-            beschreibung: variant.beschreibung || dienstleistung.longDesc,
+            beschreibung,
+            kategorie,
           });
         });
       } else {
         const amount = toAmount(dienstleistung.price);
         if (amount <= 0) return;
+        const beschreibung = dienstleistung.longDesc !== dienstleistung.shortDesc ? dienstleistung.longDesc : undefined;
+        const kategorie = normalizeCategory((dienstleistung as any).kategorie)
+          || inferCategoryFromText(dienstleistung.shortDesc, beschreibung);
         loadedOptions.push({
           titel: dienstleistung.shortDesc,
           betrag: amount,
-          beschreibung: dienstleistung.longDesc !== dienstleistung.shortDesc ? dienstleistung.longDesc : undefined,
+          beschreibung,
+          kategorie,
         });
       }
     });
@@ -209,12 +248,16 @@ const buildOptionsFromCustom = (
       const url = typeof voucher.contactUrl === 'string' ? voucher.contactUrl.trim() : '';
       if (!url) return;
       const amount = toAmount(voucher.betrag);
+      const beschreibung = (voucher as any).beschreibung?.trim() || undefined;
+      const kategorie = normalizeCategory((voucher as any).kategorie || (voucher as any).category)
+        || inferCategoryFromText(voucher.titel.trim(), beschreibung);
       loadedOptions.push({
         titel: voucher.titel.trim(),
         betrag: amount,
         abPreis: Boolean((voucher as any).abPreis),
         inhalt: (voucher as any).inhalt?.trim() || undefined,
-        beschreibung: (voucher as any).beschreibung?.trim() || undefined,
+        beschreibung,
+        kategorie,
         type: 'contact',
         contactUrl: url,
         buttonLabel: (voucher as any).buttonLabel?.trim() || undefined,
@@ -222,12 +265,16 @@ const buildOptionsFromCustom = (
     } else {
       const amount = toAmount(voucher.betrag);
       if (amount <= 0) return;
+      const beschreibung = (voucher as any).beschreibung?.trim() || undefined;
+      const kategorie = normalizeCategory((voucher as any).kategorie || (voucher as any).category)
+        || inferCategoryFromText(voucher.titel.trim(), beschreibung);
       loadedOptions.push({
         titel: voucher.titel.trim(),
         betrag: amount,
         abPreis: Boolean((voucher as any).abPreis),
         inhalt: (voucher as any).inhalt?.trim() || undefined,
-        beschreibung: (voucher as any).beschreibung?.trim() || undefined,
+        beschreibung,
+        kategorie,
         type: 'gutschein',
       });
     }
@@ -242,7 +289,8 @@ const EmbedWidget: React.FC = () => {
   const [options, setOptions] = useState<GutscheinOption[]>([]);
   const [error, setError] = useState('');
   const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
-  const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: number]: boolean }>({});
+  const [selectedOptionByCategory, setSelectedOptionByCategory] = useState<{ [kategorie: string]: number }>({});
+  const [hasUserSelectionByCategory, setHasUserSelectionByCategory] = useState<{ [kategorie: string]: boolean }>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -438,6 +486,72 @@ const EmbedWidget: React.FC = () => {
     loadData();
   }, [slug, isProspectDemo]);
 
+  const categoryCards = useMemo(() => {
+    const grouped = new Map<string, Array<{ option: GutscheinOption; originalIndex: number }>>();
+
+    options.forEach((option, originalIndex) => {
+      const kategorie = option.kategorie?.trim() || 'Weitere Angebote';
+      if (!grouped.has(kategorie)) {
+        grouped.set(kategorie, []);
+      }
+      grouped.get(kategorie)!.push({ option, originalIndex });
+    });
+
+    return Array.from(grouped.entries())
+      .map(([kategorie, items]) => ({ kategorie, items }))
+      .sort((a, b) => a.items[0].originalIndex - b.items[0].originalIndex);
+  }, [options]);
+
+  useEffect(() => {
+    setSelectedOptionByCategory((prev) => {
+      const next = { ...prev };
+      const validCategories = new Set<string>();
+      let changed = false;
+
+      categoryCards.forEach((card) => {
+        validCategories.add(card.kategorie);
+        const selectedIndex = next[card.kategorie];
+        const existsInCard = card.items.some((item) => item.originalIndex === selectedIndex);
+        if (!existsInCard) {
+          next[card.kategorie] = card.items[0].originalIndex;
+          changed = true;
+        }
+      });
+
+      Object.keys(next).forEach((kategorie) => {
+        if (!validCategories.has(kategorie)) {
+          delete next[kategorie];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+
+    setHasUserSelectionByCategory((prev) => {
+      const next: { [kategorie: string]: boolean } = {};
+      let changed = false;
+
+      categoryCards.forEach((card) => {
+        const current = Boolean(prev[card.kategorie]);
+        next[card.kategorie] = current;
+      });
+
+      if (Object.keys(prev).length !== Object.keys(next).length) {
+        changed = true;
+      } else {
+        for (const key of Object.keys(next)) {
+          if (prev[key] !== next[key]) {
+            changed = true;
+            break;
+          }
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [categoryCards]);
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -460,7 +574,7 @@ const EmbedWidget: React.FC = () => {
       container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', updateScrollState);
     };
-  }, [options, loading]);
+  }, [categoryCards, loading]);
 
   useEffect(() => {
     const updateHeight = () => {
@@ -476,7 +590,7 @@ const EmbedWidget: React.FC = () => {
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, [loading, options, backgroundColor, parentOrigin, canScrollLeft, canScrollRight, expandedDescriptions]);
+  }, [loading, categoryCards, selectedOptionByCategory, backgroundColor, parentOrigin, canScrollLeft, canScrollRight]);
 
   const scrollCards = (direction: 'left' | 'right') => {
     const container = scrollContainerRef.current;
@@ -531,13 +645,6 @@ const EmbedWidget: React.FC = () => {
     setCustomAmounts(prev => ({
       ...prev,
       [index]: value
-    }));
-  };
-
-  const toggleDescription = (index: number) => {
-    setExpandedDescriptions((prev) => ({
-      ...prev,
-      [index]: !prev[index],
     }));
   };
 
@@ -633,7 +740,7 @@ const EmbedWidget: React.FC = () => {
         Jetzt kaufen und sofort per E-Mail erhalten
       </Typography>
 
-      {options.length > 1 && (
+      {categoryCards.length > 1 && (
         <Box
           sx={{
             display: { xs: 'flex', md: 'none' },
@@ -723,7 +830,7 @@ const EmbedWidget: React.FC = () => {
           pb: 2.5,
           px: { xs: 0, md: 1 },
           alignItems: 'stretch',
-          justifyContent: options.length <= 3 ? 'center' : 'flex-start',
+          justifyContent: categoryCards.length <= 3 ? 'center' : 'flex-start',
           scrollSnapType: { xs: 'x mandatory', md: 'none' },
           WebkitOverflowScrolling: 'touch',
           '&::-webkit-scrollbar': {
@@ -742,9 +849,22 @@ const EmbedWidget: React.FC = () => {
           },
         }}
       >
-        {options.map((option, index) => (
+        {categoryCards.map((card) => {
+          const selectedIndex = selectedOptionByCategory[card.kategorie] ?? card.items[0].originalIndex;
+          const selectedItem = card.items.find((item) => item.originalIndex === selectedIndex) || card.items[0];
+          const option = selectedItem.option;
+          const originalIndex = selectedItem.originalIndex;
+          const pricedItems = card.items.filter((item) => item.option.type !== 'contact' && item.option.betrag > 0);
+          const minCategoryAmount = pricedItems.length > 0
+            ? Math.min(...pricedItems.map((item) => item.option.betrag))
+            : 0;
+          const userHasChosen = Boolean(hasUserSelectionByCategory[card.kategorie]);
+          const showAbPrice = !userHasChosen && card.items.length > 1 && minCategoryAmount > 0 && option.type !== 'contact';
+          const detailText = option.inhalt || option.beschreibung || option.titel;
+
+          return (
           <Card
-            key={index}
+            key={`${card.kategorie}-${card.items[0].originalIndex}`}
             data-widget-card="true"
             sx={{
               minWidth: { xs: '92vw', sm: '260px' },
@@ -771,31 +891,83 @@ const EmbedWidget: React.FC = () => {
               flexDirection: 'column',
               height: '100%'
             }}>
-              {/* Titel - feste Höhe für 2 Zeilen */}
+              {/* Kategorie-Titel */}
               <Typography 
                 variant="h6" 
-                title={option.titel}
+                title={card.kategorie}
                 sx={{ 
                   mb: 1,
                   fontWeight: 600,
                   color: textStrongColor,
                   fontSize: '1.15rem',
-                  minHeight: '40px',
+                  minHeight: '34px',
                   lineHeight: 1.25,
                   whiteSpace: 'normal',
                   overflowWrap: 'anywhere',
                   wordBreak: 'break-word'
                 }}
               >
-                {option.titel}
+                {card.kategorie}
               </Typography>
+
+              {card.items.length > 1 ? (
+                <TextField
+                  select
+                  size="small"
+                  label="Leistung"
+                  value={originalIndex}
+                  onChange={(e) => {
+                    const nextIndex = Number(e.target.value);
+                    setSelectedOptionByCategory((prev) => ({
+                      ...prev,
+                      [card.kategorie]: nextIndex,
+                    }));
+                    setHasUserSelectionByCategory((prev) => ({
+                      ...prev,
+                      [card.kategorie]: true,
+                    }));
+                  }}
+                  sx={{
+                    mb: 1,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '8px',
+                    },
+                  }}
+                >
+                  {card.items.map((item) => (
+                    <MenuItem key={`${card.kategorie}-${item.originalIndex}`} value={item.originalIndex}>
+                      {item.option.titel}
+                      {item.option.type !== 'contact' && item.option.betrag > 0 ? ` - ${item.option.betrag}€` : ''}
+                      {item.option.type === 'contact' && item.option.betrag > 0 ? ` - ${item.option.betrag}€` : ''}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <Typography
+                  variant="body2"
+                  title={option.titel}
+                  sx={{
+                    mb: 1,
+                    color: textStrongColor,
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
+                    lineHeight: 1.35,
+                    minHeight: '38px',
+                    whiteSpace: 'normal',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {option.titel}
+                </Typography>
+              )}
 
               {/* Inhalt / Beschreibung */}
               <Typography 
                 variant="body2" 
-                title={option.inhalt || option.beschreibung || ''}
+                title={detailText}
                 sx={{ 
-                  mb: (option.inhalt && option.beschreibung) ? 0.75 : 1.5,
+                  mb: 1.5,
                   color: textMutedColor,
                   fontSize: '0.85rem',
                   lineHeight: 1.4,
@@ -805,48 +977,8 @@ const EmbedWidget: React.FC = () => {
                   wordBreak: 'break-word'
                 }}
               >
-                {option.inhalt || option.beschreibung || '\u00A0'}
+                {detailText}
               </Typography>
-
-              {option.inhalt && option.beschreibung && (
-                <Box sx={{ mb: 1.5 }}>
-                  <Box
-                    component="button"
-                    onClick={() => toggleDescription(index)}
-                    sx={{
-                      border: 'none',
-                      background: 'transparent',
-                      p: 0,
-                      color: primaryColor,
-                      fontWeight: 600,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      '&:hover': {
-                        textDecoration: 'underline',
-                      },
-                    }}
-                  >
-                    {expandedDescriptions[index] ? 'Weniger anzeigen' : 'Mehr erfahren'}
-                  </Box>
-                  {expandedDescriptions[index] && (
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        mt: 0.75,
-                        color: textMutedColor,
-                        fontSize: '0.84rem',
-                        lineHeight: 1.45,
-                        whiteSpace: 'normal',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {option.beschreibung}
-                    </Typography>
-                  )}
-                </Box>
-              )}
 
               <Box sx={{ flex: 1, minHeight: 12 }} />
 
@@ -866,8 +998,8 @@ const EmbedWidget: React.FC = () => {
                   <TextField
                     type="number"
                     placeholder="50"
-                    value={customAmounts[index] || ''}
-                    onChange={(e) => handleCustomAmountChange(index, e.target.value)}
+                    value={customAmounts[originalIndex] || ''}
+                    onChange={(e) => handleCustomAmountChange(originalIndex, e.target.value)}
                     inputProps={{ min: 10, step: 5 }}
                     sx={{
                       width: '90px',
@@ -924,17 +1056,17 @@ const EmbedWidget: React.FC = () => {
                       fontSize: '2rem'
                     }}
                   >
-                    {option.abPreis && (
+                    {(showAbPrice || option.abPreis) && (
                       <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 500, color: textMutedColor, mr: 0.5 }}>ab</Box>
                     )}
-                    {option.betrag}€
+                    {showAbPrice ? minCategoryAmount : option.betrag}€
                   </Typography>
                 </Box>
               )}
 
               <Box
                 component="button"
-                onClick={() => handleWeiterZurZahlung(option, index)}
+                onClick={() => handleWeiterZurZahlung(option, originalIndex)}
                 sx={{
                   width: '100%',
                   bgcolor: primaryColor,
@@ -965,7 +1097,8 @@ const EmbedWidget: React.FC = () => {
               </Box>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </Box>
 
       {/* Unterer Divider */}

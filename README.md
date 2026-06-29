@@ -4,6 +4,41 @@
 
 See [gutschein-backend/osm/SELF_HOSTED_SETUP.md](gutschein-backend/osm/SELF_HOSTED_SETUP.md) to run PostGIS locally and query municipality leads without public Overpass rate limits.
 
+## Google Places Lead Setup
+
+Google Places names-only lead lookup is wired into the admin marketing flow.
+
+### Backend env
+
+Set these values in [gutschein-backend/.env](gutschein-backend/.env):
+
+```env
+GOOGLE_PLACES_API_KEY=your_key_here
+GOOGLE_PLACES_DAILY_BUDGET_USD=10
+GOOGLE_PLACES_USD_PER_1000=32
+```
+
+- `GOOGLE_PLACES_API_KEY` is required.
+- `GOOGLE_PLACES_DAILY_BUDGET_USD` defaults to `10`.
+- `GOOGLE_PLACES_USD_PER_1000` is the estimated request price used for the daily cap.
+
+### Frontend env
+
+Set these values in [frontend/.env](frontend/.env):
+
+```env
+REACT_APP_LEAD_SOURCE=google
+# optional when using a dedicated backend URL
+# REACT_APP_API_URL=http://localhost:8080
+```
+
+### Behavior
+
+- Lead lookup stays city-based via `municipality` + `bundesland`.
+- Google is used as the primary source when `REACT_APP_LEAD_SOURCE=google`.
+- The backend blocks further Google requests with HTTP `429` when the daily budget is exhausted.
+- Results are names-first and avoid expensive detail lookups.
+
 
 
 ## Getting started
