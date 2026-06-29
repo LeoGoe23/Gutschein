@@ -678,8 +678,8 @@ const EmbedWidget: React.FC = () => {
     <Box sx={{ 
       bgcolor: backgroundColor,
       fontFamily,
-      pt: 6,
-      pb: 3,
+      pt: { xs: 10, md: 11 },
+      pb: { xs: 7, md: 8 },
       px: { xs: 0, md: 2 },
       position: 'relative',
       '& *': {
