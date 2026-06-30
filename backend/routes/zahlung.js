@@ -127,6 +127,83 @@ router.post("/create-payment", async (req, res) => {
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+const IS_TEST_MODE = process.env.STRIPE_TEST_MODE === 'true';
+const STRIPE_KEY = IS_TEST_MODE ? process.env.STRIPE_TEST_SECRET_KEY : process.env.STRIPE_SECRET_KEY;
+
+router.get('/test-mode-status', async (req, res) => {
+  try {
+    res.json({
+      testMode: IS_TEST_MODE,
+      message: IS_TEST_MODE ? 'Test-Modus aktiv' : 'Live-Modus aktiv'
+    });
+  } catch (err) {
+    console.error('Fehler beim Abrufen des Test-Mode Status:', err);
+    res.status(500).json({ error: 'Server-Fehler' });
+  }
+});
+
+router.post('/create-payment-intent', async (req, res) => {
+  const { amount, customerEmail, stripeAccountId, slug, provision } = req.body || {};
+
+  const amountInCents = Math.round(Number(amount));
+  if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
+    return res.status(400).json({ error: 'Ungültiger Betrag' });
+  }
+  if (!customerEmail || typeof customerEmail !== 'string' || !customerEmail.includes('@')) {
+    return res.status(400).json({ error: 'Ungültige E-Mail' });
+  }
+  if (!slug) {
+    return res.status(400).json({ error: 'Slug fehlt' });
+  }
+
+  try {
+    const stripeInstance = require('stripe')(STRIPE_KEY);
+    const provisionRate = provision || 0.08;
+    const provisionAmount = Math.round(amountInCents * provisionRate);
+
+    const paymentIntentConfig = {
+      amount: amountInCents,
+      currency: 'eur',
+      receipt_email: customerEmail,
+      payment_method_types: ['card'],
+      metadata: {
+        slug,
+        customerEmail,
+        provisionAmount: String(provisionAmount),
+        originalAmount: String(amountInCents / 100)
+      }
+    };
+
+    if (stripeAccountId) {
+      if (provisionAmount > 0) {
+        paymentIntentConfig.application_fee_amount = provisionAmount;
+      }
+
+      const paymentIntent = await stripeInstance.paymentIntents.create(paymentIntentConfig, {
+        stripeAccount: stripeAccountId
+      });
+
+      return res.json({
+        clientSecret: paymentIntent.client_secret,
+        testMode: IS_TEST_MODE
+      });
+    }
+
+    const paymentIntent = await stripeInstance.paymentIntents.create(paymentIntentConfig);
+    return res.json({
+      clientSecret: paymentIntent.client_secret,
+      testMode: IS_TEST_MODE
+    });
+  } catch (err) {
+    console.error('Stripe Payment Intent Fehler:', err);
+    res.status(500).json({
+      error: err.message,
+      code: err.code,
+      type: err.type
+    });
+  }
+});
+
 router.post('/create-stripe-session', async (req, res) => {
   const { amount, customerEmail, stripeAccountId, slug, provision } = req.body;
   if (!amount || !customerEmail || !stripeAccountId || !slug) {
@@ -148,8 +225,8 @@ router.post('/create-stripe-session', async (req, res) => {
       }],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.DOMAIN}/checkoutc/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.DOMAIN}/checkoutc/${slug}?canceled=true`,
+      success_url: `${process.env.DOMAIN}/checkout/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.DOMAIN}/checkout/${slug}?canceled=true`,
       payment_intent_data: {
         application_fee_amount: provisionAmount, // <--- Provision an Plattform
         transfer_data: {

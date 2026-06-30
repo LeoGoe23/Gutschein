@@ -6,7 +6,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { loadCheckoutDataBySlug, CheckoutData } from '../utils/loadCheckoutData';
 import { generateGutscheinPDF } from '../utils/generateGutscheinPDF';
 import { saveSoldGutscheinToShop, updateUserEinnahmenStats } from '../utils/saveSoldGutscheinToShop';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { saveAdminStats, saveAdminHit } from '../utils/saveAdminStats';
 import { uploadPDFToStorage, saveGutscheinLink } from '../utils/firebaseStorage';
@@ -23,6 +23,78 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
   const [paymentElement, setPaymentElement] = useState<any>(null);
   const [error, setError] = useState<string>(''); // ✅ NEU: Error State
 
+  const trackFailedAttempt = async (phase: string, reason: string, details?: Record<string, any>) => {
+    try {
+      const slug = window.location.pathname.split('/').pop() || null;
+      await addDoc(collection(db, 'FailedAttempts'), {
+        createdAt: serverTimestamp(),
+        phase,
+        reason,
+        details: details || {},
+        slug,
+        amount: betrag ?? null,
+        customerEmail: customerEmail || null,
+        stripeAccountId: stripeAccountId || null,
+        apiUrl: API_URL || null,
+        isTestMode,
+        page: 'checkoutc',
+        path: window.location.pathname,
+        href: window.location.href,
+        userAgent: navigator.userAgent
+      });
+    } catch (trackingError) {
+      console.error('FailedAttempts tracking error:', trackingError);
+    }
+  };
+
+  const getFriendlyPaymentError = (stripeError: any) => {
+    const code = stripeError?.code;
+    const declineCode = stripeError?.decline_code;
+
+    if (code === 'card_declined') {
+      if (declineCode === 'insufficient_funds') return 'Die Zahlung wurde abgelehnt: Nicht ausreichendes Guthaben.';
+      if (declineCode === 'expired_card') return 'Die Zahlung wurde abgelehnt: Die Karte ist abgelaufen.';
+      if (declineCode === 'incorrect_cvc') return 'Die Zahlung wurde abgelehnt: Der Sicherheitscode ist falsch.';
+      if (declineCode === 'incorrect_number') return 'Die Zahlung wurde abgelehnt: Die Kartennummer ist ungültig.';
+      return 'Die Karte wurde von der Bank abgelehnt. Bitte andere Karte oder Zahlungsmethode nutzen.';
+    }
+
+    if (code === 'authentication_required') {
+      return 'Bitte bestätigen Sie die Zahlung in Ihrer Banking-App (3D Secure) und versuchen Sie es erneut.';
+    }
+
+    if (code === 'expired_card') return 'Die Karte ist abgelaufen. Bitte eine andere Karte verwenden.';
+    if (code === 'incorrect_cvc') return 'Der Sicherheitscode (CVC) ist ungültig.';
+    if (code === 'incorrect_number') return 'Die Kartennummer ist ungültig.';
+    if (code === 'processing_error') return 'Technischer Fehler bei der Verarbeitung. Bitte in 1-2 Minuten erneut versuchen.';
+    if (code === 'rate_limit') return 'Zu viele Versuche in kurzer Zeit. Bitte kurz warten und erneut probieren.';
+
+    return stripeError?.message || 'Die Zahlung konnte nicht abgeschlossen werden. Bitte prüfen Sie Ihre Daten und versuchen Sie es erneut.';
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const canceled = params.get('canceled');
+    const redirectStatus = params.get('redirect_status');
+
+    if (canceled === 'true') {
+      setError('Die Zahlung wurde abgebrochen. Es wurde nichts berechnet. Sie koennen es jederzeit erneut versuchen.');
+      void trackFailedAttempt('confirm_payment', 'customer_canceled_payment');
+      return;
+    }
+
+    if (redirectStatus === 'failed') {
+      setError('Die Zahlung konnte nach der Weiterleitung nicht abgeschlossen werden. Bitte versuchen Sie es erneut oder nutzen Sie eine andere Zahlungsmethode.');
+      void trackFailedAttempt('confirm_payment', 'redirect_status_failed');
+      return;
+    }
+
+    if (redirectStatus === 'requires_payment_method') {
+      setError('Die Zahlung wurde von der Bank nicht bestaetigt. Bitte pruefen Sie die Zahlungsdaten oder waehlen Sie eine andere Methode.');
+      void trackFailedAttempt('confirm_payment', 'redirect_status_requires_payment_method');
+    }
+  }, []);
+
   // ✅ VERBESSERTE Stripe-Initialisierung
   useEffect(() => {
     const initializeStripe = async () => {
@@ -38,6 +110,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         }
         
         if (!(window as any).Stripe) {
+          void trackFailedAttempt('initialize_stripe', 'stripe_js_not_loaded');
           setError('Stripe JS konnte nicht geladen werden. Bitte Seite neu laden.');
           return;
         }
@@ -65,6 +138,9 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           });
 
           if (!stripeKey) {
+            void trackFailedAttempt('initialize_stripe', 'missing_stripe_key', {
+              mode: data.testMode ? 'test' : 'live'
+            });
             setError(`Stripe Key fehlt für ${data.testMode ? 'Test' : 'Live'} Modus`);
             return;
           }
@@ -84,10 +160,17 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         } else {
           const errorText = await response.text();
           console.error('❌ Test-Mode Status Fehler:', response.status, errorText);
+          void trackFailedAttempt('initialize_stripe', 'test_mode_status_http_error', {
+            status: response.status,
+            errorText: String(errorText || '').slice(0, 500)
+          });
           setError(`Backend nicht erreichbar: ${response.status}`);
         }
       } catch (err) {
         console.error('❌ Fehler beim Initialisieren von Stripe:', err);
+        void trackFailedAttempt('initialize_stripe', 'initialize_exception', {
+          message: String(err)
+        });
         setError(`Netzwerkfehler: ${err}`);
       }
     };
@@ -116,6 +199,9 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         // ✅ FIX: Amount Validation im Frontend
         if (!betrag || betrag <= 0) {
           console.error('❌ Ungültiger Betrag:', betrag);
+          void trackFailedAttempt('create_payment_intent', 'invalid_amount', {
+            amount: betrag
+          });
           setError('Ungültiger Betrag');
           return;
         }
@@ -149,12 +235,19 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
 
         if (!response.ok) {
           console.error('❌ Payment Intent Fehler:', data.error);
-          setError(`Payment Intent Fehler: ${data.error}`);
+          void trackFailedAttempt('create_payment_intent', 'payment_intent_http_error', {
+            status: response.status,
+            error: data?.error,
+            code: data?.code,
+            type: data?.type
+          });
+          setError('Zahlung momentan nicht verfuegbar. Bitte in wenigen Minuten erneut versuchen.');
           return;
         }
 
         if (!data.clientSecret) {
           console.error('❌ Kein Client Secret erhalten');
+          void trackFailedAttempt('create_payment_intent', 'missing_client_secret');
           setError('Kein Client Secret erhalten');
           return;
         }
@@ -186,6 +279,9 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
 
       } catch (err) {
         console.error('❌ Fehler beim Erstellen des Payment Intent:', err);
+        void trackFailedAttempt('create_payment_intent', 'create_payment_intent_exception', {
+          message: String(err)
+        });
         setError(`Fehler: ${err}`);
       }
     };
@@ -253,7 +349,12 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
   // ✅ ALTERNATIVE: Billing Details manuell übergeben
   const handlePayment = async () => {
     if (!stripe || !elements || !clientSecret) {
-      alert('Stripe ist noch nicht bereit. Bitte warten Sie einen Moment.');
+      void trackFailedAttempt('confirm_payment', 'stripe_not_ready', {
+        hasStripe: !!stripe,
+        hasElements: !!elements,
+        hasClientSecret: !!clientSecret
+      });
+      setError('Das Zahlungsformular ist noch nicht vollstaendig geladen. Bitte kurz warten und erneut klicken.');
       return;
     }
 
@@ -292,7 +393,15 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
       
       if (error) {
         console.error('❌ Payment Error:', error);
-        setError(`Zahlung fehlgeschlagen: ${error.message}`);
+        void trackFailedAttempt('confirm_payment', 'stripe_confirm_error', {
+          code: error.code,
+          declineCode: error.decline_code,
+          type: error.type,
+          message: error.message,
+          paymentIntentId: paymentIntent?.id || null,
+          paymentStatus: paymentIntent?.status || null
+        });
+        setError(getFriendlyPaymentError(error));
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
         console.log('✅ Payment successful:', paymentIntent.id);
         onPaymentSuccess(betrag!, customerEmail);
@@ -300,10 +409,21 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         console.log('⏳ Payment Status:', paymentIntent?.status);
         if (paymentIntent?.status === 'processing') {
           onPaymentSuccess(betrag!, customerEmail);
+        } else {
+          void trackFailedAttempt('confirm_payment', 'unexpected_payment_status', {
+            paymentIntentId: paymentIntent?.id || null,
+            paymentStatus: paymentIntent?.status || null
+          });
+          setError(`Zahlung nicht abgeschlossen (Status: ${paymentIntent?.status || 'unbekannt'})`);
         }
       }
     } catch (err: any) {
       console.error('❌ Payment Exception:', err);
+      void trackFailedAttempt('confirm_payment', 'confirm_payment_exception', {
+        message: err?.message || 'Unbekannter Fehler',
+        type: err?.type || null,
+        code: err?.code || null
+      });
       setError('Zahlung fehlgeschlagen: ' + (err?.message || 'Unbekannter Fehler'));
     } finally {
       setIsProcessing(false);
