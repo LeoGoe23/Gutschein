@@ -21,6 +21,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
   const [elements, setElements] = useState<any>(null);
   const [clientSecret, setClientSecret] = useState<string>('');
   const [paymentElement, setPaymentElement] = useState<any>(null);
+  const [paymentElementReady, setPaymentElementReady] = useState<boolean>(false);
   const [error, setError] = useState<string>(''); // ✅ NEU: Error State
 
   const trackFailedAttempt = async (phase: string, reason: string, details?: Record<string, any>) => {
@@ -299,6 +300,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
       });
       return;
     }
+    setPaymentElementReady(false);
     
     const container = document.getElementById('payment-element');
     if (!container) {
@@ -331,6 +333,17 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
         googlePay: 'auto'     // ✅ Google Pay aktiviert (nur auf Android/Chrome)
       }
     });
+
+    paymentElementInstance.on('ready', () => {
+      console.log('✅ Payment Element ready');
+      setPaymentElementReady(true);
+    });
+
+    paymentElementInstance.on('loaderror', (event: any) => {
+      console.error('❌ Payment Element load error:', event);
+      setPaymentElementReady(false);
+      setError('Das Zahlungsformular konnte nicht vollstaendig geladen werden. Bitte Seite neu laden.');
+    });
     
     paymentElementInstance.mount('#payment-element');
     setPaymentElement(paymentElementInstance);
@@ -339,6 +352,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
     
     return () => {
       try {
+        setPaymentElementReady(false);
         paymentElementInstance.unmount();
       } catch (e) {
         // Element bereits unmounted
@@ -358,10 +372,31 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
       return;
     }
 
+    if (!paymentElement || !paymentElementReady) {
+      void trackFailedAttempt('confirm_payment', 'payment_element_not_ready', {
+        hasPaymentElement: !!paymentElement,
+        paymentElementReady
+      });
+      setError('Das Zahlungsformular ist noch nicht bereit. Bitte 1-2 Sekunden warten und erneut versuchen.');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
       console.log('💳 Starte Payment Confirmation...');
+
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        console.error('❌ Elements Submit Error:', submitError);
+        void trackFailedAttempt('confirm_payment', 'elements_submit_error', {
+          code: submitError.code,
+          type: submitError.type,
+          message: submitError.message
+        });
+        setError(getFriendlyPaymentError(submitError));
+        return;
+      }
       
       // ✅ FIX: Billing Details explizit übergeben wenn address: 'never'
       const currentSlug = window.location.pathname.split('/').pop() || '';
@@ -518,7 +553,7 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
           width: '100%'
         }}
         onClick={handlePayment}
-        disabled={isProcessing || !clientSecret || !customerEmail || !!error}
+        disabled={isProcessing || !clientSecret || !customerEmail || !!error || !paymentElementReady}
       >
         {isProcessing ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
