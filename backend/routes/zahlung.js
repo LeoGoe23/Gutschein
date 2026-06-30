@@ -161,11 +161,30 @@ router.post('/create-payment-intent', async (req, res) => {
     const provisionRate = provision || 0.08;
     const provisionAmount = Math.round(amountInCents * provisionRate);
 
+    let paymentMethodTypes = ['card'];
+    if (IS_TEST_MODE) {
+      paymentMethodTypes = ['card', 'sepa_debit'];
+    } else if (stripeAccountId) {
+      try {
+        const account = await stripeInstance.accounts.retrieve(stripeAccountId);
+        const capabilities = account.capabilities || {};
+        const availableMethods = ['card'];
+
+        if (capabilities.sepa_debit_payments === 'active') availableMethods.push('sepa_debit');
+        if (capabilities.giropay_payments === 'active') availableMethods.push('giropay');
+        if (capabilities.sofort_payments === 'active') availableMethods.push('sofort');
+
+        paymentMethodTypes = availableMethods;
+      } catch (capErr) {
+        console.warn('Capabilities konnten nicht geladen werden, fallback auf card:', capErr?.message || capErr);
+      }
+    }
+
     const paymentIntentConfig = {
       amount: amountInCents,
       currency: 'eur',
       receipt_email: customerEmail,
-      payment_method_types: ['card'],
+      payment_method_types: paymentMethodTypes,
       metadata: {
         slug,
         customerEmail,
