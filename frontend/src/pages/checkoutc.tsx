@@ -364,10 +364,12 @@ function PaymentForm({ betrag, onPaymentSuccess, stripeAccountId, provision }: {
       console.log('💳 Starte Payment Confirmation...');
       
       // ✅ FIX: Billing Details explizit übergeben wenn address: 'never'
+      const currentSlug = window.location.pathname.split('/').pop() || '';
+      const safeReturnUrl = `${window.location.origin}/checkout/${currentSlug}`;
       const confirmConfig = {
         elements,
         confirmParams: {
-          return_url: window.location.href,
+          return_url: safeReturnUrl,
           receipt_email: customerEmail,
           // ✅ HINZUFÜGEN: Billing Details wenn address: 'never'
           payment_method_data: {
