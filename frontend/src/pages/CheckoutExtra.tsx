@@ -45,8 +45,8 @@ interface ExtraCheckoutData {
   StripeAccountId: string;
   Provision: number;
   designConfig?: {
-    betrag: { x: number; y: number; size: number; width?: number };
-    code: { x: number; y: number; size: number; width?: number };
+    betrag: { x: number; y: number; size: number; width?: number; color?: string };
+    code: { x: number; y: number; size: number; width?: number; color?: string };
   };
   extraOffer: ExtraOfferConfig;
 }

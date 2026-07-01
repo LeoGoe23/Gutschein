@@ -14,8 +14,8 @@ export interface GutscheinData {
   };
   gutscheinDesignURL?: string;
   designConfig?: {
-    betrag: { x: number; y: number; size: number; width?: number };
-    code: { x: number; y: number; size: number; width?: number };
+    betrag: { x: number; y: number; size: number; width?: number; color?: string };
+    code: { x: number; y: number; size: number; width?: number; color?: string };
   };
   isDemoMode?: boolean; // ✅ NEU: Demo-Flag hinzufügen
 }
@@ -138,6 +138,9 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
       y: data.designConfig.code.y, // Bereits Pixel
       size: data.designConfig.code.size,
     };
+
+    const betragColor = data.designConfig?.betrag?.color || '#000000';
+    const codeColor = data.designConfig?.code?.color || '#000000';
     
     console.log('🎯 Direkte Pixel-Werte:');
     console.log('🎯 Betrag - Pixel:', betragConfig);
@@ -192,12 +195,11 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
             top: ${betragConfig.y}px;
             transform: translateX(-50%);
             font-size: ${betragConfig.size}px;
-            color: #000000;
+            color: ${betragColor};
             font-weight: bold;
             font-family: Arial, sans-serif;
             text-align: center;
             line-height: 1.1;
-            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
             white-space: pre-line;
             max-width: ${data.designConfig?.betrag?.width || 80}%;
             padding: 4px 8px;
@@ -212,11 +214,10 @@ export const generateGutscheinPDF = async (data: GutscheinData): Promise<Blob> =
             top: ${codeConfig.y}px;
             transform: translateX(-50%);
             font-size: ${codeConfig.size}px;
-            color: #000000;
+            color: ${codeColor};
             font-weight: bold;
             font-family: 'Courier New', monospace;
             text-align: center;
-            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
             white-space: nowrap;
             min-width: 150px;
           ">

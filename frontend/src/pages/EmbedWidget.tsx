@@ -562,19 +562,44 @@ const EmbedWidget: React.FC = () => {
       }));
     }
 
+    const customAmountCards = options
+      .map((option, originalIndex) => ({ option, originalIndex }))
+      .filter(({ option }) => option.betrag === 0 && option.type !== 'contact')
+      .map(({ option, originalIndex }) => ({
+        kategorie: `custom-${originalIndex}`,
+        items: [{ option, originalIndex }],
+      }));
+
+    const singleVoucherCards = options
+      .map((option, originalIndex) => ({ option, originalIndex }))
+      .filter(({ option }) => !option.kategorie?.trim() && !(option.betrag === 0 && option.type !== 'contact'))
+      .map(({ option, originalIndex }) => ({
+        kategorie: `single-${originalIndex}`,
+        items: [{ option, originalIndex }],
+      }));
+
     const grouped = new Map<string, Array<{ option: GutscheinOption; originalIndex: number }>>();
 
     options.forEach((option, originalIndex) => {
-      const kategorie = option.kategorie?.trim() || i18n.fallbackCategory;
+      if (!option.kategorie?.trim() || (option.betrag === 0 && option.type !== 'contact')) {
+        return;
+      }
+
+      const kategorie = option.kategorie.trim();
       if (!grouped.has(kategorie)) {
         grouped.set(kategorie, []);
       }
       grouped.get(kategorie)!.push({ option, originalIndex });
     });
 
-    return Array.from(grouped.entries())
-      .map(([kategorie, items]) => ({ kategorie, items }))
-      .sort((a, b) => a.items[0].originalIndex - b.items[0].originalIndex);
+    const groupedCards = Array.from(grouped.entries())
+      .map(([kategorie, items]) => ({ kategorie, items }));
+
+    return [
+      ...customAmountCards,
+      ...singleVoucherCards,
+      ...groupedCards,
+    ].sort((a, b) => a.items[0].originalIndex - b.items[0].originalIndex);
   }, [options, widgetDisplayMode, i18n.fallbackCategory]);
 
   useEffect(() => {
@@ -983,8 +1008,14 @@ const EmbedWidget: React.FC = () => {
             ? (option.titelEn?.trim() || (option.titel === 'Freier Betrag' ? 'Custom Amount' : option.titel))
             : option.titel;
           const localizedCategoryTitle = language === 'en'
-            ? (option.kategorieEn?.trim() || (card.kategorie === 'Weitere Angebote' ? i18n.fallbackCategory : card.kategorie))
-            : card.kategorie;
+            ? (option.kategorieEn?.trim() || (card.kategorie.startsWith('custom-') ? (option.titel === 'Freier Betrag' ? 'Custom Amount' : option.titel) : (card.kategorie.startsWith('single-') ? (option.titelEn?.trim() || option.titel) : card.kategorie)))
+            : (card.kategorie.startsWith('custom-') || card.kategorie.startsWith('single-') ? option.titel : card.kategorie)
+          ;
+          const isCustomAmountCard = option.betrag === 0 && option.type !== 'contact';
+          const isSingleVoucherCard = card.kategorie.startsWith('single-');
+          const resolvedCategoryTitle = language === 'en'
+            ? (isCustomAmountCard ? 'Custom Amount' : localizedCategoryTitle)
+            : (isCustomAmountCard ? 'Freier Betrag' : (isSingleVoucherCard ? option.titel : card.kategorie));
           const pricedItems = card.items.filter((item) => item.option.type !== 'contact' && item.option.betrag > 0);
           const minCategoryAmount = pricedItems.length > 0
             ? Math.min(...pricedItems.map((item) => item.option.betrag))
@@ -1028,7 +1059,7 @@ const EmbedWidget: React.FC = () => {
               {/* Kategorie-Titel */}
               <Typography 
                 variant="h6" 
-                title={isFlatCard ? localizedTitle : localizedCategoryTitle}
+                title={isFlatCard ? localizedTitle : resolvedCategoryTitle}
                 sx={{ 
                   mb: 1,
                   fontWeight: 600,
@@ -1041,7 +1072,7 @@ const EmbedWidget: React.FC = () => {
                   wordBreak: 'break-word'
                 }}
               >
-                {isFlatCard ? localizedTitle : localizedCategoryTitle}
+                {isFlatCard ? localizedTitle : resolvedCategoryTitle}
               </Typography>
 
               {card.items.length > 1 ? (

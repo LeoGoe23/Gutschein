@@ -93,8 +93,8 @@ export default function GutscheinDesignAdminEdit() {
   const [designURL, setDesignURL] = useState<string | null>(null);
   const [designFile, setDesignFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [betragConfig, setBetragConfig] = useState({ y: 200, size: 32, width: 80 }); // ✅ width hinzugefügt
-  const [codeConfig, setCodeConfig] = useState({ y: 250, size: 24, width: 70 });     // ✅ width hinzugefügt
+  const [betragConfig, setBetragConfig] = useState({ y: 200, size: 32, width: 80, color: '#000000' });
+  const [codeConfig, setCodeConfig] = useState({ y: 250, size: 24, width: 70, color: '#000000' });
   const [previewDimensions, setPreviewDimensions] = useState<{width: number, height: number}>(calculatePreviewDimensions());
   const [slug, setSlug] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<string | null>(null);
@@ -119,12 +119,14 @@ export default function GutscheinDesignAdminEdit() {
           setBetragConfig({ 
             y: data.Checkout?.DesignConfig?.betrag?.y || 200, 
             size: data.Checkout?.DesignConfig?.betrag?.size || 32,
-            width: data.Checkout?.DesignConfig?.betrag?.width || 80 // ✅ NEU
+            width: data.Checkout?.DesignConfig?.betrag?.width || 80,
+            color: data.Checkout?.DesignConfig?.betrag?.color || '#000000'
           });
           setCodeConfig({ 
             y: data.Checkout?.DesignConfig?.code?.y || 250, 
             size: data.Checkout?.DesignConfig?.code?.size || 24,
-            width: data.Checkout?.DesignConfig?.code?.width || 70 // ✅ NEU
+            width: data.Checkout?.DesignConfig?.code?.width || 70,
+            color: data.Checkout?.DesignConfig?.code?.color || '#000000'
           });
         } else {
           setError('Shop nicht gefunden');
@@ -218,13 +220,15 @@ export default function GutscheinDesignAdminEdit() {
             x: A4_WIDTH_PX / 2, // IMMER zentriert
             y: betragConfig.y,
             size: betragConfig.size,
-            width: betragConfig.width // ✅ NEU
+            width: betragConfig.width,
+            color: betragConfig.color
           },
           code: {
             x: A4_WIDTH_PX / 2, // IMMER zentriert
             y: codeConfig.y,
             size: codeConfig.size,
-            width: codeConfig.width // ✅ NEU
+            width: codeConfig.width,
+            color: codeConfig.color
           }
         }
       });
@@ -584,10 +588,9 @@ export default function GutscheinDesignAdminEdit() {
                         component="div"
                         sx={{
                           fontSize: `${betragConfig.size}px`,
-                          color: '#000000',
+                          color: betragConfig.color,
                           fontWeight: 'bold',
                           userSelect: 'none',
-                          textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
                           textAlign: 'center',
                           lineHeight: 1.1,
                           padding: '4px 8px',
@@ -635,10 +638,9 @@ export default function GutscheinDesignAdminEdit() {
                       <Typography
                         sx={{
                           fontSize: `${codeConfig.size}px`,
-                          color: '#000000',
+                          color: codeConfig.color,
                           fontWeight: 'bold',
                           userSelect: 'none',
-                          textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
                           fontFamily: '"Courier New", monospace',
                           textAlign: 'center',
                           whiteSpace: 'nowrap',
@@ -701,6 +703,26 @@ export default function GutscheinDesignAdminEdit() {
                     size="small"
                     sx={{ width: 100 }}
                     inputProps={{ min: 8, max: 72 }}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="body2" sx={{ mb: 1 }}>Betrag Farbe</Typography>
+                  <TextField
+                    type="color"
+                    value={betragConfig.color}
+                    onChange={e => setBetragConfig({ ...betragConfig, color: e.target.value })}
+                    size="small"
+                    sx={{ width: 100 }}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="body2" sx={{ mb: 1 }}>Code Farbe</Typography>
+                  <TextField
+                    type="color"
+                    value={codeConfig.color}
+                    onChange={e => setCodeConfig({ ...codeConfig, color: e.target.value })}
+                    size="small"
+                    sx={{ width: 100 }}
                   />
                 </Box>
               </Box>

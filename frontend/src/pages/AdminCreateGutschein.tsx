@@ -124,7 +124,7 @@ export default function AdminCreateGutschein() {
   const [empfaengerEmail, setEmpfaengerEmail] = useState('');
 
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ gutscheinCode: string; downloadLink: string } | null>(null);
+  const [success, setSuccess] = useState<{ gutscheinCode: string; downloadLink?: string; mode: 'send' | 'print' } | null>(null);
 
   const selectedShop = useMemo(
     () => shops.find((shop) => shop.id === selectedShopId) || null,
@@ -224,15 +224,17 @@ export default function AdminCreateGutschein() {
     setSelectedDienstleistungId('');
   }, [selectedShopId]);
 
-  const canSubmit = !!selectedShop && !!empfaengerEmail.trim() && ((gutscheinTyp === 'wert' && !!betrag && betrag > 0) || (gutscheinTyp === 'dienstleistung' && !!selectedDienstleistung));
+  const hasValidVoucherSelection = !!selectedShop && ((gutscheinTyp === 'wert' && !!betrag && betrag > 0) || (gutscheinTyp === 'dienstleistung' && !!selectedDienstleistung));
+  const canSend = hasValidVoucherSelection && !!empfaengerEmail.trim();
+  const canPrint = hasValidVoucherSelection;
 
-  const handleCreate = async () => {
+  const handleCreate = async (mode: 'send' | 'print') => {
     if (!selectedShop) return;
 
     const normalizedEmail = empfaengerEmail.trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!emailRegex.test(normalizedEmail)) {
+    if (mode === 'send' && !emailRegex.test(normalizedEmail)) {
       setError('Bitte eine gültige E-Mail-Adresse eingeben.');
       return;
     }
@@ -271,6 +273,43 @@ export default function AdminCreateGutschein() {
         gutscheinDesignURL: selectedShop.gutscheinURL,
         designConfig: selectedShop.designConfig,
       });
+
+      if (mode === 'print') {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const printWindow = window.open(pdfUrl, '_blank');
+
+        if (!printWindow) {
+          URL.revokeObjectURL(pdfUrl);
+          throw new Error('Druckfenster konnte nicht geöffnet werden. Bitte Popups erlauben.');
+        }
+
+        const revoke = () => URL.revokeObjectURL(pdfUrl);
+        printWindow.addEventListener('load', () => {
+          try {
+            printWindow.focus();
+            printWindow.print();
+          } catch {
+            // Druckdialog konnte im Browser nicht automatisch gestartet werden.
+          }
+        });
+        printWindow.addEventListener('beforeunload', revoke);
+        setTimeout(revoke, 120000);
+
+        await saveSoldGutscheinToShop({
+          gutscheinCode,
+          betrag: effektiverBetrag,
+          kaufdatum: new Date().toISOString(),
+          empfaengerEmail: normalizedEmail || 'druck@lokal',
+          slug: selectedShop.slug,
+          provision: 0,
+        });
+
+        setSuccess({ gutscheinCode, mode: 'print' });
+        setEmpfaengerEmail('');
+        setBetrag(null);
+        setSelectedDienstleistungId('');
+        return;
+      }
 
       const fileName = `${selectedShop.slug}_${gutscheinCode}_${Date.now()}_admin.pdf`;
       const downloadURL = await uploadPDFToStorage(pdfBlob, fileName);
@@ -327,7 +366,7 @@ export default function AdminCreateGutschein() {
         provision: 0,
       });
 
-      setSuccess({ gutscheinCode, downloadLink: publicDownloadLink });
+      setSuccess({ gutscheinCode, downloadLink: publicDownloadLink, mode: 'send' });
       setEmpfaengerEmail('');
       setBetrag(null);
       setSelectedDienstleistungId('');
@@ -453,7 +492,7 @@ export default function AdminCreateGutschein() {
                     <TextField
                       fullWidth
                       type="email"
-                      label="Empfänger E-Mail"
+                      label="Empfänger E-Mail (nur für Versand nötig)"
                       value={empfaengerEmail}
                       onChange={(e) => setEmpfaengerEmail(e.target.value)}
                       sx={{ mb: 2.5 }}
@@ -463,20 +502,36 @@ export default function AdminCreateGutschein() {
 
                     {success && (
                       <Alert severity="success" sx={{ mb: 2 }}>
-                        Gutschein {success.gutscheinCode} wurde erstellt und versendet.
-                        <br />
-                        Download-Link: {success.downloadLink}
+                        {success.mode === 'send'
+                          ? `Gutschein ${success.gutscheinCode} wurde erstellt und versendet.`
+                          : `Gutschein ${success.gutscheinCode} wurde erstellt und zum Drucken geöffnet.`}
+                        {success.downloadLink && (
+                          <>
+                            <br />
+                            Download-Link: {success.downloadLink}
+                          </>
+                        )}
                       </Alert>
                     )}
 
-                    <Button
-                      variant="contained"
-                      onClick={handleCreate}
-                      disabled={!canSubmit || isSubmitting}
-                      sx={{ minWidth: 220 }}
-                    >
-                      {isSubmitting ? 'Wird erstellt...' : 'Gutschein erstellen'}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="contained"
+                        onClick={() => handleCreate('send')}
+                        disabled={!canSend || isSubmitting}
+                        sx={{ minWidth: 220 }}
+                      >
+                        {isSubmitting ? 'Wird erstellt...' : 'Erstellen & versenden'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        onClick={() => handleCreate('print')}
+                        disabled={!canPrint || isSubmitting}
+                        sx={{ minWidth: 220 }}
+                      >
+                        {isSubmitting ? 'Wird erstellt...' : 'Erstellen & drucken'}
+                      </Button>
+                    </Box>
                   </>
                 )}
               </>

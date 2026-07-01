@@ -9,6 +9,8 @@ interface DemoTemplateData {
   name?: string;
   demoHtml?: string;
   bildURL?: string;
+  websiteUrl?: string;
+  gutscheinAnzeige?: 'einzeln' | 'kategorie';
 }
 
 type EditAction =
@@ -72,7 +74,7 @@ const stripLayoutEditorArtifacts = (html: string): string => {
   }
 };
 
-const normalizeRelativeAssetUrls = (html: string): string => {
+const normalizeRelativeAssetUrls = (html: string, websiteUrlOverride?: string): string => {
   const inferSourceOrigin = (value: string): string => {
     const matcher = /(\b(?:src|href|action)\s*=\s*["'])(https?:\/\/[^"'\s>]+)(["'])/gi;
     let match: RegExpExecArray | null = null;
@@ -131,7 +133,11 @@ const normalizeRelativeAssetUrls = (html: string): string => {
     return '';
   };
 
-  const sourceOrigin = inferSourceOrigin(html);
+  // Use provided customer website URL if available, otherwise infer from HTML
+  const sourceOrigin = websiteUrlOverride || inferSourceOrigin(html);
+  console.log('sourceOrigin:', sourceOrigin);
+  console.log('websiteUrlOverride:', websiteUrlOverride);
+
   const keepLocalPrefixes = ['/embed/', '/demo/', '/widgetdemo/', '/checkoutdemo/', '/api/'];
   const shouldKeepLocalPath = (path: string): boolean => {
     return keepLocalPrefixes.some((prefix) => path.startsWith(prefix));
@@ -420,17 +426,17 @@ const WidgetDemoBySlug: React.FC = () => {
         const qDemo = query(demosRef, where('slug', '==', normalizedSlug));
         const demoSnap = await getDocs(qDemo);
         if (!demoSnap.empty) {
-          const demoDoc = demoSnap.docs[0];
-          const rawDemo = demoDoc.data() as DemoTemplateData;
-          setDemoDocId(demoDoc.id);
+          const docData = demoSnap.docs[0].data() as any; // Use 'as any' to handle old data structure
+          console.log("Loaded demo data:", docData); // Log the entire data object
           setDemoTemplate({
-            slug: (rawDemo.slug || slug).toLowerCase(),
-            name: rawDemo.name,
-            demoHtml: rawDemo.demoHtml,
-            bildURL: rawDemo.bildURL,
+            slug: (docData.slug || slug).toLowerCase(),
+            name: docData.name,
+            demoHtml: docData.demoHtml,
+            bildURL: docData.bildURL,
+            websiteUrl: docData.websiteUrl,
+            gutscheinAnzeige: docData.gutscheinAnzeige === 'paket' ? 'kategorie' : docData.gutscheinAnzeige,
           });
         } else {
-          setDemoDocId('');
           setDemoTemplate(null);
         }
 
@@ -480,6 +486,7 @@ const WidgetDemoBySlug: React.FC = () => {
         id="gutschein-widget"
         data-slug="${escapeHtmlAttribute(widgetSlug)}"
         data-theme="auto"
+        ${demoTemplate?.gutscheinAnzeige ? `data-anzeige="${escapeHtmlAttribute(demoTemplate.gutscheinAnzeige)}"` : ''}
         ${isProspectDemo ? `data-demo-mode="1" data-demo-label="${escapeHtmlAttribute(displaySlug)}"` : ''}
       ></div>
     </div>
@@ -494,6 +501,9 @@ const WidgetDemoBySlug: React.FC = () => {
     container.id = 'gutschein-widget';
     container.setAttribute('data-slug', widgetSlug);
     container.setAttribute('data-theme', 'auto');
+    if (demoTemplate?.gutscheinAnzeige) {
+      container.setAttribute('data-anzeige', demoTemplate.gutscheinAnzeige);
+    }
     if (isProspectDemo) {
       container.setAttribute('data-demo-mode', '1');
       container.setAttribute('data-demo-label', displaySlug);
@@ -776,6 +786,8 @@ const WidgetDemoBySlug: React.FC = () => {
   const originalHTML = (() => {
     if (demoTemplate?.demoHtml) {
       const rawTemplate = demoTemplate.demoHtml.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
+      const sanitizedTemplate = sanitizeCrossOriginFontFaces(rawTemplate);
+      const normalizedTemplate = normalizeRelativeAssetUrls(sanitizedTemplate, demoTemplate.websiteUrl);
       
       // Debug: Log if bildURL is missing
       if (!demoTemplate.bildURL && demoTemplate.demoHtml.includes('{{BILD_URL}}')) {
@@ -784,19 +796,19 @@ const WidgetDemoBySlug: React.FC = () => {
 
       // Always use raw template to match actual customer site exactly.
       // No cleanup, normalization, or auto-hero injection in any mode.
-      if (rawTemplate.includes('{{WIDGET_IFRAME}}')) {
-        return rawTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetLoaderMarkup);
+      if (sanitizedTemplate.includes('{{WIDGET_IFRAME}}')) {
+        return normalizedTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetLoaderMarkup);
       }
 
-      if (containsWidgetMarkup(rawTemplate)) {
-        return rawTemplate;
+      if (containsWidgetMarkup(sanitizedTemplate)) {
+        return normalizedTemplate;
       }
 
-      return `${rawTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetLoaderMarkup}</div></section>`;
+      return `${normalizedTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetLoaderMarkup}</div></section>`;
     }
 
     if (demoTemplate) {
-      return generatedDemoHtml;
+      return normalizeRelativeAssetUrls(generatedDemoHtml, demoTemplate.websiteUrl);
     }
 
     return defaultHTML;
@@ -1752,7 +1764,7 @@ const WidgetDemoBySlug: React.FC = () => {
     if (!exportHtml) return;
     try {
       const cleanedHtml = stripLayoutEditorArtifacts(exportHtml);
-      const normalizedHtml = normalizeRelativeAssetUrls(cleanedHtml);
+      const normalizedHtml = normalizeRelativeAssetUrls(cleanedHtml, demoTemplate?.websiteUrl);
       await navigator.clipboard.writeText(normalizedHtml);
       setCopyState('HTML kopiert');
       window.setTimeout(() => setCopyState(''), 1800);
@@ -1776,7 +1788,7 @@ const WidgetDemoBySlug: React.FC = () => {
     try {
       setIsSavingHtml(true);
       const cleanedHtml = stripLayoutEditorArtifacts(exportHtml);
-      const normalizedHtml = normalizeRelativeAssetUrls(cleanedHtml);
+      const normalizedHtml = normalizeRelativeAssetUrls(cleanedHtml, demoTemplate?.websiteUrl);
       await updateDoc(doc(db, 'demos', demoDocId), {
         demoHtml: normalizedHtml,
         updatedAt: new Date().toISOString(),

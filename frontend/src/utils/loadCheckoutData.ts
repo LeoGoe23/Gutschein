@@ -59,8 +59,8 @@ export interface CheckoutData {
   Provision: number;
   // KORRIGIERT: Positionen sind jetzt DIREKTE PIXEL-WERTE
   designConfig?: {
-    betrag: { x: number; y: number; size: number }; // x,y = Pixel (absolut)
-    code: { x: number; y: number; size: number };   // x,y = Pixel (absolut)
+    betrag: { x: number; y: number; size: number; width?: number; color?: string }; // x,y = Pixel (absolut)
+    code: { x: number; y: number; size: number; width?: number; color?: string };   // x,y = Pixel (absolut)
   };
   widgetConfig: WidgetConfig;
 }

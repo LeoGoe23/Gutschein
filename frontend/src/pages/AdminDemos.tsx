@@ -2,7 +2,7 @@ import { Box, Typography, Paper, Button, TextField, Switch, FormControlLabel, Li
 import { Add, Edit, Delete, CloudUpload, Image, ContentCopy, OpenInNew } from '@mui/icons-material';
 import TopLeftLogo from '../components/home/TopLeftLogo';
 import TopBar from '../components/home/TopBar';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../auth/useAuth';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
@@ -13,8 +13,10 @@ interface DemoData {
   id?: string;
   name: string;
   bildURL: string;
+  websiteUrl?: string; // Kundenwebsite-URL für relative Asset-Pfade
   demoHtml?: string;
   customValue: boolean;
+  gutscheinAnzeige?: 'einzeln' | 'kategorie'; // 'paket' wird zu 'kategorie'
   rabattcodes: RabattCode[];
   dienstleistungen: Array<{
     shortDesc: string;
@@ -53,6 +55,10 @@ interface CheckoutSource {
   slug: string;
   name: string;
 }
+
+type DienstleistungEntry = DemoData['dienstleistungen'][number];
+
+const SINGLE_VOUCHER_GROUP = 'Einzelgutscheine';
 
 const sanitizeForFirestore = (value: any): any => {
   if (value === undefined) return undefined;
@@ -182,8 +188,10 @@ export default function AdminDemosPage() {
   const [formData, setFormData] = useState<DemoData>({
     name: '',
     bildURL: '',
+    websiteUrl: '',
     demoHtml: '',
     customValue: false,
+    gutscheinAnzeige: 'einzeln',
     rabattcodes: [],
     dienstleistungen: [],
     slug: '',
@@ -242,8 +250,10 @@ export default function AdminDemosPage() {
           id: doc.id,
           name: rawData.name || '',
           bildURL: rawData.bildURL || '',
+          websiteUrl: rawData.websiteUrl || '',
           demoHtml: rawData.demoHtml || '',
           customValue: Boolean(rawData.customValue),
+          gutscheinAnzeige: rawData.gutscheinAnzeige === 'paket' ? 'kategorie' : (rawData.gutscheinAnzeige || 'einzeln'),
           rabattcodes: Array.isArray(rawData.rabattcodes) ? rawData.rabattcodes : [],
           dienstleistungen: Array.isArray(rawData.dienstleistungen) ? rawData.dienstleistungen : [],
           slug: rawData.slug || '',
@@ -309,8 +319,47 @@ export default function AdminDemosPage() {
   };
 
   const normalizedProspectSlug = generateSlug(prospectSlugInput.trim());
+
+  const availableCategories = useMemo(() => {
+    const uniqueCategories = new Set<string>();
+
+    formData.dienstleistungen.forEach((dienstleistung) => {
+      const category = (dienstleistung.kategorie || '').trim();
+      if (category) uniqueCategories.add(category);
+    });
+
+    return Array.from(uniqueCategories).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [formData.dienstleistungen]);
+
+  const groupedDienstleistungen = useMemo(() => {
+    const groups = new Map<string, Array<{ dienstleistung: DienstleistungEntry; index: number }>>();
+
+    formData.dienstleistungen.forEach((dienstleistung, index) => {
+      const category = (dienstleistung.kategorie || '').trim() || SINGLE_VOUCHER_GROUP;
+      if (!groups.has(category)) {
+        groups.set(category, []);
+      }
+      groups.get(category)!.push({ dienstleistung, index });
+    });
+
+    return Array.from(groups.entries()).sort((a, b) => {
+      if (a[0] === SINGLE_VOUCHER_GROUP) return -1;
+      if (b[0] === SINGLE_VOUCHER_GROUP) return 1;
+      return a[0].localeCompare(b[0], 'de');
+    });
+  }, [formData.dienstleistungen]);
+  
+  // Use production domain for demo links (even in local development)
+  // Falls über const API_URL (braucht auch PUBLIC_URL)
+  const PUBLIC_URL = process.env.REACT_APP_PUBLIC_URL || 'https://gutscheinery.de';
+  
+  const getBaseDemoUrl = () => {
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isDev ? PUBLIC_URL : window.location.origin;
+  };
+  
   const prospectDemoUrl = normalizedProspectSlug
-    ? `${window.location.origin}/widgetdemo/${encodeURIComponent(normalizedProspectSlug)}`
+    ? `${getBaseDemoUrl()}/widgetdemo/${encodeURIComponent(normalizedProspectSlug)}`
     : '';
 
   const ensureUniqueDemoSlug = (baseSlug: string) => {
@@ -401,6 +450,7 @@ export default function AdminDemosPage() {
       const importedName = checkout.Unternehmensname || userData.Unternehmensdaten?.Unternehmensname || '';
       const importedImage = checkout.BildURL || '';
       const importedCustomValue = Boolean(checkout.Freibetrag);
+      const importedGutscheinAnzeige = (checkout as any).gutscheinAnzeige === 'paket' ? 'kategorie' : ((checkout as any).gutscheinAnzeige || 'einzeln');
       const importedDienstleistungen = mapCheckoutDienstleistungenToDemo(checkout.Gutscheinarten || {});
       const importedSlug = ensureUniqueDemoSlug(`${(userData.slug || sourceSlug)}-demo`);
 
@@ -409,6 +459,7 @@ export default function AdminDemosPage() {
         name: importedName,
         bildURL: importedImage,
         customValue: importedCustomValue,
+        gutscheinAnzeige: importedGutscheinAnzeige,
         rabattcodes: prev.rabattcodes || [],
         dienstleistungen: importedDienstleistungen,
         slug: importedSlug,
@@ -453,6 +504,7 @@ export default function AdminDemosPage() {
       bildURL: '',
       demoHtml: '',
       customValue: false,
+      gutscheinAnzeige: 'einzeln',
       rabattcodes: [],
       dienstleistungen: [],
       slug: '',
@@ -716,6 +768,19 @@ export default function AdminDemosPage() {
       ...formData,
       dienstleistungen: formData.dienstleistungen.filter((_, i) => i !== index)
     });
+  };
+
+  const updateDienstleistungCategory = (index: number, category: string) => {
+    const normalizedCategory = category.trim();
+
+    setFormData((prev) => ({
+      ...prev,
+      dienstleistungen: prev.dienstleistungen.map((dienstleistung, i) =>
+        i === index
+          ? { ...dienstleistung, kategorie: normalizedCategory || undefined }
+          : dienstleistung
+      ),
+    }));
   };
 
   const addRabattCode = () => {
@@ -1033,6 +1098,14 @@ export default function AdminDemosPage() {
             />
 
             <TextField
+              label="Kundenwebsite-URL"
+              value={formData.websiteUrl || ''}
+              onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value.trim() })}
+              placeholder="https://meggywoll.de"
+              helperText="Website-URL des Kunden - wird verwendet um relative Bild-Pfade korrekt aufzulösen"
+            />
+
+            <TextField
               label="HTML-Code der grossen Seite (optional)"
               value={formData.demoHtml || ''}
               onChange={(e) => setFormData({ ...formData, demoHtml: e.target.value })}
@@ -1168,6 +1241,16 @@ export default function AdminDemosPage() {
               label="Freier Betrag erlaubt"
             />
 
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.gutscheinAnzeige === 'kategorie'}
+                  onChange={(e) => setFormData({ ...formData, gutscheinAnzeige: e.target.checked ? 'kategorie' : 'einzeln' })}
+                />
+              }
+              label="Gutscheine als Paket anzeigen"
+            />
+
             <Typography variant="h6">Rabattcodes (Demo)</Typography>
             <Box sx={{ border: '1px dashed #ccc', p: 2, borderRadius: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 2 }}>
@@ -1299,6 +1382,9 @@ export default function AdminDemosPage() {
             {/* Neue Dienstleistung hinzufügen */}
             <Box sx={{ border: '1px dashed #ccc', p: 2, borderRadius: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 2 }}>Neue Dienstleistung hinzufügen:</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                Leer lassen = Einzelgutschein. Gleiche Kategorienamen werden später automatisch zusammengefasst.
+              </Typography>
               <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                 <TextField
                   label="Kurzbeschreibung"
@@ -1327,7 +1413,7 @@ export default function AdminDemosPage() {
                   value={newDienstleistung.kategorie || ''}
                   onChange={(e) => setNewDienstleistung({ ...newDienstleistung, kategorie: e.target.value })}
                   size="small"
-                  sx={{ flex: '1 1 220px' }}
+                  sx={{ flex: '1 1 260px' }}
                 />
                 <Button 
                   variant="contained" 
@@ -1342,38 +1428,89 @@ export default function AdminDemosPage() {
             {/* Liste der Dienstleistungen */}
             {formData.dienstleistungen.length > 0 && (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Aktuelle Dienstleistungen:</Typography>
-                {formData.dienstleistungen.map((dienst, index) => (
-                  <Box key={index} sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    p: 2, 
-                    border: '1px solid #eee', 
-                    borderRadius: 2, 
-                    mb: 1,
-                    backgroundColor: '#fafafa'
-                  }}>
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>
-                        {dienst.shortDesc} - {dienst.price}€
-                      </Typography>
-                      {dienst.kategorie && (
-                        <Typography variant="caption" color="primary" sx={{ display: 'block', mb: 0.25 }}>
-                          Kategorie: {dienst.kategorie}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 2, mb: 1 }}>
+                  <Typography variant="subtitle2">Aktuelle Dienstleistungen:</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {availableCategories.length > 0
+                      ? `${availableCategories.length} Kategorien + Einzelgutscheine`
+                      : 'Nur Einzelgutscheine'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {groupedDienstleistungen.map(([category, items]) => (
+                    <Box
+                      key={category}
+                      sx={{
+                        p: 2,
+                        border: '1px solid #eee',
+                        borderRadius: 2,
+                        backgroundColor: category === SINGLE_VOUCHER_GROUP ? '#fafafa' : '#f8fbff',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                        <Typography variant="body2" fontWeight={700}>
+                          {category}
                         </Typography>
-                      )}
-                      {dienst.longDesc && (
                         <Typography variant="caption" color="text.secondary">
-                          {dienst.longDesc}
+                          {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'}
                         </Typography>
-                      )}
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {items.map(({ dienstleistung, index }) => (
+                          <Box
+                            key={`${category}-${index}`}
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: 2,
+                              p: 1.5,
+                              border: '1px solid #f0f0f0',
+                              borderRadius: 2,
+                              backgroundColor: '#fff',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={600}>
+                                {dienstleistung.shortDesc} - {dienstleistung.price}€
+                              </Typography>
+                              {dienstleistung.longDesc && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                  {dienstleistung.longDesc}
+                                </Typography>
+                              )}
+                            </Box>
+
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <TextField
+                                select
+                                size="small"
+                                label="Kategorie"
+                                value={dienstleistung.kategorie || ''}
+                                onChange={(e) => updateDienstleistungCategory(index, e.target.value)}
+                                sx={{ minWidth: 220 }}
+                              >
+                                <MenuItem value="">Einzelgutschein</MenuItem>
+                                {availableCategories.map((categoryName) => (
+                                  <MenuItem key={categoryName} value={categoryName}>
+                                    {categoryName}
+                                  </MenuItem>
+                                ))}
+                              </TextField>
+
+                              <IconButton size="small" onClick={() => removeDienstleistung(index)} color="error">
+                                <Delete />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
                     </Box>
-                    <IconButton size="small" onClick={() => removeDienstleistung(index)} color="error">
-                      <Delete />
-                    </IconButton>
-                  </Box>
-                ))}
+                  ))}
+                </Box>
               </Box>
             )}
 
