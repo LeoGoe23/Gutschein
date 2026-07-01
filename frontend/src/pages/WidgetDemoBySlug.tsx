@@ -776,6 +776,11 @@ const WidgetDemoBySlug: React.FC = () => {
   const originalHTML = (() => {
     if (demoTemplate?.demoHtml) {
       const rawTemplate = demoTemplate.demoHtml.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
+      
+      // Debug: Log if bildURL is missing
+      if (!demoTemplate.bildURL && demoTemplate.demoHtml.includes('{{BILD_URL}}')) {
+        console.warn('⚠️ bildURL nicht gefunden! Template hat {{BILD_URL}} Placeholder, aber keine URL gespeichert.');
+      }
 
       // Always use raw template to match actual customer site exactly.
       // No cleanup, normalization, or auto-hero injection in any mode.
