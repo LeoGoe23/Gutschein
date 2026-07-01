@@ -775,30 +775,19 @@ const WidgetDemoBySlug: React.FC = () => {
 
   const originalHTML = (() => {
     if (demoTemplate?.demoHtml) {
-      const cleanedTemplate = stripLayoutEditorArtifacts(demoTemplate.demoHtml);
-      const normalizedTemplate = normalizeRelativeAssetUrls(cleanedTemplate);
-      const fontSafeTemplate = sanitizeCrossOriginFontFaces(normalizedTemplate);
-      const withImage = fontSafeTemplate.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
+      const rawTemplate = demoTemplate.demoHtml.replaceAll('{{BILD_URL}}', demoTemplate.bildURL || '');
 
-      let enhancedTemplate = withImage;
-      if (demoTemplate.bildURL && !hasMainHeroImage(withImage)) {
-        enhancedTemplate = `
-          <section class="demo-auto-hero" style="position: relative; min-height: 46vh; background-image: url('${demoTemplate.bildURL}'); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;">
-            <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.18), rgba(15,23,42,0.46));"></div>
-            <h1 style="position: relative; z-index: 1; color: #fff; margin: 0; padding: 24px; text-align: center; font-size: clamp(2rem, 5vw, 4rem); line-height: 1.08; text-shadow: 0 8px 24px rgba(0,0,0,0.38);">${demoTemplate?.name || displaySlug}</h1>
-          </section>
-        ${withImage}`;
+      // Always use raw template to match actual customer site exactly.
+      // No cleanup, normalization, or auto-hero injection in any mode.
+      if (rawTemplate.includes('{{WIDGET_IFRAME}}')) {
+        return rawTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetLoaderMarkup);
       }
 
-      if (enhancedTemplate.includes('{{WIDGET_IFRAME}}')) {
-        return enhancedTemplate.replaceAll('{{WIDGET_IFRAME}}', widgetLoaderMarkup);
+      if (containsWidgetMarkup(rawTemplate)) {
+        return rawTemplate;
       }
 
-      if (containsWidgetMarkup(enhancedTemplate)) {
-        return enhancedTemplate;
-      }
-
-      return `${enhancedTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetLoaderMarkup}</div></section>`;
+      return `${rawTemplate}\n<section class="gutschein-section"><div class="gutschein-container">${widgetLoaderMarkup}</div></section>`;
     }
 
     if (demoTemplate) {
